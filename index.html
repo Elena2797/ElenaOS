@@ -573,9 +573,9 @@ function areaView() {
       cats[c]=(cats[c]||0)+parseFloat(t.amount||0);
     });
     const catList=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
-    const catColors={'Comida':'#E8734A','Transporte':'#185FA5','Ocio':'#7C3AED','Ropa':'#DB2777','Salud':'#0F6E56','Suscripciones':'#854F0B','Transferencias':'#6B7280','Otros':'#9CA3AF','Gym':'#16A34A'};
+    const catColors={'Comida':'#E8734A','Transporte':'#185FA5','Ocio':'#7C3AED','Ropa':'#DB2777','Salud':'#0F6E56','Suscripciones':'#854F0B','Transferencias':'#6B7280','Otros':'#9CA3AF','Hogar':'#0369A1','Jaime':'#BE185D','Familia':'#B45309','Belleza':'#9333EA','Amigas':'#0891B2','Viajes':'#059669','Ahorro':'#16A34A'};
 
-    const categories=['Comida','Transporte','Ocio','Ropa','Salud','Suscripciones','Transferencias','Gym','Ahorro','Otros'];
+    const categories=['Comida','Hogar','Transporte','Ocio','Ropa','Salud','Suscripciones','Belleza','Amigas','Jaime','Familia','Viajes','Ahorro','Transferencias','Otros'];
 
     return `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
