@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1a1a1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Life OS">
+<link rel="manifest" href="manifest.json">
+<title>Life OS</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#f5f5f2;
+  --surface:#fff;
+  --border:rgba(0,0,0,0.08);
+  --text:#1a1a1a;
+  --t2:#6b6b6b;
+  --t3:#b0b0b0;
+  --urgent-bg:#FCEBEB;--urgent:#A32D2D;
+  --warn-bg:#FAEEDA;--warn:#854F0B;
+  --ok-bg:#E1F5EE;--ok:#085041;
+  --info-bg:#EEEDFE;--info:#534AB7;
+  --r:14px;--r-sm:10px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;overscroll-behavior:none}
+#app{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh}
+
+/* Topbar */
+#topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{font-size:16px;font-weight:700;letter-spacing:0.03em}
+.topbar-r{display:flex;align-items:center;gap:10px}
+.mode-pill{font-size:11px;font-weight:700;padding:5px 12px;border-radius:999px;cursor:pointer;user-select:none;border:none;letter-spacing:0.04em}
+.m-on{background:var(--warn-bg);color:var(--warn)}
+.m-off{background:var(--ok-bg);color:var(--ok)}
+.topdate{font-size:12px;color:var(--t3)}
+
+/* Main */
+#main{flex:1;padding:14px 16px 100px;max-width:500px;margin:0 auto;width:100%}
+
+/* Bottom nav */
+#nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:100}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0 8px;border:none;background:none;color:var(--t3);font-size:10px;gap:3px;cursor:pointer;font-family:inherit}
+.nb i{font-size:22px}
+.nb.on{color:var(--text)}
+
+/* FAB */
+.fab{position:fixed;bottom:80px;right:18px;width:52px;height:52px;border-radius:50%;background:var(--text);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:99}
+.fab i{color:#fff;font-size:26px}
+.fab:active{transform:scale(0.95)}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+.card-head{padding:11px 14px 9px;display:flex;align-items:center;gap:8px}
+.ch-icon{font-size:15px}
+.ch-label{font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--t2)}
+.ch-count{margin-left:auto;font-size:12px;color:var(--t3);background:var(--bg);padding:2px 7px;border-radius:999px}
+
+/* Items */
+.item{padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.item:active{background:var(--bg)}
+.chk{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;background:none}
+.chk:active{background:var(--bg)}
+.item-txt{flex:1;font-size:14px;color:var(--text)}
+.avoiding .item-txt{color:var(--t3);text-decoration:line-through}
+.pill{font-size:10px;font-weight:600;padding:3px 8px;border-radius:999px;flex-shrink:0;white-space:nowrap}
+.p-urg{background:var(--urgent-bg);color:var(--urgent)}
+.p-warn{background:var(--warn-bg);color:var(--warn)}
+.p-gray{background:var(--bg);color:var(--t2)}
+
+/* Waiting */
+.wf-item{padding:10px 14px;border-top:1px solid var(--border)}
+.wf-t{font-size:14px;font-weight:500}
+.wf-s{font-size:12px;color:var(--t2);margin-top:2px}
+
+/* Empty */
+.empty{padding:16px 14px;font-size:13px;color:var(--t3);text-align:center}
+
+/* Context bar */
+.ctx{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--t2);display:flex;align-items:center;gap:8px}
+.ctx i{font-size:15px;flex-shrink:0}
+
+/* Areas grid */
+.ag{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ac{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;cursor:pointer}
+.ac:active{background:var(--bg)}
+.ac-name{font-size:14px;font-weight:600;margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.ac-count{font-size:12px;color:var(--t3)}
+
+/* Page header */
+.ph{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.ph h2{font-size:18px;font-weight:700}
+.back{background:none;border:none;font-size:26px;cursor:pointer;color:var(--text);padding:0;line-height:1}
+
+/* Modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;display:flex;align-items:flex-end}
+.modal{background:var(--surface);border-radius:var(--r) var(--r) 0 0;padding:20px 16px;width:100%;padding-bottom:calc(20px + env(safe-area-inset-bottom));animation:slideup 0.2s ease}
+@keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal h3{font-size:17px;font-weight:700;margin-bottom:16px}
+.fi{width:100%;padding:13px 12px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:15px;margin-bottom:10px;background:var(--bg);color:var(--text);font-family:inherit;outline:none}
+.fi:focus{border-color:var(--text)}
+.ma{display:flex;gap:8px;margin-top:4px}
+.btn{flex:1;padding:13px;border-radius:var(--r-sm);font-size:15px;font-weight:600;border:1.5px solid var(--border);cursor:pointer;font-family:inherit}
+.btn:active{opacity:0.8}
+.btn-p{background:var(--text);color:#fff;border-color:var(--text)}
+.btn-s{background:var(--surface);color:var(--text)}
+
+/* PIN */
+.pin-screen{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px}
+.pin-logo{font-size:22px;font-weight:800;letter-spacing:0.04em}
+.pin-dots{display:flex;gap:14px}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);transition:background 0.15s}
+.pin-dot.filled{background:var(--text);border-color:var(--text)}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:240px}
+.pin-btn{height:64px;border-radius:16px;border:1.5px solid var(--border);background:var(--surface);font-size:22px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text)}
+.pin-btn:active{background:var(--bg)}
+.pin-err{font-size:13px;color:#A32D2D;height:18px}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.pin-shake{animation:shake 0.3s ease}
+
+/* Section title */
+.section-title{font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--t2);margin:20px 0 8px 2px}
+
+/* Chat overlay */
+.chat-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;display:flex;align-items:flex-end}
+.chat-panel{background:var(--surface);border-radius:20px 20px 0 0;width:100%;height:78vh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom);animation:slideup 0.25s ease}
+.chat-ph{padding:14px 16px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0}
+.chat-msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:12px 16px}
+.chat-input-row{display:flex;gap:8px;padding:10px 16px;border-top:1px solid var(--border);flex-shrink:0;align-items:center}
+.chat-attach{width:38px;height:38px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--t2)}
+.msg-u{align-self:flex-end;background:var(--text);color:#fff;border-radius:18px 18px 4px 18px;padding:10px 14px;font-size:14px;max-width:85%;word-break:break-word;white-space:pre-wrap}
+.msg-a{align-self:flex-start;background:var(--bg);border:1px solid var(--border);border-radius:18px 18px 18px 4px;padding:10px 14px;font-size:14px;max-width:85%;word-break:break-word;white-space:pre-wrap}
+.msg-loading{align-self:flex-start;color:var(--t3);font-size:13px;font-style:italic;padding:4px 2px}
+.fab-chat{position:fixed;bottom:80px;left:18px;width:52px;height:52px;border-radius:50%;background:#534AB7;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:99}
+.fab-chat i{color:#fff;font-size:22px}
+.fab-chat:active{transform:scale(0.95)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <span class="logo">Life OS</span>
+    <div class="topbar-r">
+      <span class="topdate" id="td"></span>
+      <button class="mode-pill m-off" id="mp" onclick="toggleMode()">OFF</button>
+    </div>
+  </div>
+  <div id="main"><p class="empty">Cargando...</p></div>
+  <nav id="nav">
+    <button class="nb on" id="nb-home" onclick="go('home')"><i class="ti ti-home"></i>Inicio</button>
+    <button class="nb" id="nb-areas" onclick="go('areas')"><i class="ti ti-layout-grid"></i>Áreas</button>
+    <button class="nb" id="nb-global" onclick="go('global')"><i class="ti ti-circle-dotted"></i>Global</button>
+  </nav>
+  <button class="fab" onclick="openAdd()"><i class="ti ti-plus"></i></button>
+  <button class="fab-chat" onclick="openChat()"><i class="ti ti-message-circle"></i></button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const PIN = '1965';
+let pinVal = '';
+
+function showPin() {
+  if (sessionStorage.getItem('unlocked') === '1') { initApp(); return; }
+  const el = document.createElement('div');
+  el.className = 'pin-screen'; el.id = 'pin-screen';
+  el.innerHTML = `
+    <div class="pin-logo">Life OS</div>
+    <div class="pin-dots" id="pin-dots">
+      ${[0,1,2,3].map(i=>`<div class="pin-dot" id="pd${i}"></div>`).join('')}
+    </div>
+    <div class="pin-err" id="pin-err"></div>
+    <div class="pin-pad">
+      ${[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(n=>`<button class="pin-btn" onclick="pinPress('${n}')">${n}</button>`).join('')}
+    </div>`;
+  document.body.appendChild(el);
+}
+
+function pinPress(v) {
+  if (v === '') return;
+  if (v === '⌫') { pinVal = pinVal.slice(0,-1); }
+  else if (pinVal.length < 4) { pinVal += v; }
+  [0,1,2,3].forEach(i => {
+    const d = document.getElementById('pd'+i);
+    if(d) d.className = 'pin-dot' + (i < pinVal.length ? ' filled' : '');
+  });
+  if (pinVal.length === 4) {
+    if (pinVal === PIN) {
+      sessionStorage.setItem('unlocked','1');
+      document.getElementById('pin-screen')?.remove();
+      initApp();
+    } else {
+      const dots = document.getElementById('pin-dots');
+      if(dots){ dots.classList.add('pin-shake'); setTimeout(()=>dots.classList.remove('pin-shake'),300); }
+      const err = document.getElementById('pin-err');
+      if(err) err.textContent = 'PIN incorrecto';
+      pinVal = '';
+      setTimeout(()=>{ [0,1,2,3].forEach(i=>{ const d=document.getElementById('pd'+i); if(d) d.className='pin-dot'; }); if(err) err.textContent=''; }, 600);
+    }
+  }
+}
+</script>
+<script>
+const URL_ = 'https://cllubptdwydifomlnxds.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsbHVicHRkd3lkaWZvbWxueGRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMDE1MTksImV4cCI6MjA5Nzg3NzUxOX0.jh_OJLmixJAYSmh0GdtxMszNMZCqBZVLkNGFQoG1MhI';
+
+let db, S = { mode:'OFF', view:'home', areaId:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], pendingImage:null, transactions:[], finMonth: new Date().toISOString().slice(0,7) };
+
+async function initApp() {
+  db = supabase.createClient(URL_, KEY_);
+  const now = new Date();
+  document.getElementById('td').textContent = now.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
+  await reload();
+  render();
+}
+
+async function reload() {
+  try {
+    const [c,a,t,w,d,m,op,tr] = await Promise.all([
+      db.from('life_context').select('*').order('created_at',{ascending:false}).limit(1),
+      db.from('areas').select('*').order('sort_order'),
+      db.from('tasks').select('*,areas(name,color)').neq('status','done'),
+      db.from('waiting_for').select('*,areas(name,color)').eq('status','active'),
+      db.from('decisions').select('*,areas(name,color)').eq('status','open'),
+      db.from('metrics').select('*'),
+      db.from('operators').select('*').order('created_at'),
+      db.from('transactions').select('*').order('date',{ascending:false})
+    ]);
+    if(c.data&&c.data[0]) S.mode=c.data[0].mode;
+    S.areas=a.data||[]; S.tasks=t.data||[]; S.wf=w.data||[]; S.dec=d.data||[];
+    S.metrics=m.data||[]; S.operators=op.data||[]; S.transactions=tr.data||[];
+  } catch(e){ console.error(e); }
+}
+
+function render() {
+  ['home','areas','global'].forEach(v=>{
+    document.getElementById('nb-'+v).className='nb'+(S.view===v||(S.view==='area'&&v==='areas')?' on':'');
+  });
+  const mp=document.getElementById('mp');
+  mp.textContent=S.mode; mp.className='mode-pill '+(S.mode==='ON'?'m-on':'m-off');
+  const views={home:homeView,areas:areasView,area:areaView,global:globalView};
+  document.getElementById('main').innerHTML=(views[S.view]||homeView)();
+}
+
+function homeView() {
+  const now=Date.now();
+  const filtered=S.tasks.filter(t=>!t.suitable_modes||t.suitable_modes.includes(S.mode));
+  const importa=filtered.filter(t=>t.horizon==='today'||t.priority==='critical'||(t.due_date&&new Date(t.due_date)<=new Date(now+8*864e5)));
+  const olv=filtered.filter(t=>{
+    const d=(now-new Date(t.updated_at||t.created_at))/(864e5);
+    return d>3&&t.status==='pending'&&!importa.find(i=>i.id===t.id);
+  });
+  const evit=S.tasks.filter(t=>t.status==='avoiding');
+  const ctx=S.mode==='ON'?'Modo ON · energía limitada · solo lo urgente e ineludible':'Modo OFF · construcción · '+S.wf.length+' en espera · '+S.dec.length+' decisiones abiertas';
+
+  return `
+  <div class="ctx"><i class="ti ti-info-circle"></i>${ctx}</div>
+  ${section('⚡','Qué importa hoy',importa.map(t=>taskEl(t)).join('')||empty('Todo bajo control'))}
+  ${section('🔔','Qué estás olvidando',olv.map(t=>taskEl(t)).join('')||empty('Nada olvidado'))}
+  ${section('⚠️','Qué estás evitando',evit.map(t=>taskEl(t,true)).join('')||empty('Sin bloqueos — bien'))}
+  ${section('❓','Decisiones pendientes',S.dec.map(decEl).join('')||empty('Sin decisiones abiertas'))}
+  ${section('⏳','Esperando respuesta de',S.wf.map(wfEl).join('')||empty('Sin elementos esperando'))}`;
+}
+
+function areasView() {
+  const cnt={};
+  S.tasks.forEach(t=>{if(t.area_id)cnt[t.area_id]=(cnt[t.area_id]||0)+1});
+  return `<div class="ag">${S.areas.map(a=>`
+    <div class="ac" onclick="go('area','${a.id}')">
+      <div class="ac-name"><span class="dot" style="background:${a.color}"></span>${a.name}</div>
+      <div class="ac-count">${cnt[a.id]||0} pendientes</div>
+    </div>`).join('')}</div>`;
+}
+
+function areaView() {
+  const a=S.areas.find(x=>x.id===S.areaId);
+  if(!a) return '';
+  const ts=S.tasks.filter(t=>t.area_id===a.id);
+  const ws=S.wf.filter(w=>w.area_id===a.id);
+  const ds=S.dec.filter(d=>d.area_id===a.id);
+  const isVJ=a.name==='VistaJet';
+  const isJETMI=a.name==='JETMI';
+  const isFin=a.name==='Finanzas';
+  const isSalud=a.name==='Salud';
+  const isGym=a.name==='Gym';
+  const isMarca=a.name==='Marca Personal';
+  const isVida=a.name==='Vida Personal';
+
+  const vjTools=isVJ?`
+  <div class="card" style="margin-bottom:10px">
+    <div class="card-head"><span class="ch-icon">✈️</span><span class="ch-label">Herramientas</span></div>
+    <a href="/ch-tools.html" style="display:flex;align-items:center;gap:12px;padding:14px;text-decoration:none;color:var(--text)">
+      <div style="width:40px;height:40px;border-radius:10px;background:#854F0B18;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📋</div>
+      <div>
+        <div style="font-size:14px;font-weight:600">CH Tools</div>
+        <div style="font-size:12px;color:var(--t2);margin-top:2px">HO/TO · Inventario por avión</div>
+      </div>
+      <i class="ti ti-chevron-right" style="margin-left:auto;color:var(--t3)"></i>
+    </a>
+  </div>`:'';
+
+  const jetmiView=isJETMI?()=>{
+    const m=S.metrics.filter(x=>x.area_id===a.id);
+    const mv=k=>m.find(x=>x.key===k);
+    const ops=S.operators;
+    const statusColor={contacted:'#534AB7',active:'#0F6E56',identified:'#6b6b6b',declined:'#A32D2D'};
+    const statusLabel={contacted:'Contactado',active:'Activo ✓',identified:'Identificado',declined:'Descartado'};
+    const metricsHtml=m.length?`
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">📊</span><span class="ch-label">Métricas clave</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)">
+        ${m.map(x=>`
+        <div style="background:var(--surface);padding:14px 12px">
+          <div style="font-size:22px;font-weight:700;color:var(--text)">${x.value}<span style="font-size:12px;color:var(--t2);font-weight:400"> ${x.unit}</span></div>
+          <div style="font-size:11px;color:var(--t2);margin-top:2px">${x.label}</div>
+          ${x.target?`<div style="font-size:10px;color:var(--t3);margin-top:1px">objetivo: ${x.target}</div>`:''}
+        </div>`).join('')}
+      </div>
+    </div>`:'';
+
+    const statusBanner=`
+    <div style="background:#FAEEDA;border-radius:var(--r-sm);padding:10px 12px;margin-bottom:10px;font-size:12px;color:#854F0B;display:flex;align-items:center;gap:8px">
+      <i class="ti ti-alert-triangle" style="font-size:15px;flex-shrink:0"></i>
+      <span>Pre-revenue · Bloqueado por constitución legal pendiente</span>
+    </div>`;
+
+    const opsHtml=ops.length?`
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">🤝</span><span class="ch-label">Operadores</span><span class="ch-count">${ops.filter(o=>o.status==='active').length} activos</span></div>
+      ${ops.map(o=>`
+      <div class="item" style="align-items:flex-start;padding:12px 14px">
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:600">${o.name}</div>
+          ${o.notes?`<div style="font-size:12px;color:var(--t2);margin-top:2px">${o.notes}</div>`:''}
+          ${o.commission?`<div style="font-size:11px;color:var(--t3);margin-top:2px">Comisión: ${o.commission}</div>`:''}
+        </div>
+        <span class="pill" style="background:${statusColor[o.status]||'#888'}18;color:${statusColor[o.status]||'#888'};margin-top:2px">${statusLabel[o.status]||o.status}</span>
+      </div>`).join('')}
+    </div>`:'';
+
+    return statusBanner+metricsHtml+opsHtml;
+  }:'';
+
+  const vidaView=isVida?()=>{
+    const m=S.metrics.filter(x=>x.area_id===a.id);
+    const get=k=>m.find(x=>x.key===k);
+    const cannabis=get('dias_sin_cannabis');
+    const sueno=get('horas_sueno');
+    const rels=[
+      {name:'Jaime',status:'Pareja · conexión fuerte',icon:'❤️'},
+      {name:'Madre',status:'Cercana · apoyo clave',icon:'💛'},
+      {name:'Padre',status:'Melanoma · apoyo con límites',icon:'🧡'},
+    ];
+    const planes=[
+      {icon:'🇨🇳',label:'China',desc:'Hong Kong · Shenzhen · Chongqing · Guilin'},
+      {icon:'🇵🇹',label:'Portugal',desc:'Residencia fiscal norte Portugal — objetivo medio plazo'},
+    ];
+    const habitos=[
+      {label:'Cannabis',key:'cannabis',val:cannabis?cannabis.value:'0',objetivo:'Eliminar',color:cannabis&&parseInt(cannabis.value)>7?'#0F6E56':'#A32D2D'},
+      {label:'Sueño',key:'sueno',val:sueno?sueno.value:'—',objetivo:'8h',color:'#185FA5'},
+    ];
+    return `
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">🌱</span><span class="ch-label">Hábitos</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)">
+        <div style="background:var(--surface);padding:14px 12px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:${cannabis&&parseInt(cannabis.value)>7?'#0F6E56':cannabis&&parseInt(cannabis.value)>3?'#854F0B':'#A32D2D'}">${cannabis?cannabis.value:'0'}</div>
+          <div style="font-size:10px;color:var(--t2);margin-top:2px">días sin cannabis</div>
+          <button onclick="incHabito('dias_sin_cannabis')" style="margin-top:6px;padding:4px 10px;border-radius:6px;background:var(--bg);border:1px solid var(--border);font-size:11px;cursor:pointer">+1 día</button>
+        </div>
+        <div style="background:var(--surface);padding:14px 12px;text-align:center">
+          <div style="font-size:28px;font-weight:700">${sueno?sueno.value:'—'}<span style="font-size:14px;color:var(--t2);font-weight:400">h</span></div>
+          <div style="font-size:10px;color:var(--t2);margin-top:2px">sueño anoche</div>
+          <div style="display:flex;gap:4px;justify-content:center;margin-top:6px">
+            ${[6,7,8,9].map(h=>`<button onclick="setSueno(${h})" style="padding:3px 6px;border-radius:5px;border:1px solid ${sueno&&parseInt(sueno.value)===h?'var(--text)':'var(--border)'};background:${sueno&&parseInt(sueno.value)===h?'var(--text)':'var(--surface)'};color:${sueno&&parseInt(sueno.value)===h?'#fff':'var(--t2)'};font-size:10px;cursor:pointer">${h}h</button>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">👥</span><span class="ch-label">Relaciones</span></div>
+      ${rels.map(r=>`
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-top:1px solid var(--border)">
+        <span style="font-size:20px">${r.icon}</span>
+        <div>
+          <div style="font-size:14px;font-weight:600">${r.name}</div>
+          <div style="font-size:12px;color:var(--t2)">${r.status}</div>
+        </div>
+      </div>`).join('')}
+    </div>
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">✈️</span><span class="ch-label">Planes</span></div>
+      ${planes.map(p=>`
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-top:1px solid var(--border)">
+        <span style="font-size:22px">${p.icon}</span>
+        <div>
+          <div style="font-size:14px;font-weight:600">${p.label}</div>
+          <div style="font-size:12px;color:var(--t2)">${p.desc}</div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  }:'';
+
+  const marcaView=isMarca?()=>{
+    const m=S.metrics.filter(x=>x.area_id===a.id);
+    const get=k=>m.find(x=>x.key===k);
+    const posts=get('posts_semana');
+    const replies=get('replies_stories');
+    const saves=get('saves');
+    const diasSin=get('dias_sin_publicar');
+    const diasVal=diasSin?parseInt(diasSin.value):0;
+    const capas=[
+      {icon:'✈️',label:'ON duty — captura',desc:'Fotos, audios, notas. Sin publicar. Acumulas.'},
+      {icon:'📱',label:'OFF duty — publica',desc:'Procesa lo capturado. Máx. 3 stories/semana.'},
+      {icon:'📌',label:'Mensual — ancla',desc:'Una pieza de fondo. Conecta con tu posicionamiento.'},
+    ];
+    return `
+    <div style="background:#EEEDFE;border-radius:var(--r-sm);padding:10px 12px;margin-bottom:10px;font-size:12px;color:#534AB7;display:flex;align-items:center;gap:8px">
+      <i class="ti ti-info-circle" style="font-size:15px;flex-shrink:0"></i>
+      <span>Fase 0 · Instagram Stories primero · TikTok cuando tengas audiencia base</span>
+    </div>
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">📊</span><span class="ch-label">Métricas que importan</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)">
+        <div style="background:var(--surface);padding:14px 12px;text-align:center">
+          <div style="font-size:26px;font-weight:700;color:${posts&&parseInt(posts.value)>=3?'#993556':'#854F0B'}">${posts?posts.value:'0'}<span style="font-size:12px;color:var(--t2);font-weight:400"> / 3</span></div>
+          <div style="font-size:10px;color:var(--t2);margin-top:2px">posts esta semana</div>
+        </div>
+        <div style="background:var(--surface);padding:14px 12px;text-align:center">
+          <div style="font-size:26px;font-weight:700;color:${diasVal>5?'#A32D2D':diasVal>0?'#854F0B':'#0F6E56'}">${diasVal}</div>
+          <div style="font-size:10px;color:var(--t2);margin-top:2px">días sin publicar</div>
+        </div>
+        <div style="background:var(--surface);padding:14px 12px;text-align:center">
+          <div style="font-size:26px;font-weight:700">${replies?replies.value:'0'}</div>
+          <div style="font-size:10px;color:var(--t2);margin-top:2px">respuestas stories</div>
+        </div>
+        <div style="background:var(--surface);padding:14px 12px;text-align:center">
+          <div style="font-size:26px;font-weight:700">${saves?saves.value:'0'}</div>
+          <div style="font-size:10px;color:var(--t2);margin-top:2px">saves este mes</div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">🎯</span><span class="ch-label">Sistema de contenido</span></div>
+      ${capas.map(c=>`
+      <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-top:1px solid var(--border)">
+        <span style="font-size:20px">${c.icon}</span>
+        <div>
+          <div style="font-size:13px;font-weight:600">${c.label}</div>
+          <div style="font-size:12px;color:var(--t2);margin-top:2px">${c.desc}</div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  }:'';
+
+  const gymView=isGym?()=>{
+    const m=S.metrics.filter(x=>x.area_id===a.id);
+    const get=k=>m.find(x=>x.key===k);
+    const ses=get('sesiones_semana');
+    const dias=get('dias_ultima_sesion');
+    const prensa=get('prensa_kg');
+    const ext=get('extension_kg');
+    const sesVal=ses?parseInt(ses.value):0;
+    const ejercicios=[
+      {name:'Aductora',kg:'70',series:'3×10-15'},
+      {name:'Prensa 45°',kg:'120',series:'3×8'},
+      {name:'Smith squat',kg:'25-30/lado',series:'3×8'},
+      {name:'Extensión cuádriceps',kg:'80→85',series:'3×7'},
+      {name:'Curl inclinado 45°',kg:'7',series:'2×7'},
+    ];
+    const restricciones=['Sin back squat con barra','Sin peso muerto convencional','Sin RDL sin validación previa','Búlgaras solo con energía alta'];
+    return `
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">📊</span><span class="ch-label">Esta semana</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)">
+        <div style="background:var(--surface);padding:14px 12px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:${sesVal>=2?'#3B6D11':'#854F0B'}">${sesVal}<span style="font-size:14px;color:var(--t2);font-weight:400"> / 2</span></div>
+          <div style="font-size:10px;color:var(--t2);margin-top:2px">sesiones</div>
+          <div style="display:flex;gap:4px;justify-content:center;margin-top:6px">
+            ${[1,2].map(n=>`<div style="width:28px;height:6px;border-radius:3px;background:${sesVal>=n?'#3B6D11':'var(--border)'}"></div>`).join('')}
+          </div>
+        </div>
+        <div style="background:var(--surface);padding:14px 12px;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:${dias&&parseInt(dias.value)>7?'#A32D2D':dias&&parseInt(dias.value)>4?'#854F0B':'#3B6D11'}">${dias?dias.value:'—'}</div>
+          <div style="font-size:10px;color:var(--t2);margin-top:2px">días sin entrenar</div>
+        </div>
+      </div>
+      <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px">
+        <button onclick="regSesion()" style="flex:1;padding:10px;border-radius:8px;background:#3B6D11;color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer">✓ Registrar sesión hoy</button>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">🏋️</span><span class="ch-label">Pesos de referencia</span></div>
+      ${ejercicios.map(e=>`
+      <div style="display:flex;align-items:center;padding:10px 14px;border-top:1px solid var(--border)">
+        <span style="flex:1;font-size:13px">${e.name}</span>
+        <span style="font-size:12px;color:var(--t2);margin-right:10px">${e.series}</span>
+        <span style="font-size:13px;font-weight:700">${e.kg} kg</span>
+      </div>`).join('')}
+    </div>
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">⚠️</span><span class="ch-label">Restricciones</span></div>
+      ${restricciones.map(r=>`<div style="padding:9px 14px;border-top:1px solid var(--border);font-size:12px;color:#A32D2D;display:flex;gap:8px"><span>✗</span>${r}</div>`).join('')}
+    </div>`;
+  }:'';
+
+  const saludView=isSalud?()=>{
+    const m=S.metrics.filter(x=>x.area_id===a.id);
+    const get=k=>m.find(x=>x.key===k);
+    const dias=get('dias_sin_sintomas');
+    const dolor=get('dolor_hoy');
+    const itu=get('iti_año');
+    const meds=['Hiprex 1g (noche)','D-manosa diaria','Probióticos','Vitamina C','Cranberry PAC 36','NAC 600mg (noche)','L-glutamina','GABA + L-teanina + B6','Creatina'];
+    const conds=['Vejiga dolorosa (crónica)','HPV — seguimiento activo','Hernia lumbar + ciática','Escoliosis dorsolumbar','Posible endometriosis (sin confirmar)','Hiperreactividad respiratoria'];
+    return `
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">📊</span><span class="ch-label">Seguimiento</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border)">
+        <div style="background:var(--surface);padding:14px 10px;text-align:center">
+          <div style="font-size:26px;font-weight:700;color:#0F6E56">${dias?dias.value:'0'}</div>
+          <div style="font-size:10px;color:var(--t2);margin-top:2px">días sin síntomas</div>
+        </div>
+        <div style="background:var(--surface);padding:14px 10px;text-align:center">
+          <div style="font-size:26px;font-weight:700;color:${dolor&&parseInt(dolor.value)>3?'#A32D2D':dolor&&parseInt(dolor.value)>0?'#854F0B':'#0F6E56'}">${dolor?dolor.value:'0'}</div>
+          <div style="font-size:10px;color:var(--t2);margin-top:2px">dolor hoy (0-10)</div>
+        </div>
+        <div style="background:var(--surface);padding:14px 10px;text-align:center">
+          <div style="font-size:26px;font-weight:700">${itu?itu.value:'0'}</div>
+          <div style="font-size:10px;color:var(--t2);margin-top:2px">ITU este año</div>
+        </div>
+      </div>
+      <div style="padding:12px 14px;border-top:1px solid var(--border);display:flex;gap:8px">
+        ${[0,1,2,3,4,5,6,7,8,9,10].map(n=>`<button onclick="updateDolor(${n})" style="flex:1;padding:6px 2px;border-radius:6px;border:1.5px solid ${dolor&&parseInt(dolor.value)===n?'var(--text)':'var(--border)'};background:${dolor&&parseInt(dolor.value)===n?'var(--text)':'var(--surface)'};color:${dolor&&parseInt(dolor.value)===n?'#fff':'var(--t2)'};font-size:11px;font-weight:600;cursor:pointer">${n}</button>`).join('')}
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">💊</span><span class="ch-label">Protocolo diario</span></div>
+      ${meds.map(m=>`<div style="padding:9px 14px;border-top:1px solid var(--border);font-size:13px;color:var(--text)">${m}</div>`).join('')}
+    </div>
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">🩺</span><span class="ch-label">Condiciones activas</span></div>
+      ${conds.map(c=>`<div style="padding:9px 14px;border-top:1px solid var(--border);font-size:13px;color:var(--text);display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border-radius:50%;background:#0F6E56;flex-shrink:0;display:inline-block"></span>${c}</div>`).join('')}
+    </div>`;
+  }:'';
+
+  const finView=isFin?()=>{
+    const met=S.metrics.filter(x=>x.area_id===a.id);
+    const get=k=>met.find(x=>x.key===k);
+    const deuda=get('deuda_visa');
+
+    // Month navigation
+    const [yr,mo]=S.finMonth.split('-').map(Number);
+    const monthName=new Date(yr,mo-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+
+    // Filter transactions for this month
+    const txs=S.transactions.filter(t=>t.date&&t.date.startsWith(S.finMonth));
+    const gastos=txs.filter(t=>t.type==='expense'||!t.type);
+    const ahorros=txs.filter(t=>t.category==='Ahorro');
+    const totalGasto=gastos.reduce((s,t)=>s+parseFloat(t.amount||0),0);
+    const totalAhorro=ahorros.reduce((s,t)=>s+parseFloat(t.amount||0),0);
+
+    // Categories
+    const cats={};
+    gastos.filter(t=>t.category!=='Ahorro').forEach(t=>{
+      const c=t.category||'Otros';
+      cats[c]=(cats[c]||0)+parseFloat(t.amount||0);
+    });
+    const catList=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+    const catColors={'Comida':'#E8734A','Transporte':'#185FA5','Ocio':'#7C3AED','Ropa':'#DB2777','Salud':'#0F6E56','Suscripciones':'#854F0B','Transferencias':'#6B7280','Otros':'#9CA3AF','Gym':'#16A34A'};
+
+    const categories=['Comida','Transporte','Ocio','Ropa','Salud','Suscripciones','Transferencias','Gym','Ahorro','Otros'];
+
+    return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <button onclick="finPrev()" style="border:none;background:var(--surface);padding:8px 12px;border-radius:8px;cursor:pointer;font-size:16px">‹</button>
+      <span style="font-size:14px;font-weight:600;text-transform:capitalize">${monthName}</span>
+      <button onclick="finNext()" style="border:none;background:var(--surface);padding:8px 12px;border-radius:8px;cursor:pointer;font-size:16px">›</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+      <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Gastado</div>
+        <div style="font-size:18px;font-weight:700;color:#A32D2D">${totalGasto.toFixed(0)}€</div>
+      </div>
+      <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Ahorrado</div>
+        <div style="font-size:18px;font-weight:700;color:#0F6E56">${totalAhorro.toFixed(0)}€</div>
+      </div>
+      <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Deuda Visa</div>
+        <div style="font-size:18px;font-weight:700;color:${deuda&&parseFloat(deuda.value)>0?'#A32D2D':'#6B7280'}">${deuda?parseFloat(deuda.value).toFixed(0)+'€':'—'}</div>
+      </div>
+    </div>
+
+    ${catList.length?`<div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">📊</span><span class="ch-label">Por categoría</span></div>
+      ${catList.map(([cat,total])=>{
+        const pct=Math.round((total/totalGasto)*100)||0;
+        const col=catColors[cat]||'#9CA3AF';
+        return `<div style="padding:10px 14px;border-top:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span style="font-size:13px;font-weight:500">${cat}</span>
+            <span style="font-size:13px;font-weight:700">${total.toFixed(2)}€ <span style="font-size:11px;color:var(--t2);font-weight:400">${pct}%</span></span>
+          </div>
+          <div style="background:var(--bg);border-radius:999px;height:5px;overflow:hidden">
+            <div style="background:${col};height:100%;width:${pct}%;border-radius:999px"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`:''}
+
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">📋</span><span class="ch-label">Transacciones (${txs.length})</span></div>
+      ${txs.length===0?`<div class="empty">Sin transacciones este mes</div>`:''}
+      ${txs.map(t=>`
+      <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.description}</div>
+          <div style="font-size:11px;color:var(--t2)">${t.date}</div>
+        </div>
+        <select onchange="updateTxCat('${t.id}',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);max-width:90px">
+          ${categories.map(c=>`<option value="${c}"${t.category===c?' selected':''}>${c}</option>`).join('')}
+        </select>
+        <span style="font-size:13px;font-weight:700;color:${t.category==='Ahorro'?'#0F6E56':'#A32D2D'};white-space:nowrap">${parseFloat(t.amount).toFixed(2)}€</span>
+      </div>`).join('')}
+    </div>`;
+  }:'';
+
+  return `
+  <div class="ph">
+    <button class="back" onclick="go('areas')"><i class="ti ti-arrow-left"></i></button>
+    <span class="dot" style="background:${a.color};width:12px;height:12px"></span>
+    <h2>${a.name}</h2>
+  </div>
+  ${vjTools}
+  ${isJETMI?jetmiView():''}
+  ${isFin?finView():''}
+  ${isSalud?saludView():''}
+  ${isGym?gymView():''}
+  ${isMarca?marcaView():''}
+  ${isVida?vidaView():''}
+  ${section('✓','Tareas',ts.map(t=>taskEl(t)).join('')||empty('Sin tareas'))}
+  ${ws.length?section('⏳','Esperando',ws.map(wfEl).join('')):''}
+  ${ds.length?section('❓','Decisiones',ds.map(decEl).join('')):''}`;
+}
+
+function globalView() {
+  return `
+  <p class="section-title">Todas las tareas</p>
+  ${section('','',S.tasks.map(t=>taskEl(t)).join('')||empty('Sin tareas'))}
+  <p class="section-title">Waiting For</p>
+  ${section('','',S.wf.map(wfEl).join('')||empty('Sin elementos'))}
+  <p class="section-title">Decisiones</p>
+  ${section('','',S.dec.map(decEl).join('')||empty('Sin decisiones'))}`;
+}
+
+function section(icon,label,content) {
+  const countMatch=content.match(/class="item"/g)||[];
+  const wfMatch=content.match(/class="wf-item"/g)||[];
+  const count=countMatch.length+wfMatch.length;
+  return `<div class="card">
+    ${label?`<div class="card-head"><span class="ch-icon">${icon}</span><span class="ch-label">${label}</span>${count?`<span class="ch-count">${count}</span>`:''}</div>`:''}
+    ${content}
+  </div>`;
+}
+
+function taskEl(t,avoid=false) {
+  const a=t.areas;
+  const col=a?a.color:'#aaa';
+  const aname=a?a.name:'';
+  const isCrit=t.priority==='critical';
+  const tag=t.due_date?fmtDate(t.due_date):(aname||'');
+  const tagCls=isCrit?'p-urg':(t.horizon==='today'?'p-warn':'p-gray');
+  const tagStyle=aname&&!isCrit?`background:${col}18;color:${col}`:'';
+  return `<div class="item${avoid?' avoiding':''}">
+    <div class="chk" onclick="done('${t.id}')"><i class="ti ti-check" style="font-size:12px;color:transparent"></i></div>
+    <span class="item-txt">${t.title}</span>
+    ${tag?`<span class="pill ${tagCls}" style="${tagStyle}">${tag}</span>`:''}
+  </div>`;
+}
+
+function decEl(d) {
+  const a=d.areas; const col=a?a.color:'#888'; const aname=a?a.name:'';
+  return `<div class="item">
+    <i class="ti ti-help-circle" style="font-size:17px;color:#534AB7;flex-shrink:0"></i>
+    <span class="item-txt">${d.title}</span>
+    ${aname?`<span class="pill" style="background:${col}18;color:${col}">${aname}</span>`:''}
+  </div>`;
+}
+
+function wfEl(w) {
+  return `<div class="wf-item">
+    <div class="wf-t">${w.title}</div>
+    <div class="wf-s"><i class="ti ti-clock" style="font-size:11px"></i> ${w.waiting_on}${w.follow_up_date?' · seguimiento '+fmtDate(w.follow_up_date):''}</div>
+  </div>`;
+}
+
+function empty(msg) { return `<div class="empty">${msg}</div>`; }
+
+function fmtDate(s) {
+  if(!s) return '';
+  const d=new Date(s), t=new Date(), diff=Math.ceil((d-t)/864e5);
+  if(diff<0) return 'vencida';
+  if(diff===0) return 'hoy';
+  if(diff===1) return 'mañana';
+  if(diff<=7) return diff+'d';
+  return d.toLocaleDateString('es-ES',{day:'numeric',month:'short'});
+}
+
+function go(view, id=null) {
+  S.view=view; if(id) S.areaId=id;
+  window.scrollTo(0,0); render();
+}
+
+async function toggleMode() {
+  S.mode=S.mode==='ON'?'OFF':'ON'; render();
+  await db.from('life_context').insert({mode:S.mode});
+}
+
+async function done(id) {
+  S.tasks=S.tasks.filter(t=>t.id!==id); render();
+  await db.from('tasks').update({status:'done',completed_at:new Date().toISOString()}).eq('id',id);
+}
+
+function openAdd() {
+  const opts=S.areas.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
+  const m=document.createElement('div');
+  m.className='overlay'; m.id='modal';
+  m.innerHTML=`<div class="modal">
+    <h3>Nueva tarea</h3>
+    <input class="fi" id="nt" placeholder="¿Qué tienes pendiente?" autocomplete="off">
+    <select class="fi" id="na"><option value="">Sin área</option>${opts}</select>
+    <select class="fi" id="np">
+      <option value="medium">Prioridad normal</option>
+      <option value="critical">Crítica — urgente</option>
+      <option value="high">Alta</option>
+      <option value="low">Baja</option>
+    </select>
+    <div class="ma">
+      <button class="btn btn-s" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-p" onclick="addTask()">Añadir</button>
+    </div>
+  </div>`;
+  m.onclick=e=>{if(e.target===m)closeModal()};
+  document.body.appendChild(m);
+  setTimeout(()=>document.getElementById('nt').focus(),150);
+}
+
+function closeModal() { const m=document.getElementById('modal'); if(m)m.remove(); }
+
+async function incHabito(key) {
+  const a=S.areas.find(x=>x.name==='Vida Personal');
+  if(!a) return;
+  const m=S.metrics.find(x=>x.area_id===a.id&&x.key===key);
+  if(m){const nv=String(parseInt(m.value)+1);await db.from('metrics').update({value:nv,updated_at:new Date().toISOString()}).eq('id',m.id);m.value=nv;}
+  render();
+}
+
+async function setSueno(h) {
+  const a=S.areas.find(x=>x.name==='Vida Personal');
+  if(!a) return;
+  const m=S.metrics.find(x=>x.area_id===a.id&&x.key==='horas_sueno');
+  if(m){await db.from('metrics').update({value:String(h),updated_at:new Date().toISOString()}).eq('id',m.id);m.value=String(h);}
+  render();
+}
+
+async function regSesion() {
+  const a=S.areas.find(x=>x.name==='Gym');
+  if(!a) return;
+  const ses=S.metrics.find(x=>x.area_id===a.id&&x.key==='sesiones_semana');
+  const dias=S.metrics.find(x=>x.area_id===a.id&&x.key==='dias_ultima_sesion');
+  if(ses){await db.from('metrics').update({value:String(parseInt(ses.value)+1),updated_at:new Date().toISOString()}).eq('id',ses.id);ses.value=String(parseInt(ses.value)+1);}
+  if(dias){await db.from('metrics').update({value:'0',updated_at:new Date().toISOString()}).eq('id',dias.id);dias.value='0';}
+  render();
+}
+
+async function updateDolor(n) {
+  const a=S.areas.find(x=>x.name==='Salud');
+  if(!a) return;
+  const m=S.metrics.find(x=>x.area_id===a.id&&x.key==='dolor_hoy');
+  if(m){
+    await db.from('metrics').update({value:String(n),updated_at:new Date().toISOString()}).eq('id',m.id);
+    m.value=String(n);
+  }
+  render();
+}
+
+async function addTask() {
+  const title=document.getElementById('nt').value.trim();
+  const area_id=document.getElementById('na').value||null;
+  const priority=document.getElementById('np').value;
+  if(!title) return;
+  closeModal();
+  const {data}=await db.from('tasks').insert({
+    title,area_id,priority,
+    suitable_modes:['ON','OFF'],
+    horizon:priority==='critical'?'today':'this_week'
+  }).select('*,areas(name,color)').single();
+  if(data){S.tasks.unshift(data);render();}
+}
+
+function openChat() {
+  if(document.getElementById('chat-overlay')) return;
+  const ctxName = S.areaId ? (S.areas.find(a=>a.id===S.areaId)?.name||'Área') :
+    S.view==='home'?'Inicio':S.view==='global'?'Vista global':'Life OS';
+  const welcome = S.chatHistory.length===0 ?
+    `<div class="msg-a">Hola Estefanía 👋 Soy Isabel.\n\nPuedo añadir tareas, actualizar métricas, cambiar el modo... ¿en qué te ayudo?</div>` : '';
+  const msgs = S.chatHistory.map(m=>`<div class="${m.role==='user'?'msg-u':'msg-a'}">${m.content}</div>`).join('');
+  const ov=document.createElement('div');
+  ov.className='chat-overlay'; ov.id='chat-overlay';
+  ov.onclick=e=>{if(e.target===ov)closeChat()};
+  ov.innerHTML=`<div class="chat-panel">
+    <div class="chat-ph">
+      <div>
+        <div style="font-size:15px;font-weight:700">Isabel</div>
+        <div style="font-size:11px;color:var(--t2)">Contexto: ${ctxName}</div>
+      </div>
+      <button onclick="closeChat()" style="background:none;border:none;padding:4px;cursor:pointer;color:var(--t2);font-size:22px;line-height:1"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="chat-msgs" id="chat-msgs">${welcome}${msgs}</div>
+    <div class="chat-input-row">
+      <label for="chat-file" class="chat-attach"><i class="ti ti-paperclip" style="font-size:18px"></i></label>
+      <input type="file" id="chat-file" accept="image/*,application/pdf" style="display:none" onchange="handleFile(this)">
+      <input class="fi" id="chat-in" placeholder="Escribe algo..." autocomplete="off" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}" style="margin:0;flex:1">
+      <button class="btn btn-p" onclick="sendMsg()" style="flex:0;padding:11px 14px;min-width:46px"><i class="ti ti-send" style="font-size:15px"></i></button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  scrollChat();
+  setTimeout(()=>document.getElementById('chat-in')?.focus(),300);
+}
+
+function closeChat() { const el=document.getElementById('chat-overlay'); if(el) el.remove(); }
+
+async function sendMsg() {
+  const input=document.getElementById('chat-in');
+  const msg=input?.value.trim();
+  if(!msg&&!S.pendingImage) return;
+  if(input) input.value='';
+  const userText=msg||(S.pendingImage?`📎 ${S.pendingImage.name}`:'');
+  S.chatHistory.push({role:'user',content:userText});
+  const msgs=document.getElementById('chat-msgs');
+  if(msgs){
+    const u=document.createElement('div'); u.className='msg-u'; u.textContent=userText; msgs.appendChild(u);
+    const ld=document.createElement('div'); ld.className='msg-loading'; ld.id='chat-ld'; ld.textContent='Isabel está pensando...'; msgs.appendChild(ld);
+    scrollChat();
+  }
+  const ctx=S.areaId?(S.areas.find(a=>a.id===S.areaId)?.name||''):S.view;
+  try {
+    const body={message:msg,history:S.chatHistory.slice(0,-1),context:ctx};
+    if(S.pendingImage){body.image=S.pendingImage;S.pendingImage=null;}
+    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const data=await res.json();
+    S.chatHistory.push({role:'assistant',content:data.reply});
+    document.getElementById('chat-ld')?.remove();
+    if(msgs){const a=document.createElement('div');a.className='msg-a';a.textContent=data.reply;msgs.appendChild(a);}
+    if(data.actions?.length){await reload();render();}
+  } catch(e) {
+    document.getElementById('chat-ld')?.remove();
+    const errMsg='Error de conexión.';
+    S.chatHistory.push({role:'assistant',content:errMsg});
+    if(msgs){const a=document.createElement('div');a.className='msg-a';a.textContent=errMsg;msgs.appendChild(a);}
+  }
+  scrollChat();
+}
+
+function handleFile(input) {
+  const file=input.files[0]; if(!file) return; input.value='';
+  const reader=new FileReader();
+  reader.onload=e=>{
+    S.pendingImage={data:e.target.result.split(',')[1],mediaType:file.type,name:file.name};
+    const msgs=document.getElementById('chat-msgs');
+    if(msgs){const el=document.createElement('div');el.className='msg-u';el.textContent=`📎 ${file.name} — escribe tu pregunta y envía`;msgs.appendChild(el);scrollChat();}
+  };
+  reader.readAsDataURL(file);
+}
+
+function scrollChat() {
+  setTimeout(()=>{const el=document.getElementById('chat-msgs');if(el)el.scrollTop=el.scrollHeight;},60);
+}
+
+async function updateTxCat(id, category) {
+  await db.from('transactions').update({category}).eq('id',id);
+  const tx=S.transactions.find(t=>t.id===id);
+  if(tx) tx.category=category;
+}
+
+function finPrev() {
+  const [yr,mo]=S.finMonth.split('-').map(Number);
+  const d=new Date(yr,mo-2,1);
+  S.finMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  render();
+}
+
+function finNext() {
+  const [yr,mo]=S.finMonth.split('-').map(Number);
+  const d=new Date(yr,mo,1);
+  S.finMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  render();
+}
+
+window.addEventListener('load',showPin);
+</script>
+</body>
+</html>
