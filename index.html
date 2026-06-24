@@ -558,13 +558,17 @@ function areaView() {
     // Filter transactions for this month
     const txs=S.transactions.filter(t=>t.date&&t.date.startsWith(S.finMonth));
     const gastos=txs.filter(t=>t.type==='expense'||!t.type);
+    const ingresos=txs.filter(t=>t.type==='income');
     const ahorros=txs.filter(t=>t.category==='Ahorro');
-    const totalGasto=gastos.reduce((s,t)=>s+parseFloat(t.amount||0),0);
+    const EXCLUIR=['Transferencias','Ahorro'];
+    const gastosReales=gastos.filter(t=>!EXCLUIR.includes(t.category));
+    const totalGasto=gastosReales.reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const totalAhorro=ahorros.reduce((s,t)=>s+parseFloat(t.amount||0),0);
+    const totalIngreso=ingresos.filter(t=>t.category==='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
 
-    // Categories
+    // Categories (excluye Transferencias y Ahorro del gráfico)
     const cats={};
-    gastos.filter(t=>t.category!=='Ahorro').forEach(t=>{
+    gastosReales.forEach(t=>{
       const c=t.category||'Otros';
       cats[c]=(cats[c]||0)+parseFloat(t.amount||0);
     });
@@ -580,14 +584,20 @@ function areaView() {
       <button onclick="finNext()" style="border:none;background:var(--surface);padding:8px 12px;border-radius:8px;cursor:pointer;font-size:16px">›</button>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Nómina</div>
+        <div style="font-size:18px;font-weight:700;color:#0F6E56">${totalIngreso>0?totalIngreso.toFixed(0)+'€':'—'}</div>
+      </div>
       <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
         <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Gastado</div>
         <div style="font-size:18px;font-weight:700;color:#A32D2D">${totalGasto.toFixed(0)}€</div>
       </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
       <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
         <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Ahorrado</div>
-        <div style="font-size:18px;font-weight:700;color:#0F6E56">${totalAhorro.toFixed(0)}€</div>
+        <div style="font-size:18px;font-weight:700;color:#085041">${totalAhorro.toFixed(0)}€</div>
       </div>
       <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
         <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Deuda Visa</div>
