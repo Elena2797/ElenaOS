@@ -610,6 +610,16 @@ function areaView() {
     const flowAhoItem={c:'Ahorro',v:ytdAhorro,pct:totalDep>0?Math.round((ytdAhorro/totalDep)*100):0};
     const flowRestPct=Math.max(0,100-flowItems.reduce((s,x)=>s+x.pct,0)-flowAhoItem.pct);
 
+    // Categories (excluye Transferencias y Ahorro del gráfico)
+    const cats={};
+    gastosReales.forEach(t=>{
+      const c=t.category||'Otros';
+      cats[c]=(cats[c]||0)+parseFloat(t.amount||0);
+    });
+    const catList=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+    const catColors={'Comida':'#E8734A','Transporte':'#185FA5','Ocio':'#7C3AED','Ropa':'#DB2777','Salud':'#0F6E56','Suscripciones':'#854F0B','Transferencias':'#6B7280','Otros':'#9CA3AF','Hogar':'#0369A1','Renta':'#DC2626','Jaime':'#BE185D','Familia':'#B45309','Belleza':'#9333EA','Amigas':'#0891B2','Viajes':'#059669','Ahorro':'#16A34A','Nómina':'#16A34A','Farmacia':'#0891B2','Seguro':'#6B7280','Suplementos':'#7C3AED','Donaciones':'#B45309','Multas':'#DC2626','Perú':'#E8734A','Rotación':'#9CA3AF','Deuda':'#A32D2D'};
+    const categories=['Comida','Renta','Hogar','Transporte','Ocio','Ropa','Salud','Farmacia','Suplementos','Suscripciones','Seguro','Belleza','Amigas','Jaime','Familia','Viajes','Perú','Donaciones','Multas','Ahorro','Deuda','Transferencias','Rotación','Nómina','Otros'];
+
     // === BUILD HTML BLOCKS ===
     const budgetCardHtml=(()=>{
       if(!catList.length) return '';
@@ -676,17 +686,6 @@ function areaView() {
       leg+='</div>';
       return '<div class="card" style="margin-bottom:10px"><div class="card-head"><span class="ch-icon">💸</span><span class="ch-label">¿A dónde fue el dinero?</span><span class="ch-count">YTD</span></div><div style="padding:10px 14px">'+bar+leg+'</div></div>';
     })();
-
-    // Categories (excluye Transferencias y Ahorro del gráfico)
-    const cats={};
-    gastosReales.forEach(t=>{
-      const c=t.category||'Otros';
-      cats[c]=(cats[c]||0)+parseFloat(t.amount||0);
-    });
-    const catList=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
-    const catColors={'Comida':'#E8734A','Transporte':'#185FA5','Ocio':'#7C3AED','Ropa':'#DB2777','Salud':'#0F6E56','Suscripciones':'#854F0B','Transferencias':'#6B7280','Otros':'#9CA3AF','Hogar':'#0369A1','Renta':'#DC2626','Jaime':'#BE185D','Familia':'#B45309','Belleza':'#9333EA','Amigas':'#0891B2','Viajes':'#059669','Ahorro':'#16A34A','Nómina':'#16A34A','Farmacia':'#0891B2','Seguro':'#6B7280','Suplementos':'#7C3AED','Donaciones':'#B45309','Multas':'#DC2626','Perú':'#E8734A','Rotación':'#9CA3AF','Deuda':'#A32D2D'};
-
-    const categories=['Comida','Renta','Hogar','Transporte','Ocio','Ropa','Salud','Farmacia','Suplementos','Suscripciones','Seguro','Belleza','Amigas','Jaime','Familia','Viajes','Perú','Donaciones','Multas','Ahorro','Deuda','Transferencias','Rotación','Nómina','Otros'];
 
     if(S.finCat){
       const catTxs=txs.filter(t=>t.category===S.finCat);
