@@ -568,8 +568,6 @@ function areaView() {
     const totalNomina=ingresos.filter(t=>t.category==='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const margen=totalNomina-totalGasto;
     const tasaMes=totalNomina>0?Math.max(0,Math.round((margen/totalNomina)*100)):0;
-    const patrimonioAMes=SAVE_KEYS.filter(mk=>mk<=S.finMonth).reduce((sum,mk)=>sum+S.transactions.filter(t=>t.date&&t.date.startsWith(mk)&&t.category==='Ahorro').reduce((s,t)=>s+parseFloat(t.amount||0),0),0);
-    const fn=v=>S.finHide?'<span style="filter:blur(6px);user-select:none;display:inline-block">'+v+'</span>':String(v);
 
     // YTD + monthly breakdown
     const SAVE_KEYS=['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'];
@@ -577,16 +575,20 @@ function areaView() {
     const txsYTD=S.transactions.filter(t=>t.date&&t.date.startsWith('2026'));
     const ytdIngreso=txsYTD.filter(t=>t.category==='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const ytdGasto=txsYTD.filter(t=>t.type==='expense'&&!EXCLUIR.includes(t.category)).reduce((s,t)=>s+parseFloat(t.amount||0),0);
-    const ytdAhorro=txsYTD.filter(t=>t.category==='Ahorro').reduce((s,t)=>s+parseFloat(t.amount||0),0);
+    // Solo cuenta como patrimonio las transferencias reales a ahorro (excluye redondeos Sabadell)
+    const isPatrimonio=t=>t.category==='Ahorro'&&!(t.description||'').toUpperCase().includes('PARA AHORRO');
+    const ytdAhorro=txsYTD.filter(isPatrimonio).reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const ytdTasa=ytdIngreso>0?Math.max(0,Math.round(((ytdIngreso-ytdGasto)/ytdIngreso)*100)):0;
     const monthlyData=SAVE_KEYS.map((mk,i)=>{
       const mtxs=S.transactions.filter(t=>t.date&&t.date.startsWith(mk));
       const ing=mtxs.filter(t=>t.category==='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
       const gas=mtxs.filter(t=>t.type==='expense'&&!EXCLUIR.includes(t.category)).reduce((s,t)=>s+parseFloat(t.amount||0),0);
-      const aho=mtxs.filter(t=>t.category==='Ahorro').reduce((s,t)=>s+parseFloat(t.amount||0),0);
+      const aho=mtxs.filter(isPatrimonio).reduce((s,t)=>s+parseFloat(t.amount||0),0);
       return {mk,lab:SAVE_LABS[i],ing,gas,aho,mar:ing-gas,tasa:ing>0?Math.max(0,Math.round(((ing-gas)/ing)*100)):0};
     });
     let _cum=0;const monthlyDataC=monthlyData.map(m=>{_cum+=m.aho;return {...m,cumPat:_cum};});
+    const patrimonioAMes=SAVE_KEYS.filter(mk=>mk<=S.finMonth).reduce((sum,mk)=>sum+S.transactions.filter(t=>t.date&&t.date.startsWith(mk)&&isPatrimonio(t)).reduce((s,t)=>s+parseFloat(t.amount||0),0),0);
+    const fn=v=>S.finHide?'<span style="filter:blur(6px);user-select:none;display:inline-block">'+v+'</span>':String(v);
 
     // === HEATMAP DATA ===
     const HEAT_CATS=['Renta','Rotación','Ropa','Comida','Viajes','Ocio','Belleza','Salud','Suscripciones','Amigas'];
