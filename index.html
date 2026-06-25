@@ -561,7 +561,7 @@ function areaView() {
     const gastos=txs.filter(t=>t.type==='expense');
     const ingresos=txs.filter(t=>t.type==='income');
     const ahorros=txs.filter(t=>t.category==='Ahorro');
-    const EXCLUIR=['Transferencias','Ahorro','Nómina','Rotación'];
+    const EXCLUIR=['Transferencias','Ahorro','Nómina'];
     const gastosReales=gastos.filter(t=>!EXCLUIR.includes(t.category));
     const totalGasto=gastosReales.reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const totalAhorro=ahorros.reduce((s,t)=>s+parseFloat(t.amount||0),0);
