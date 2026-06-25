@@ -557,10 +557,10 @@ function areaView() {
 
     // Filter transactions for this month
     const txs=S.transactions.filter(t=>t.date&&t.date.startsWith(S.finMonth));
-    const gastos=txs.filter(t=>t.type==='expense'||!t.type);
+    const gastos=txs.filter(t=>t.type==='expense');
     const ingresos=txs.filter(t=>t.type==='income');
     const ahorros=txs.filter(t=>t.category==='Ahorro');
-    const EXCLUIR=['Transferencias','Ahorro'];
+    const EXCLUIR=['Transferencias','Ahorro','Nómina'];
     const gastosReales=gastos.filter(t=>!EXCLUIR.includes(t.category));
     const totalGasto=gastosReales.reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const totalAhorro=ahorros.reduce((s,t)=>s+parseFloat(t.amount||0),0);
@@ -634,7 +634,7 @@ function areaView() {
         <select onchange="updateTxCat('${t.id}',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);max-width:90px">
           ${categories.map(c=>`<option value="${c}"${t.category===c?' selected':''}>${c}</option>`).join('')}
         </select>
-        <span style="font-size:13px;font-weight:700;color:${t.category==='Ahorro'?'#0F6E56':'#A32D2D'};white-space:nowrap">${parseFloat(t.amount).toFixed(2)}€</span>
+        <span style="font-size:13px;font-weight:700;color:${t.type==='income'||t.category==='Ahorro'?'#0F6E56':'#A32D2D'};white-space:nowrap">${parseFloat(t.amount).toFixed(2)}€</span>
       </div>`).join('')}
     </div>`;
   }:'';
