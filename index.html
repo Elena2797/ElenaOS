@@ -550,6 +550,7 @@ function areaView() {
     const met=S.metrics.filter(x=>x.area_id===a.id);
     const get=k=>met.find(x=>x.key===k);
     const deuda=get('deuda_visa');
+    const ahorroTotal=get('ahorro_total');
 
     // Month navigation
     const [yr,mo]=S.finMonth.split('-').map(Number);
@@ -604,6 +605,13 @@ function areaView() {
       <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
         <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Deuda Visa</div>
         <div style="font-size:18px;font-weight:700;color:${deuda&&parseFloat(deuda.value)>0?'#A32D2D':'#6B7280'}">${deuda?parseFloat(deuda.value).toFixed(0)+'€':'—'}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Ahorro total (pocket)</div>
+        <div style="font-size:18px;font-weight:700;color:#16A34A">${ahorroTotal?parseFloat(ahorroTotal.value).toFixed(0)+'€':'—'}</div>
+        <div style="font-size:10px;color:var(--t2);margin-top:2px">+ este mes: ${totalAhorro.toFixed(0)}€</div>
       </div>
     </div>
     <div style="background:var(--surface);border-radius:var(--r-sm);padding:11px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
