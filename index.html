@@ -1113,11 +1113,55 @@ function openIngresoModal(month){
     +'<span style="font-size:16px;font-weight:700;color:#0F6E56">'+total.toFixed(0)+'€</span>'
     +'</div>'
     +rows
-    +'<button onclick="closeModal();openAddTx(\''+month+'\')" style="width:100%;margin-top:14px;padding:13px;background:var(--accent);color:white;border:none;border-radius:var(--r-sm);font-size:14px;font-weight:600;cursor:pointer">+ Añadir ingreso</button>'
+    +'<button onclick="closeModal();openAddIngreso(\''+month+'\')" style="width:100%;margin-top:14px;padding:13px;background:var(--accent);color:white;border:none;border-radius:var(--r-sm);font-size:14px;font-weight:600;cursor:pointer">+ Añadir nómina / ingreso</button>'
     +'<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:11px;background:none;color:var(--t2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:13px;cursor:pointer">Cerrar</button>'
     +'</div>';
   m.onclick=e=>{if(e.target===m)closeModal()};
   document.body.appendChild(m);
+}
+
+function openAddIngreso(month){
+  const d=new Date(month+'-15');
+  const mName=d.toLocaleDateString('es-ES',{month:'long'});
+  const mNameCap=mName.charAt(0).toUpperCase()+mName.slice(1);
+  const defDate=month+'-28';
+  const today=new Date().toISOString().slice(0,10);
+  const finalDate=defDate<=today?defDate:today;
+  const m=document.createElement('div');m.className='overlay';m.id='modal';
+  m.innerHTML='<div class="modal">'
+    +'<h3>Añadir ingreso · '+mNameCap+'</h3>'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px">Fecha</label>'
+    +'<input class="fi" id="ai-date" type="date" value="'+finalDate+'">'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px;margin-top:12px">Concepto</label>'
+    +'<input class="fi" id="ai-desc" type="text" value="Nómina '+mNameCap+'" placeholder="Nómina '+mNameCap+'">'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px;margin-top:12px">Importe €</label>'
+    +'<input class="fi" id="ai-amt" type="number" inputmode="decimal" placeholder="0.00" min="0" step="0.01">'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px;margin-top:12px">Categoría</label>'
+    +'<select class="fi" id="ai-cat"><option value="Nómina" selected>Nómina</option><option value="Otros">Otros ingresos</option><option value="Transferencias">Transferencia</option></select>'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px;margin-top:12px">Cuenta</label>'
+    +'<select class="fi" id="ai-src"><option value="Revolut" selected>Revolut</option><option value="Sabadell">Sabadell</option></select>'
+    +'<div class="ma" style="margin-top:16px">'
+    +'<button class="btn btn-s" onclick="closeModal();openIngresoModal(\''+month+'\')">← Atrás</button>'
+    +'<button class="btn btn-p" onclick="saveAddIngreso(\''+month+'\')">Guardar</button>'
+    +'</div></div>';
+  m.onclick=e=>{if(e.target===m)closeModal()};
+  document.body.appendChild(m);
+  setTimeout(()=>document.getElementById('ai-amt')?.focus(),150);
+}
+
+async function saveAddIngreso(month){
+  const date=document.getElementById('ai-date')?.value;
+  const desc=(document.getElementById('ai-desc')?.value||'').trim();
+  const amt=parseFloat(document.getElementById('ai-amt')?.value);
+  const cat=document.getElementById('ai-cat')?.value;
+  const src=document.getElementById('ai-src')?.value;
+  if(!date||!desc||isNaN(amt)||amt<=0){alert('Falta el importe');return;}
+  closeModal();
+  const{data,error}=await db.from('transactions').insert({date,description:desc,amount:amt,type:'income',category:cat,source:src}).select();
+  if(!error&&data?.[0]){S.transactions=[...S.transactions,data[0]];}
+  else{const{data:all}=await db.from('transactions').select('*').gte('date','2026-01-01').order('date',{ascending:false});if(all)S.transactions=all;}
+  render();
+  openIngresoModal(month);
 }
 
 function openAddTx(monthPrefix) {
