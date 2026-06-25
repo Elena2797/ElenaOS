@@ -586,8 +586,6 @@ function areaView() {
       const aho=mtxs.filter(isPatrimonio).reduce((s,t)=>s+parseFloat(t.amount||0),0);
       return {mk,lab:SAVE_LABS[i],ing,gas,aho,mar:ing-gas,tasa:ing>0?Math.max(0,Math.round(((ing-gas)/ing)*100)):0};
     });
-    let _cum=0;const monthlyDataC=monthlyData.map(m=>{_cum+=m.aho;return {...m,cumPat:_cum};});
-    const patrimonioAMes=SAVE_KEYS.filter(mk=>mk<=S.finMonth).reduce((sum,mk)=>sum+S.transactions.filter(t=>t.date&&t.date.startsWith(mk)&&isPatrimonio(t)).reduce((s,t)=>s+parseFloat(t.amount||0),0),0);
     const fn=v=>S.finHide?'<span style="filter:blur(6px);user-select:none;display:inline-block">'+v+'</span>':String(v);
 
     // === HEATMAP DATA ===
@@ -744,8 +742,8 @@ function areaView() {
       </div>
       <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
         <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Patrimonio</div>
-        <div style="font-size:18px;font-weight:700;color:#085041">${fn(patrimonioAMes.toFixed(0)+'€')}</div>
-        <div style="font-size:10px;color:var(--t3);margin-top:2px">acumulado hasta ${monthName.split(' ')[0]}</div>
+        <div style="font-size:18px;font-weight:700;color:#085041">${fn(ytdAhorro.toFixed(0)+'€')}</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:2px">total 2026</div>
       </div>
     </div>
     <div style="text-align:center;margin-bottom:8px">
@@ -768,7 +766,7 @@ function areaView() {
           <span style="font-weight:700;color:#085041">${ytdAhorro.toFixed(0)}€</span>
         </div>
       </div>
-      ${monthlyDataC.filter(m=>m.ing>0||m.gas>0).map(m=>{
+      ${monthlyData.filter(m=>m.ing>0||m.gas>0).map(m=>{
         const barW=m.ing>0?Math.min(Math.max(0,Math.round((m.mar/m.ing)*100)),100):0;
         const isActive=m.mk===S.finMonth;
         const col=m.tasa>=20?'#16A34A':m.tasa>=10?'#65A96E':'#D97706';
@@ -778,10 +776,7 @@ function areaView() {
           <div style="flex:1;background:var(--bg);border-radius:999px;height:5px;overflow:hidden">
             <div style="background:${col};height:100%;width:${barW}%;border-radius:999px"></div>
           </div>
-          <div style="text-align:right">
-            <div style="font-size:12px;font-weight:600;color:${marCol}">${m.ing>0?fn((m.mar>=0?'+':'')+m.mar.toFixed(0)+'€'):'—'}</div>
-            ${m.cumPat>0?'<div style="font-size:10px;color:var(--t3)">🏦 '+fn(m.cumPat.toFixed(0)+'€')+'</div>':''}
-          </div>
+          <span style="font-size:12px;font-weight:600;color:${marCol};width:56px;text-align:right">${m.ing>0?fn((m.mar>=0?'+':'')+m.mar.toFixed(0)+'€'):'—'}</span>
           <span style="font-size:11px;color:var(--t2);width:28px;text-align:right">${m.ing>0?fn(m.tasa+'%'):'—'}</span>
         </div>`;
       }).join('')}
