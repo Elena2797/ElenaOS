@@ -713,6 +713,7 @@ function areaView() {
             ${categories.map(c=>`<option value="${c}"${t.category===c?' selected':''}>${c}</option>`).join('')}
           </select>
           <span style="font-size:13px;font-weight:700;color:${t.type==='income'||t.category==='Ahorro'?'#0F6E56':'#A32D2D'};white-space:nowrap">${parseFloat(t.amount).toFixed(2)}€</span>
+          <button onclick="openEditTx('${t.id}')" style="border:none;background:none;cursor:pointer;padding:2px 4px;color:var(--t3);font-size:15px;line-height:1;flex-shrink:0"><i class="ti ti-pencil"></i></button>
         </div>`).join('')}
       </div>`;
     }
@@ -792,7 +793,7 @@ function areaView() {
     ${projectionCardHtml}
 
     <div class="card" style="margin-bottom:10px">
-      <div class="card-head"><span class="ch-icon">📋</span><span class="ch-label">Transacciones (${txs.length})</span></div>
+      <div class="card-head"><span class="ch-icon">📋</span><span class="ch-label">Transacciones (${txs.length})</span><button onclick="openAddTx('${S.finMonth}')" style="border:none;background:var(--accent);color:white;border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;margin-left:auto">+ Añadir</button></div>
       ${txs.length===0?`<div class="empty">Sin transacciones este mes</div>`:''}
       ${txs.map(t=>`
       <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px">
@@ -804,6 +805,7 @@ function areaView() {
           ${categories.map(c=>`<option value="${c}"${t.category===c?' selected':''}>${c}</option>`).join('')}
         </select>
         <span style="font-size:13px;font-weight:700;color:${t.type==='income'||t.category==='Ahorro'?'#0F6E56':'#A32D2D'};white-space:nowrap">${parseFloat(t.amount).toFixed(2)}€</span>
+        <button onclick="openEditTx('${t.id}')" style="border:none;background:none;cursor:pointer;padding:2px 4px;color:var(--t3);font-size:15px;line-height:1;flex-shrink:0"><i class="ti ti-pencil"></i></button>
       </div>`).join('')}
     </div>`;
   }:'';
@@ -1082,6 +1084,101 @@ function saveBudgetVal(cat){
 function deleteBudget(cat){
   delete S.budgets[cat];localStorage.setItem('life_budgets',JSON.stringify(S.budgets));
   closeModal();render();
+}
+
+const catList=['Comida','Renta','Hogar','Transporte','Ocio','Ropa','Salud','Farmacia','Suplementos','Suscripciones','Seguro','Belleza','Amigas','Jaime','Familia','Viajes','Perú','Donaciones','Multas','Ahorro','Deuda','Transferencias','Rotación','Nómina','Otros'];
+
+function openAddTx(monthPrefix) {
+  const today=new Date().toISOString().slice(0,10);
+  const defDate=monthPrefix?(monthPrefix+'-'+today.slice(8,10)):today;
+  const finalDate=defDate<=today?defDate:today;
+  const catOpts=catList.map(c=>`<option value="${c}"${c==='Nómina'?' selected':''}>${c}</option>`).join('');
+  const m=document.createElement('div');m.className='overlay';m.id='modal';
+  m.innerHTML='<div class="modal"><h3>Nueva transacción</h3>'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px">Fecha</label>'
+    +'<input class="fi" id="tx-date" type="date" value="'+finalDate+'">'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px;margin-top:10px">Descripción</label>'
+    +'<input class="fi" id="tx-desc" type="text" placeholder="Ej: Nómina junio, Freelance...">'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px;margin-top:10px">Importe €</label>'
+    +'<input class="fi" id="tx-amt" type="number" inputmode="decimal" placeholder="0.00" min="0" step="0.01">'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px;margin-top:10px">Tipo</label>'
+    +'<select class="fi" id="tx-type" onchange="txTypeChanged()"><option value="income" selected>Ingreso</option><option value="expense">Gasto</option></select>'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px;margin-top:10px">Categoría</label>'
+    +'<select class="fi" id="tx-cat">'+catOpts+'</select>'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px;margin-top:10px">Cuenta</label>'
+    +'<select class="fi" id="tx-src"><option value="Revolut">Revolut</option><option value="Sabadell">Sabadell</option></select>'
+    +'<div class="ma"><button class="btn btn-s" onclick="closeModal()">Cancelar</button><button class="btn btn-p" onclick="saveNewTx()">Guardar</button></div></div>';
+  m.onclick=e=>{if(e.target===m)closeModal()};
+  document.body.appendChild(m);
+  setTimeout(()=>document.getElementById('tx-desc')?.focus(),150);
+}
+
+function txTypeChanged(){
+  const type=document.getElementById('tx-type')?.value;
+  const cat=document.getElementById('tx-cat');
+  if(!cat)return;
+  cat.value=type==='income'?'Nómina':'Comida';
+}
+
+async function saveNewTx(){
+  const date=document.getElementById('tx-date')?.value;
+  const desc=(document.getElementById('tx-desc')?.value||'').trim();
+  const amt=parseFloat(document.getElementById('tx-amt')?.value);
+  const type=document.getElementById('tx-type')?.value;
+  const cat=document.getElementById('tx-cat')?.value;
+  const src=document.getElementById('tx-src')?.value;
+  if(!date||!desc||isNaN(amt)||amt<=0){alert('Rellena todos los campos');return;}
+  closeModal();
+  const {data,error}=await db.from('transactions').insert({date,description:desc,amount:amt,type,category:cat,source:src}).select();
+  if(!error&&data?.[0]){S.transactions=[...S.transactions,data[0]];}
+  else{const{data:all}=await db.from('transactions').select('*').gte('date','2026-01-01').order('date',{ascending:false});if(all)S.transactions=all;}
+  render();
+}
+
+function openEditTx(id){
+  const t=S.transactions.find(x=>String(x.id)===String(id));
+  if(!t)return;
+  const catOpts=catList.map(c=>`<option value="${c}"${t.category===c?' selected':''}>${c}</option>`).join('');
+  const m=document.createElement('div');m.className='overlay';m.id='modal';
+  m.innerHTML='<div class="modal"><h3>Editar transacción</h3>'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px">Fecha</label>'
+    +'<input class="fi" id="etx-date" type="date" value="'+t.date+'">'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px;margin-top:10px">Descripción</label>'
+    +'<input class="fi" id="etx-desc" type="text" value="'+(t.description||'')+'">'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px;margin-top:10px">Importe €</label>'
+    +'<input class="fi" id="etx-amt" type="number" inputmode="decimal" value="'+parseFloat(t.amount).toFixed(2)+'" min="0" step="0.01">'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px;margin-top:10px">Tipo</label>'
+    +'<select class="fi" id="etx-type"><option value="income"'+(t.type==='income'?' selected':'')+'>Ingreso</option><option value="expense"'+(t.type==='expense'?' selected':'')+'>Gasto</option></select>'
+    +'<label style="font-size:12px;color:var(--t2);display:block;margin-bottom:4px;margin-top:10px">Categoría</label>'
+    +'<select class="fi" id="etx-cat">'+catOpts+'</select>'
+    +'<div class="ma" style="flex-wrap:wrap;gap:8px">'
+    +'<button class="btn btn-s" onclick="closeModal()">Cancelar</button>'
+    +'<button class="btn btn-s" onclick="deleteTx(\''+id+'\')" style="flex:0;padding:13px 14px;color:#DC2626"><i class="ti ti-trash"></i></button>'
+    +'<button class="btn btn-p" onclick="saveEditTx(\''+id+'\')">Guardar</button></div></div>';
+  m.onclick=e=>{if(e.target===m)closeModal()};
+  document.body.appendChild(m);
+}
+
+async function saveEditTx(id){
+  const date=document.getElementById('etx-date')?.value;
+  const desc=(document.getElementById('etx-desc')?.value||'').trim();
+  const amt=parseFloat(document.getElementById('etx-amt')?.value);
+  const type=document.getElementById('etx-type')?.value;
+  const cat=document.getElementById('etx-cat')?.value;
+  if(!date||!desc||isNaN(amt)||amt<=0){alert('Rellena todos los campos');return;}
+  closeModal();
+  await db.from('transactions').update({date,description:desc,amount:amt,type,category:cat}).eq('id',id);
+  const tx=S.transactions.find(t=>String(t.id)===String(id));
+  if(tx){tx.date=date;tx.description=desc;tx.amount=amt;tx.type=type;tx.category=cat;}
+  render();
+}
+
+async function deleteTx(id){
+  if(!confirm('¿Borrar esta transacción?'))return;
+  closeModal();
+  await db.from('transactions').delete().eq('id',id);
+  S.transactions=S.transactions.filter(t=>String(t.id)!==String(id));
+  render();
 }
 
 function finPrev() {
