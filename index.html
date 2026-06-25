@@ -207,7 +207,7 @@ function pinPress(v) {
 const URL_ = 'https://cllubptdwydifomlnxds.supabase.co';
 const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsbHVicHRkd3lkaWZvbWxueGRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMDE1MTksImV4cCI6MjA5Nzg3NzUxOX0.jh_OJLmixJAYSmh0GdtxMszNMZCqBZVLkNGFQoG1MhI';
 
-let db, S = { mode:'OFF', view:'home', areaId:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], pendingImage:null, transactions:[], finMonth: new Date().toISOString().slice(0,7) };
+let db, S = { mode:'OFF', view:'home', areaId:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], pendingImage:null, transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null };
 
 async function initApp() {
   db = supabase.createClient(URL_, KEY_);
@@ -591,6 +591,33 @@ function areaView() {
 
     const categories=['Comida','Renta','Hogar','Transporte','Ocio','Ropa','Salud','Suscripciones','Belleza','Amigas','Jaime','Familia','Viajes','Ahorro','Transferencias','Nómina','Otros'];
 
+    if(S.finCat){
+      const catTxs=txs.filter(t=>t.category===S.finCat);
+      const catTotal=catTxs.reduce((s,t)=>s+parseFloat(t.amount||0),0);
+      return `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <button onclick="S.finCat=null;render()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text);padding:0;line-height:1">‹</button>
+        <div>
+          <div style="font-size:15px;font-weight:700">${S.finCat}</div>
+          <div style="font-size:12px;color:var(--t2)">${monthName} · ${catTxs.length} transacciones · ${catTotal.toFixed(2)}€</div>
+        </div>
+      </div>
+      <div class="card">
+        ${catTxs.length===0?`<div class="empty">Sin transacciones en esta categoría</div>`:''}
+        ${catTxs.map(t=>`
+        <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.description}</div>
+            <div style="font-size:11px;color:var(--t2)">${t.date}</div>
+          </div>
+          <select onchange="updateTxCat('${t.id}',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);max-width:90px">
+            ${categories.map(c=>`<option value="${c}"${t.category===c?' selected':''}>${c}</option>`).join('')}
+          </select>
+          <span style="font-size:13px;font-weight:700;color:${t.type==='income'||t.category==='Ahorro'?'#0F6E56':'#A32D2D'};white-space:nowrap">${parseFloat(t.amount).toFixed(2)}€</span>
+        </div>`).join('')}
+      </div>`;
+    }
+
     return `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <button onclick="finPrev()" style="border:none;background:var(--surface);padding:8px 12px;border-radius:8px;cursor:pointer;font-size:16px">‹</button>
@@ -622,7 +649,7 @@ function areaView() {
           <text x="32" y="15" text-anchor="end" font-size="8" fill="#b0b0b0">${saveFmt(saveMax)}</text>
           <text x="32" y="73" text-anchor="end" font-size="8" fill="#b0b0b0">${saveFmt(saveMax/2)}</text>
           <text x="32" y="131" text-anchor="end" font-size="8" fill="#b0b0b0">0</text>
-          ${saveCumul.map((v,i)=>{const bH=Math.max(Math.round((v/saveMax)*116),2);const bX=42+i*43;const bY=128-bH;const isActive=SAVE_KEYS[i]===S.finMonth;const valLabel=bH>16?`<text x="${bX+15}" y="${bY-3}" text-anchor="middle" font-size="8" fill="#15803d" font-weight="700">${saveFmt(v)}</text>`:'';return `<g style="cursor:pointer" onclick="S.finMonth='${SAVE_KEYS[i]}';render()"><rect x="${bX}" y="${bY}" width="30" height="${bH}" fill="${isActive?'#15803d':'#16A34A'}" rx="3" opacity="${isActive?1:0.85}"/><title>${SAVE_LABS[i]}: ${v.toFixed(0)}€ acumulado (+${saveMonthly[i].toFixed(0)}€ este mes)</title><text x="${bX+15}" y="143" text-anchor="middle" font-size="9" fill="#6b6b6b">${SAVE_LABS[i]}</text>${valLabel}</g>`;}).join('')}
+          ${saveCumul.map((v,i)=>{const bH=Math.max(Math.round((v/saveMax)*116),2);const bX=42+i*43;const bY=128-bH;const isActive=SAVE_KEYS[i]===S.finMonth;const valLabel=bH>16?`<text x="${bX+15}" y="${bY-3}" text-anchor="middle" font-size="8" fill="#15803d" font-weight="700">${saveFmt(v)}</text>`:'';return `<g style="cursor:pointer" onclick="S.finCat=null;S.finMonth='${SAVE_KEYS[i]}';render()"><rect x="${bX}" y="${bY}" width="30" height="${bH}" fill="${isActive?'#15803d':'#16A34A'}" rx="3" opacity="${isActive?1:0.85}"/><title>${SAVE_LABS[i]}: ${v.toFixed(0)}€ acumulado (+${saveMonthly[i].toFixed(0)}€ este mes)</title><text x="${bX+15}" y="143" text-anchor="middle" font-size="9" fill="#6b6b6b">${SAVE_LABS[i]}</text>${valLabel}</g>`;}).join('')}
         </svg>
       </div>
     </div>
@@ -646,7 +673,7 @@ function areaView() {
       ${catList.map(([cat,total])=>{
         const pct=Math.round((total/totalGasto)*100)||0;
         const col=catColors[cat]||'#9CA3AF';
-        return `<div style="padding:10px 14px;border-top:1px solid var(--border)">
+        return `<div style="padding:10px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="S.finCat='${cat}';render()">
           <div style="display:flex;justify-content:space-between;margin-bottom:4px">
             <span style="font-size:13px;font-weight:500">${cat}</span>
             <span style="font-size:13px;font-weight:700">${total.toFixed(2)}€ <span style="font-size:11px;color:var(--t2);font-weight:400">${pct}%</span></span>
@@ -938,14 +965,14 @@ function finPrev() {
   const [yr,mo]=S.finMonth.split('-').map(Number);
   const d=new Date(yr,mo-2,1);
   S.finMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-  render();
+  S.finCat=null; render();
 }
 
 function finNext() {
   const [yr,mo]=S.finMonth.split('-').map(Number);
   const d=new Date(yr,mo,1);
   S.finMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-  render();
+  S.finCat=null; render();
 }
 
 window.addEventListener('load',showPin);
