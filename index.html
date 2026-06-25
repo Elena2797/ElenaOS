@@ -561,14 +561,12 @@ function areaView() {
     const gastos=txs.filter(t=>t.type==='expense');
     const ingresos=txs.filter(t=>t.type==='income');
     const ahorros=txs.filter(t=>t.category==='Ahorro');
-    const EXCLUIR=['Transferencias','Ahorro','Nómina'];
+    const EXCLUIR=['Transferencias','Ahorro','Nómina','Rotación'];
     const gastosReales=gastos.filter(t=>!EXCLUIR.includes(t.category));
     const totalGasto=gastosReales.reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const totalAhorro=ahorros.reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const totalNomina=ingresos.filter(t=>t.category==='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
-    const totalOtrosIngresos=ingresos.filter(t=>t.category!=='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
-    const totalIngreso=ingresos.reduce((s,t)=>s+parseFloat(t.amount||0),0);
-    const balance=totalIngreso-totalGasto-totalAhorro;
+    const margen=totalNomina-totalGasto;
 
     // Savings chart — cumulative jan-jun 2026
     const SAVE_KEYS=['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'];
@@ -587,9 +585,9 @@ function areaView() {
       cats[c]=(cats[c]||0)+parseFloat(t.amount||0);
     });
     const catList=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
-    const catColors={'Comida':'#E8734A','Transporte':'#185FA5','Ocio':'#7C3AED','Ropa':'#DB2777','Salud':'#0F6E56','Suscripciones':'#854F0B','Transferencias':'#6B7280','Otros':'#9CA3AF','Hogar':'#0369A1','Renta':'#DC2626','Jaime':'#BE185D','Familia':'#B45309','Belleza':'#9333EA','Amigas':'#0891B2','Viajes':'#059669','Ahorro':'#16A34A','Nómina':'#16A34A'};
+    const catColors={'Comida':'#E8734A','Transporte':'#185FA5','Ocio':'#7C3AED','Ropa':'#DB2777','Salud':'#0F6E56','Suscripciones':'#854F0B','Transferencias':'#6B7280','Otros':'#9CA3AF','Hogar':'#0369A1','Renta':'#DC2626','Jaime':'#BE185D','Familia':'#B45309','Belleza':'#9333EA','Amigas':'#0891B2','Viajes':'#059669','Ahorro':'#16A34A','Nómina':'#16A34A','Farmacia':'#0891B2','Seguro':'#6B7280','Suplementos':'#7C3AED','Donaciones':'#B45309','Multas':'#DC2626','Perú':'#E8734A','Rotación':'#9CA3AF','Deuda':'#A32D2D'};
 
-    const categories=['Comida','Renta','Hogar','Transporte','Ocio','Ropa','Salud','Suscripciones','Belleza','Amigas','Jaime','Familia','Viajes','Ahorro','Transferencias','Nómina','Otros'];
+    const categories=['Comida','Renta','Hogar','Transporte','Ocio','Ropa','Salud','Farmacia','Suplementos','Suscripciones','Seguro','Belleza','Amigas','Jaime','Familia','Viajes','Perú','Donaciones','Multas','Ahorro','Deuda','Transferencias','Rotación','Nómina','Otros'];
 
     if(S.finCat){
       const catTxs=txs.filter(t=>t.category===S.finCat);
@@ -625,18 +623,22 @@ function areaView() {
       <button onclick="finNext()" style="border:none;background:var(--surface);padding:8px 12px;border-radius:8px;cursor:pointer;font-size:16px">›</button>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
       <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
-        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Nómina</div>
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Ingreso</div>
         <div style="font-size:18px;font-weight:700;color:#0F6E56">${totalNomina>0?totalNomina.toFixed(0)+'€':'—'}</div>
       </div>
       <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
-        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Otros ing.</div>
-        <div style="font-size:18px;font-weight:700;color:#16A34A">${totalOtrosIngresos>0?totalOtrosIngresos.toFixed(0)+'€':'—'}</div>
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Gasto</div>
+        <div style="font-size:18px;font-weight:700;color:#A32D2D">${totalGasto.toFixed(0)}€</div>
       </div>
       <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
-        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Gastado</div>
-        <div style="font-size:18px;font-weight:700;color:#A32D2D">${totalGasto.toFixed(0)}€</div>
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Margen</div>
+        <div style="font-size:18px;font-weight:700;color:${margen>=0?'#0F6E56':'#A32D2D'}">${margen>=0?'+':''}${margen.toFixed(0)}€</div>
+      </div>
+      <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Ahorro</div>
+        <div style="font-size:18px;font-weight:700;color:#085041">${totalAhorro.toFixed(0)}€</div>
       </div>
     </div>
     <div class="card" style="margin-bottom:8px">
@@ -653,20 +655,10 @@ function areaView() {
         </svg>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-      <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
-        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Ahorrado este mes</div>
-        <div style="font-size:18px;font-weight:700;color:#085041">${totalAhorro.toFixed(0)}€</div>
-      </div>
-      <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
-        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Deuda Visa</div>
-        <div style="font-size:18px;font-weight:700;color:${deuda&&parseFloat(deuda.value)>0?'#A32D2D':'#6B7280'}">${deuda?parseFloat(deuda.value).toFixed(0)+'€':'—'}</div>
-      </div>
-    </div>
-    <div style="background:var(--surface);border-radius:var(--r-sm);padding:11px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
-      <span style="font-size:12px;color:var(--t2)">Ingresos − Gastado − Ahorro <span style="font-size:10px">(Sabadell + Revolut)</span></span>
-      <span style="font-size:16px;font-weight:700;color:${balance>=0?'#0F6E56':'#A32D2D'}">${balance>=0?'+':''}${balance.toFixed(0)}€</span>
-    </div>
+    ${deuda?`<div style="background:var(--surface);border-radius:var(--r-sm);padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:12px;color:var(--t2)">Deuda Visa Sabadell</span>
+      <span style="font-size:15px;font-weight:700;color:${parseFloat(deuda.value)>0?'#A32D2D':'#6B7280'}">${parseFloat(deuda.value).toFixed(0)}€</span>
+    </div>`:''}
 
     ${catList.length?`<div class="card" style="margin-bottom:10px">
       <div class="card-head"><span class="ch-icon">📊</span><span class="ch-label">Por categoría</span></div>
