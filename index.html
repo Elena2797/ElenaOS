@@ -729,9 +729,10 @@ function areaView() {
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-      <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
+      <div onclick="openIngresoModal('${S.finMonth}')" style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center;cursor:pointer;position:relative">
         <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Ingreso</div>
         <div style="font-size:18px;font-weight:700;color:#0F6E56">${totalNomina>0?fn(totalNomina.toFixed(0)+'€'):'—'}</div>
+        <div style="font-size:9px;color:var(--t3);margin-top:2px">toca para editar</div>
       </div>
       <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
         <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Gasto</div>
@@ -1087,6 +1088,37 @@ function deleteBudget(cat){
 }
 
 const catList=['Comida','Renta','Hogar','Transporte','Ocio','Ropa','Salud','Farmacia','Suplementos','Suscripciones','Seguro','Belleza','Amigas','Jaime','Familia','Viajes','Perú','Donaciones','Multas','Ahorro','Deuda','Transferencias','Rotación','Nómina','Otros'];
+
+function openIngresoModal(month){
+  const monthNames={jan:'Enero',feb:'Febrero',mar:'Marzo',apr:'Abril',may:'Mayo',jun:'Junio',jul:'Julio',aug:'Agosto',sep:'Septiembre',oct:'Octubre',nov:'Noviembre',dec:'Diciembre'};
+  const d=new Date(month+'-15');
+  const mName=d.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  const ingresos=S.transactions.filter(t=>t.date&&t.date.startsWith(month)&&(t.type==='income'||t.category==='Nómina')).sort((a,b)=>a.date>b.date?1:-1);
+  const total=ingresos.reduce((s,t)=>s+parseFloat(t.amount||0),0);
+  const rows=ingresos.length===0
+    ?'<div style="text-align:center;padding:20px;color:var(--t2);font-size:13px">Sin ingresos este mes</div>'
+    :ingresos.map(t=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.description}</div>
+          <div style="font-size:11px;color:var(--t2)">${t.date}</div>
+        </div>
+        <span style="font-size:14px;font-weight:700;color:#0F6E56;white-space:nowrap">${parseFloat(t.amount).toFixed(2)}€</span>
+        <button onclick="closeModal();openEditTx('${t.id}')" style="border:none;background:none;cursor:pointer;padding:4px;color:var(--t3);font-size:16px;line-height:1"><i class="ti ti-pencil"></i></button>
+      </div>`).join('');
+  const m=document.createElement('div');m.className='overlay';m.id='modal';
+  m.innerHTML='<div class="modal">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    +'<h3 style="margin:0">Ingresos · '+mName+'</h3>'
+    +'<span style="font-size:16px;font-weight:700;color:#0F6E56">'+total.toFixed(0)+'€</span>'
+    +'</div>'
+    +rows
+    +'<button onclick="closeModal();openAddTx(\''+month+'\')" style="width:100%;margin-top:14px;padding:13px;background:var(--accent);color:white;border:none;border-radius:var(--r-sm);font-size:14px;font-weight:600;cursor:pointer">+ Añadir ingreso</button>'
+    +'<button onclick="closeModal()" style="width:100%;margin-top:8px;padding:11px;background:none;color:var(--t2);border:1px solid var(--border);border-radius:var(--r-sm);font-size:13px;cursor:pointer">Cerrar</button>'
+    +'</div>';
+  m.onclick=e=>{if(e.target===m)closeModal()};
+  document.body.appendChild(m);
+}
 
 function openAddTx(monthPrefix) {
   const today=new Date().toISOString().slice(0,10);
