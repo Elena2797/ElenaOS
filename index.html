@@ -207,7 +207,7 @@ function pinPress(v) {
 const URL_ = 'https://cllubptdwydifomlnxds.supabase.co';
 const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsbHVicHRkd3lkaWZvbWxueGRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMDE1MTksImV4cCI6MjA5Nzg3NzUxOX0.jh_OJLmixJAYSmh0GdtxMszNMZCqBZVLkNGFQoG1MhI';
 
-let db, S = { mode:'OFF', view:'home', areaId:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], pendingImage:null, transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null };
+let db, S = { mode:'OFF', view:'home', areaId:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], pendingImage:null, transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}') };
 
 async function initApp() {
   db = supabase.createClient(URL_, KEY_);
@@ -585,6 +585,98 @@ function areaView() {
       return {mk,lab:SAVE_LABS[i],ing,gas,aho,mar:ing-gas,tasa:ing>0?Math.round((aho/ing)*100):0};
     });
 
+    // === HEATMAP DATA ===
+    const HEAT_CATS=['Renta','Rotación','Ropa','Comida','Viajes','Ocio','Belleza','Salud','Suscripciones','Amigas'];
+    const heatD={};
+    SAVE_KEYS.forEach(mk=>{heatD[mk]={};S.transactions.filter(t=>t.date&&t.date.startsWith(mk)&&t.type==='expense'&&!EXCLUIR.includes(t.category)).forEach(t=>{const c=t.category||'Otros';heatD[mk][c]=(heatD[mk][c]||0)+parseFloat(t.amount||0);});});
+    const activeHeatCats=HEAT_CATS.filter(c=>SAVE_KEYS.some(mk=>(heatD[mk][c]||0)>0));
+    const catRowMax={};activeHeatCats.forEach(c=>{catRowMax[c]=Math.max(...SAVE_KEYS.map(mk=>heatD[mk][c]||0));});
+    const hexRgb=hex=>{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return r+','+g+','+b;};
+
+    // === PROJECTION ===
+    const mthsWI=monthlyData.filter(m=>m.ing>0).length;
+    const remMths=Math.max(0,12-mthsWI);
+    const avgMonIncome=mthsWI>0?ytdIngreso/mthsWI:0;
+    const avgMonAhorro=mthsWI>0?ytdAhorro/mthsWI:0;
+    const projCurrent=Math.round(ytdAhorro+avgMonAhorro*remMths);
+    const projTarget20=Math.round(ytdAhorro+avgMonIncome*0.20*remMths);
+    const autoTrf=Math.round(avgMonIncome*0.20);
+
+    // === FLOW DATA ===
+    const totalDep=ytdGasto+ytdAhorro;
+    const ytdCatTots={};
+    S.transactions.filter(t=>t.date&&t.date.startsWith('2026')&&t.type==='expense'&&!EXCLUIR.includes(t.category)).forEach(t=>{const c=t.category||'Otros';ytdCatTots[c]=(ytdCatTots[c]||0)+parseFloat(t.amount||0);});
+    const flowItems=Object.entries(ytdCatTots).sort((a,b)=>b[1]-a[1]).slice(0,7).map(([c,v])=>({c,v,pct:totalDep>0?Math.round((v/totalDep)*100):0}));
+    const flowAhoItem={c:'Ahorro',v:ytdAhorro,pct:totalDep>0?Math.round((ytdAhorro/totalDep)*100):0};
+    const flowRestPct=Math.max(0,100-flowItems.reduce((s,x)=>s+x.pct,0)-flowAhoItem.pct);
+
+    // === BUILD HTML BLOCKS ===
+    const budgetCardHtml=(()=>{
+      if(!catList.length) return '';
+      let h='<div class="card" style="margin-bottom:10px"><div class="card-head"><span class="ch-icon">🎯</span><span class="ch-label">Presupuesto mensual</span><span class="ch-count" style="font-style:italic;font-size:10px">✏️ edita límites</span></div>';
+      for(const [cat,total] of catList){
+        const bud=S.budgets[cat]||0;
+        const budPct=bud>0?Math.min(Math.round((total/bud)*100),999):null;
+        const pctOfGasto=Math.round((total/totalGasto)*100)||0;
+        const col=catColors[cat]||'#9CA3AF';
+        const barCol=budPct===null?col:budPct>=100?'#DC2626':budPct>=80?'#D97706':'#16A34A';
+        const barW=bud>0?Math.min(budPct,100):pctOfGasto;
+        h+='<div style="padding:10px 14px;border-top:1px solid var(--border)">';
+        h+='<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">';
+        h+='<span style="flex:1;font-size:13px;font-weight:500;cursor:pointer" onclick="S.finCat=\''+cat+'\';render()">'+cat+'</span>';
+        h+='<span style="font-size:13px;font-weight:700;color:'+(budPct!==null&&budPct>=100?'#DC2626':'var(--text)')+'">'+total.toFixed(0)+'€</span>';
+        if(bud>0){h+='<span style="font-size:11px;color:var(--t3)">/ '+bud+'€</span><span style="font-size:11px;font-weight:700;color:'+barCol+'"> '+budPct+'%</span>';}
+        else{h+='<span style="font-size:11px;color:var(--t2)">'+pctOfGasto+'%</span>';}
+        h+='<button onclick="openBudgetEdit(\''+cat+'\','+bud+')" style="border:none;background:none;cursor:pointer;padding:2px 4px;color:var(--t3);font-size:13px;flex-shrink:0;line-height:1">✏️</button>';
+        h+='</div>';
+        h+='<div style="background:var(--bg);border-radius:999px;height:6px;overflow:hidden"><div style="background:'+barCol+';height:100%;width:'+barW+'%;border-radius:999px;transition:width 0.35s"></div></div>';
+        if(bud>0) h+='<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--t3);margin-top:2px"><span>0€</span><span>límite '+bud+'€</span></div>';
+        h+='</div>';
+      }
+      h+='</div>';
+      return h;
+    })();
+
+    const heatmapCardHtml=(()=>{
+      if(!activeHeatCats.length) return '';
+      let h='<div class="card" style="margin-bottom:10px"><div class="card-head"><span class="ch-icon">🗓</span><span class="ch-label">Mapa de gastos</span><span class="ch-count">2026</span></div><div style="padding:10px 14px;overflow-x:auto"><table style="border-collapse:separate;border-spacing:3px;font-size:10px;width:100%">';
+      h+='<tr><td style="padding-right:6px;min-width:72px"></td>'+SAVE_LABS.map(l=>'<td style="text-align:center;font-weight:700;color:var(--t2);padding:2px 4px;min-width:36px">'+l+'</td>').join('')+'</tr>';
+      for(const cat of activeHeatCats){
+        const rgb=hexRgb(catColors[cat]||'#9CA3AF');
+        h+='<tr><td style="font-weight:500;color:var(--text);padding:3px 6px 3px 0;white-space:nowrap">'+cat+'</td>';
+        for(const mk of SAVE_KEYS){
+          const val=Math.round(heatD[mk][cat]||0);
+          const op=catRowMax[cat]>0?(0.15+(val/catRowMax[cat])*0.75):0;
+          const bg=val>0?'rgba('+rgb+','+op.toFixed(2)+')':'transparent';
+          const tc=val>0?(op>0.55?'#fff':'var(--text)'):'var(--t3)';
+          h+='<td style="text-align:center;background:'+bg+';border-radius:4px;padding:3px 2px;color:'+tc+';font-weight:'+(val>0?600:400)+'">'+( val>0?val:'—')+'</td>';
+        }
+        h+='</tr>';
+      }
+      h+='</table></div></div>';
+      return h;
+    })();
+
+    const projectionCardHtml=(()=>{
+      if(mthsWI===0) return '';
+      const fmt=n=>Math.round(n).toLocaleString('es');
+      const gap=projTarget20-projCurrent;
+      return '<div class="card" style="margin-bottom:10px"><div class="card-head"><span class="ch-icon">📈</span><span class="ch-label">Proyección 2026</span><span class="ch-count">'+mthsWI+' meses</span></div><div style="padding:10px 14px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px"><div style="background:var(--bg);border-radius:var(--r-sm);padding:10px;text-align:center"><div style="font-size:10px;color:var(--t2);margin-bottom:3px">A este ritmo</div><div style="font-size:20px;font-weight:800;color:#085041">'+fmt(projCurrent)+'€</div><div style="font-size:10px;color:var(--t3)">fin de año</div></div><div style="background:var(--ok-bg);border-radius:var(--r-sm);padding:10px;text-align:center"><div style="font-size:10px;color:var(--ok);margin-bottom:3px">Con 20%/mes</div><div style="font-size:20px;font-weight:800;color:#085041">'+fmt(projTarget20)+'€</div><div style="font-size:10px;color:var(--t3)">'+(gap>0?'+'+fmt(gap)+'€ más':'')+'</div></div></div><div style="background:var(--warn-bg);border-radius:var(--r-sm);padding:10px;font-size:12px;color:var(--warn)">💡 Transferir <strong>'+fmt(autoTrf)+'€</strong> a Esther justo al cobrar cada mes te daría <strong>'+fmt(projTarget20)+'€</strong> ahorrados en diciembre.</div></div></div>';
+    })();
+
+    const flowCardHtml=(()=>{
+      if(!totalDep) return '';
+      const allSegs=[...flowItems,flowAhoItem].filter(x=>x.pct>1);
+      let bar='<div style="display:flex;height:20px;border-radius:6px;overflow:hidden;margin-bottom:10px">';
+      for(const x of allSegs){const col=x.c==='Ahorro'?'#16A34A':(catColors[x.c]||'#9CA3AF');bar+='<div style="flex:'+x.pct+';background:'+col+';min-width:0"></div>';}
+      if(flowRestPct>2) bar+='<div style="flex:'+flowRestPct+';background:#e5e7eb;min-width:0"></div>';
+      bar+='</div>';
+      let leg='<div style="display:flex;flex-wrap:wrap;gap:6px 10px">';
+      for(const x of [...flowItems,flowAhoItem].filter(x=>x.pct>0)){const col=x.c==='Ahorro'?'#16A34A':(catColors[x.c]||'#9CA3AF');leg+='<div style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:'+col+';flex-shrink:0;display:inline-block"></span><span style="font-size:11px;color:var(--t2)">'+x.c+'</span><span style="font-size:11px;font-weight:700">'+x.pct+'%</span></div>';}
+      leg+='</div>';
+      return '<div class="card" style="margin-bottom:10px"><div class="card-head"><span class="ch-icon">💸</span><span class="ch-label">¿A dónde fue el dinero?</span><span class="ch-count">YTD</span></div><div style="padding:10px 14px">'+bar+leg+'</div></div>';
+    })();
+
     // Categories (excluye Transferencias y Ahorro del gráfico)
     const cats={};
     gastosReales.forEach(t=>{
@@ -683,22 +775,10 @@ function areaView() {
       <span style="font-size:15px;font-weight:700;color:${parseFloat(deuda.value)>0?'#A32D2D':'#6B7280'}">${parseFloat(deuda.value).toFixed(0)}€</span>
     </div>`:''}
 
-    ${catList.length?`<div class="card" style="margin-bottom:10px">
-      <div class="card-head"><span class="ch-icon">📊</span><span class="ch-label">Por categoría</span></div>
-      ${catList.map(([cat,total])=>{
-        const pct=Math.round((total/totalGasto)*100)||0;
-        const col=catColors[cat]||'#9CA3AF';
-        return `<div style="padding:10px 14px;border-top:1px solid var(--border);cursor:pointer" onclick="S.finCat='${cat}';render()">
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-            <span style="font-size:13px;font-weight:500">${cat}</span>
-            <span style="font-size:13px;font-weight:700">${total.toFixed(2)}€ <span style="font-size:11px;color:var(--t2);font-weight:400">${pct}%</span></span>
-          </div>
-          <div style="background:var(--bg);border-radius:999px;height:5px;overflow:hidden">
-            <div style="background:${col};height:100%;width:${pct}%;border-radius:999px"></div>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>`:''}
+    ${budgetCardHtml}
+    ${heatmapCardHtml}
+    ${flowCardHtml}
+    ${projectionCardHtml}
 
     <div class="card" style="margin-bottom:10px">
       <div class="card-head"><span class="ch-icon">📋</span><span class="ch-label">Transacciones (${txs.length})</span></div>
@@ -974,6 +1054,23 @@ async function updateTxCat(id, category) {
   await db.from('transactions').update({category}).eq('id',id);
   const tx=S.transactions.find(t=>t.id===id);
   if(tx) tx.category=category;
+}
+
+function openBudgetEdit(cat,current){
+  const m=document.createElement('div');m.className='overlay';m.id='modal';
+  m.innerHTML='<div class="modal"><h3>Límite: '+cat+'</h3><p style="font-size:13px;color:var(--t2);margin-bottom:14px">Cuánto quieres gastar en <strong>'+cat+'</strong> al mes. La barra se pondrá roja si lo superas.</p><input class="fi" id="bv" type="number" inputmode="decimal" placeholder="Importe €" value="'+(current||'')+'"><div class="ma"><button class="btn btn-s" onclick="closeModal()">Cancelar</button>'+(current?'<button class="btn btn-s" onclick="deleteBudget(\''+cat+'\')" style="flex:0;padding:13px 14px;color:#DC2626">Borrar</button>':'')+'<button class="btn btn-p" onclick="saveBudgetVal(\''+cat+'\')">Guardar</button></div></div>';
+  m.onclick=e=>{if(e.target===m)closeModal()};
+  document.body.appendChild(m);
+  setTimeout(()=>document.getElementById('bv')?.focus(),150);
+}
+function saveBudgetVal(cat){
+  const val=parseFloat(document.getElementById('bv')?.value);
+  if(!isNaN(val)&&val>0){S.budgets[cat]=val;localStorage.setItem('life_budgets',JSON.stringify(S.budgets));}
+  closeModal();render();
+}
+function deleteBudget(cat){
+  delete S.budgets[cat];localStorage.setItem('life_budgets',JSON.stringify(S.budgets));
+  closeModal();render();
 }
 
 function finPrev() {
