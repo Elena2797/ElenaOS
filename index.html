@@ -567,16 +567,23 @@ function areaView() {
     const totalAhorro=ahorros.reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const totalNomina=ingresos.filter(t=>t.category==='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const margen=totalNomina-totalGasto;
+    const tasaMes=totalNomina>0?Math.round((totalAhorro/totalNomina)*100):0;
 
-    // Savings chart — cumulative jan-jun 2026
+    // YTD + monthly breakdown
     const SAVE_KEYS=['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'];
     const SAVE_LABS=['Ene','Feb','Mar','Abr','May','Jun'];
-    const saveTxs=S.transactions.filter(t=>t.category==='Ahorro');
-    const saveMonthly=SAVE_KEYS.map(mk=>saveTxs.filter(t=>t.date&&t.date.startsWith(mk)).reduce((s,t)=>s+parseFloat(t.amount||0),0));
-    let saveRun=0;
-    const saveCumul=saveMonthly.map(v=>(saveRun+=v,saveRun));
-    const saveMax=Math.max(...saveCumul,1);
-    const saveFmt=v=>v>=1000?(v/1000).toFixed(1)+'k':v.toFixed(0)+'€';
+    const txsYTD=S.transactions.filter(t=>t.date&&t.date.startsWith('2026'));
+    const ytdIngreso=txsYTD.filter(t=>t.category==='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
+    const ytdGasto=txsYTD.filter(t=>t.type==='expense'&&!EXCLUIR.includes(t.category)).reduce((s,t)=>s+parseFloat(t.amount||0),0);
+    const ytdAhorro=txsYTD.filter(t=>t.category==='Ahorro').reduce((s,t)=>s+parseFloat(t.amount||0),0);
+    const ytdTasa=ytdIngreso>0?Math.round((ytdAhorro/ytdIngreso)*100):0;
+    const monthlyData=SAVE_KEYS.map((mk,i)=>{
+      const mtxs=S.transactions.filter(t=>t.date&&t.date.startsWith(mk));
+      const ing=mtxs.filter(t=>t.category==='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
+      const gas=mtxs.filter(t=>t.type==='expense'&&!EXCLUIR.includes(t.category)).reduce((s,t)=>s+parseFloat(t.amount||0),0);
+      const aho=mtxs.filter(t=>t.category==='Ahorro').reduce((s,t)=>s+parseFloat(t.amount||0),0);
+      return {mk,lab:SAVE_LABS[i],ing,gas,aho,mar:ing-gas,tasa:ing>0?Math.round((aho/ing)*100):0};
+    });
 
     // Categories (excluye Transferencias y Ahorro del gráfico)
     const cats={};
@@ -641,19 +648,35 @@ function areaView() {
         <div style="font-size:18px;font-weight:700;color:#085041">${totalAhorro.toFixed(0)}€</div>
       </div>
     </div>
+    <div style="text-align:center;margin-bottom:8px">
+      <span style="font-size:12px;color:var(--t2)">Tasa de ahorro ${monthName.split(' ')[0]}: </span>
+      <span style="font-size:13px;font-weight:700;color:${tasaMes>=20?'#16A34A':tasaMes>=10?'#854F0B':'var(--t2)'}">${tasaMes}%</span>
+      ${totalNomina>0&&totalAhorro>0?`<span style="font-size:11px;color:var(--t2)"> · ${totalAhorro.toFixed(0)}€ de ${totalNomina.toFixed(0)}€</span>`:''}
+    </div>
     <div class="card" style="margin-bottom:8px">
-      <div class="card-head"><span class="ch-icon">📈</span><span class="ch-label">Ahorro acumulado 2026</span><span class="ch-count">${saveFmt(saveRun)}</span></div>
-      <div style="padding:6px 10px 10px">
-        <svg viewBox="0 0 300 155" style="width:100%;height:auto;display:block">
-          <line x1="35" y1="12" x2="35" y2="128" stroke="rgba(0,0,0,0.08)" stroke-width="1"/>
-          <line x1="35" y1="128" x2="295" y2="128" stroke="rgba(0,0,0,0.08)" stroke-width="1"/>
-          <line x1="35" y1="70" x2="295" y2="70" stroke="rgba(0,0,0,0.08)" stroke-width="0.5" stroke-dasharray="3,2"/>
-          <text x="32" y="15" text-anchor="end" font-size="8" fill="#b0b0b0">${saveFmt(saveMax)}</text>
-          <text x="32" y="73" text-anchor="end" font-size="8" fill="#b0b0b0">${saveFmt(saveMax/2)}</text>
-          <text x="32" y="131" text-anchor="end" font-size="8" fill="#b0b0b0">0</text>
-          ${saveCumul.map((v,i)=>{const bH=Math.max(Math.round((v/saveMax)*116),2);const bX=42+i*43;const bY=128-bH;const isActive=SAVE_KEYS[i]===S.finMonth;const valLabel=bH>16?`<text x="${bX+15}" y="${bY-3}" text-anchor="middle" font-size="8" fill="#15803d" font-weight="700">${saveFmt(v)}</text>`:'';return `<g style="cursor:pointer" onclick="S.finCat=null;S.finMonth='${SAVE_KEYS[i]}';render()"><rect x="${bX}" y="${bY}" width="30" height="${bH}" fill="${isActive?'#15803d':'#16A34A'}" rx="3" opacity="${isActive?1:0.85}"/><title>${SAVE_LABS[i]}: ${v.toFixed(0)}€ acumulado (+${saveMonthly[i].toFixed(0)}€ este mes)</title><text x="${bX+15}" y="143" text-anchor="middle" font-size="9" fill="#6b6b6b">${SAVE_LABS[i]}</text>${valLabel}</g>`;}).join('')}
-        </svg>
+      <div class="card-head"><span class="ch-icon">💰</span><span class="ch-label">2026 — Ahorro</span><span class="ch-count">${ytdAhorro.toFixed(0)}€ · ${ytdTasa}%</span></div>
+      <div style="padding:10px 14px 4px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-size:11px;color:var(--t2)">Tasa de ahorro anual</span>
+          <span style="font-size:12px;font-weight:700;color:#085041">${ytdTasa}% de ${(ytdIngreso/1000).toFixed(1)}k€ ganado</span>
+        </div>
+        <div style="background:var(--bg);border-radius:999px;height:8px;overflow:hidden;margin-bottom:2px">
+          <div style="background:#16A34A;height:100%;width:${Math.min(ytdTasa,100)}%;border-radius:999px"></div>
+        </div>
       </div>
+      ${monthlyData.filter(m=>m.ing>0||m.aho>0).map(m=>{
+        const barW=m.ing>0?Math.min(Math.round((m.aho/m.ing)*100),100):0;
+        const isActive=m.mk===S.finMonth;
+        const col=m.tasa>=20?'#16A34A':m.tasa>=10?'#65A96E':'#AAC8AA';
+        return `<div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer;${isActive?'background:rgba(21,128,61,0.06)':''}" onclick="S.finCat=null;S.finMonth='${m.mk}';render()">
+          <span style="font-size:12px;font-weight:${isActive?700:500};width:28px;color:${isActive?'var(--text)':'var(--t2)'}">${m.lab}</span>
+          <div style="flex:1;background:var(--bg);border-radius:999px;height:5px;overflow:hidden">
+            <div style="background:${col};height:100%;width:${barW}%;border-radius:999px"></div>
+          </div>
+          <span style="font-size:12px;font-weight:600;color:#085041;width:52px;text-align:right">${m.aho>0?m.aho.toFixed(0)+'€':'—'}</span>
+          <span style="font-size:11px;color:var(--t2);width:28px;text-align:right">${m.ing>0?m.tasa+'%':'—'}</span>
+        </div>`;
+      }).join('')}
     </div>
     ${deuda?`<div style="background:var(--surface);border-radius:var(--r-sm);padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:12px;color:var(--t2)">Deuda Visa Sabadell</span>
