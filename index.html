@@ -570,6 +570,16 @@ function areaView() {
     const totalIngreso=ingresos.reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const balance=totalIngreso-totalGasto-totalAhorro;
 
+    // Savings chart — cumulative jan-jun 2026
+    const SAVE_KEYS=['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'];
+    const SAVE_LABS=['Ene','Feb','Mar','Abr','May','Jun'];
+    const saveTxs=S.transactions.filter(t=>t.category==='Ahorro');
+    const saveMonthly=SAVE_KEYS.map(mk=>saveTxs.filter(t=>t.date&&t.date.startsWith(mk)).reduce((s,t)=>s+parseFloat(t.amount||0),0));
+    let saveRun=0;
+    const saveCumul=saveMonthly.map(v=>(saveRun+=v,saveRun));
+    const saveMax=Math.max(...saveCumul,1);
+    const saveFmt=v=>v>=1000?(v/1000).toFixed(1)+'k':v.toFixed(0)+'€';
+
     // Categories (excluye Transferencias y Ahorro del gráfico)
     const cats={};
     gastosReales.forEach(t=>{
@@ -602,21 +612,28 @@ function areaView() {
         <div style="font-size:18px;font-weight:700;color:#A32D2D">${totalGasto.toFixed(0)}€</div>
       </div>
     </div>
+    <div class="card" style="margin-bottom:8px">
+      <div class="card-head"><span class="ch-icon">📈</span><span class="ch-label">Ahorro acumulado 2026</span><span class="ch-count">${saveFmt(saveRun)}</span></div>
+      <div style="padding:6px 10px 10px">
+        <svg viewBox="0 0 300 155" style="width:100%;height:auto;display:block">
+          <line x1="35" y1="12" x2="35" y2="128" stroke="rgba(0,0,0,0.08)" stroke-width="1"/>
+          <line x1="35" y1="128" x2="295" y2="128" stroke="rgba(0,0,0,0.08)" stroke-width="1"/>
+          <line x1="35" y1="70" x2="295" y2="70" stroke="rgba(0,0,0,0.08)" stroke-width="0.5" stroke-dasharray="3,2"/>
+          <text x="32" y="15" text-anchor="end" font-size="8" fill="#b0b0b0">${saveFmt(saveMax)}</text>
+          <text x="32" y="73" text-anchor="end" font-size="8" fill="#b0b0b0">${saveFmt(saveMax/2)}</text>
+          <text x="32" y="131" text-anchor="end" font-size="8" fill="#b0b0b0">0</text>
+          ${saveCumul.map((v,i)=>{const bH=Math.max(Math.round((v/saveMax)*116),2);const bX=42+i*43;const bY=128-bH;const isActive=SAVE_KEYS[i]===S.finMonth;const valLabel=bH>16?`<text x="${bX+15}" y="${bY-3}" text-anchor="middle" font-size="8" fill="#15803d" font-weight="700">${saveFmt(v)}</text>`:'';return `<g style="cursor:pointer" onclick="S.finMonth='${SAVE_KEYS[i]}';render()"><rect x="${bX}" y="${bY}" width="30" height="${bH}" fill="${isActive?'#15803d':'#16A34A'}" rx="3" opacity="${isActive?1:0.85}"/><title>${SAVE_LABS[i]}: ${v.toFixed(0)}€ acumulado (+${saveMonthly[i].toFixed(0)}€ este mes)</title><text x="${bX+15}" y="143" text-anchor="middle" font-size="9" fill="#6b6b6b">${SAVE_LABS[i]}</text>${valLabel}</g>`;}).join('')}
+        </svg>
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
       <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
-        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Ahorrado</div>
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Ahorrado este mes</div>
         <div style="font-size:18px;font-weight:700;color:#085041">${totalAhorro.toFixed(0)}€</div>
       </div>
       <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
         <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Deuda Visa</div>
         <div style="font-size:18px;font-weight:700;color:${deuda&&parseFloat(deuda.value)>0?'#A32D2D':'#6B7280'}">${deuda?parseFloat(deuda.value).toFixed(0)+'€':'—'}</div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-      <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
-        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Ahorro total (pocket)</div>
-        <div style="font-size:18px;font-weight:700;color:#16A34A">${ahorroTotal?parseFloat(ahorroTotal.value).toFixed(0)+'€':'—'}</div>
-        <div style="font-size:10px;color:var(--t2);margin-top:2px">+ este mes: ${totalAhorro.toFixed(0)}€</div>
       </div>
     </div>
     <div style="background:var(--surface);border-radius:var(--r-sm);padding:11px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
