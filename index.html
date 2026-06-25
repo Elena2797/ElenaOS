@@ -567,7 +567,7 @@ function areaView() {
     const totalAhorro=ahorros.reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const totalNomina=ingresos.filter(t=>t.category==='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const margen=totalNomina-totalGasto;
-    const tasaMes=totalNomina>0?Math.round((totalAhorro/totalNomina)*100):0;
+    const tasaMes=totalNomina>0?Math.max(0,Math.round((margen/totalNomina)*100)):0;
 
     // YTD + monthly breakdown
     const SAVE_KEYS=['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'];
@@ -576,13 +576,13 @@ function areaView() {
     const ytdIngreso=txsYTD.filter(t=>t.category==='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const ytdGasto=txsYTD.filter(t=>t.type==='expense'&&!EXCLUIR.includes(t.category)).reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const ytdAhorro=txsYTD.filter(t=>t.category==='Ahorro').reduce((s,t)=>s+parseFloat(t.amount||0),0);
-    const ytdTasa=ytdIngreso>0?Math.round((ytdAhorro/ytdIngreso)*100):0;
+    const ytdTasa=ytdIngreso>0?Math.max(0,Math.round(((ytdIngreso-ytdGasto)/ytdIngreso)*100)):0;
     const monthlyData=SAVE_KEYS.map((mk,i)=>{
       const mtxs=S.transactions.filter(t=>t.date&&t.date.startsWith(mk));
       const ing=mtxs.filter(t=>t.category==='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
       const gas=mtxs.filter(t=>t.type==='expense'&&!EXCLUIR.includes(t.category)).reduce((s,t)=>s+parseFloat(t.amount||0),0);
       const aho=mtxs.filter(t=>t.category==='Ahorro').reduce((s,t)=>s+parseFloat(t.amount||0),0);
-      return {mk,lab:SAVE_LABS[i],ing,gas,aho,mar:ing-gas,tasa:ing>0?Math.round((aho/ing)*100):0};
+      return {mk,lab:SAVE_LABS[i],ing,gas,aho,mar:ing-gas,tasa:ing>0?Math.max(0,Math.round(((ing-gas)/ing)*100)):0};
     });
 
     // === HEATMAP DATA ===
@@ -597,8 +597,8 @@ function areaView() {
     const mthsWI=monthlyData.filter(m=>m.ing>0).length;
     const remMths=Math.max(0,12-mthsWI);
     const avgMonIncome=mthsWI>0?ytdIngreso/mthsWI:0;
-    const avgMonAhorro=mthsWI>0?ytdAhorro/mthsWI:0;
-    const projCurrent=Math.round(ytdAhorro+avgMonAhorro*remMths);
+    const avgMonBalance=mthsWI>0?(ytdIngreso-ytdGasto)/mthsWI:0;
+    const projCurrent=Math.round(ytdAhorro+Math.max(0,avgMonBalance)*remMths);
     const projTarget20=Math.round(ytdAhorro+avgMonIncome*0.20*remMths);
     const autoTrf=Math.round(avgMonIncome*0.20);
 
@@ -735,36 +735,42 @@ function areaView() {
         <div style="font-size:18px;font-weight:700;color:${margen>=0?'#0F6E56':'#A32D2D'}">${margen>=0?'+':''}${margen.toFixed(0)}€</div>
       </div>
       <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
-        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Ahorro</div>
-        <div style="font-size:18px;font-weight:700;color:#085041">${totalAhorro.toFixed(0)}€</div>
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Patrimonio</div>
+        <div style="font-size:18px;font-weight:700;color:#085041">${ytdAhorro.toFixed(0)}€</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:2px">acumulado 2026</div>
       </div>
     </div>
     <div style="text-align:center;margin-bottom:8px">
-      <span style="font-size:12px;color:var(--t2)">Tasa de ahorro ${monthName.split(' ')[0]}: </span>
-      <span style="font-size:13px;font-weight:700;color:${tasaMes>=20?'#16A34A':tasaMes>=10?'#854F0B':'var(--t2)'}">${tasaMes}%</span>
-      ${totalNomina>0&&totalAhorro>0?`<span style="font-size:11px;color:var(--t2)"> · ${totalAhorro.toFixed(0)}€ de ${totalNomina.toFixed(0)}€</span>`:''}
+      <span style="font-size:12px;color:var(--t2)">Balance ${monthName.split(' ')[0]}: </span>
+      <span style="font-size:13px;font-weight:700;color:${margen>=0?'#16A34A':'#A32D2D'}">${margen>=0?'+':''}${margen.toFixed(0)}€</span>
+      ${totalNomina>0?`<span style="font-size:11px;color:var(--t2)"> · tasa ahorro: </span><span style="font-size:12px;font-weight:700;color:${tasaMes>=20?'#16A34A':tasaMes>=10?'#854F0B':'var(--t2)'}">${tasaMes}%</span>`:''}
     </div>
     <div class="card" style="margin-bottom:8px">
-      <div class="card-head"><span class="ch-icon">💰</span><span class="ch-label">2026 — Ahorro</span><span class="ch-count">${ytdAhorro.toFixed(0)}€ · ${ytdTasa}%</span></div>
+      <div class="card-head"><span class="ch-icon">💰</span><span class="ch-label">2026 — Balance mensual</span><span class="ch-count">${ytdTasa}% tasa</span></div>
       <div style="padding:10px 14px 4px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="font-size:11px;color:var(--t2)">Tasa de ahorro anual</span>
-          <span style="font-size:12px;font-weight:700;color:#085041">${ytdTasa}% de ${(ytdIngreso/1000).toFixed(1)}k€ ganado</span>
+          <span style="font-size:11px;color:var(--t2)">Tasa ahorro YTD (balance / ingreso)</span>
+          <span style="font-size:12px;font-weight:700;color:#085041">${ytdTasa}% · ${(ytdIngreso/1000).toFixed(1)}k€</span>
         </div>
-        <div style="background:var(--bg);border-radius:999px;height:8px;overflow:hidden;margin-bottom:2px">
+        <div style="background:var(--bg);border-radius:999px;height:8px;overflow:hidden;margin-bottom:8px">
           <div style="background:#16A34A;height:100%;width:${Math.min(ytdTasa,100)}%;border-radius:999px"></div>
         </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t2);padding-top:8px;border-top:1px solid var(--border)">
+          <span>Patrimonio acumulado 2026</span>
+          <span style="font-weight:700;color:#085041">${ytdAhorro.toFixed(0)}€</span>
+        </div>
       </div>
-      ${monthlyData.filter(m=>m.ing>0||m.aho>0).map(m=>{
-        const barW=m.ing>0?Math.min(Math.round((m.aho/m.ing)*100),100):0;
+      ${monthlyData.filter(m=>m.ing>0||m.gas>0).map(m=>{
+        const barW=m.ing>0?Math.min(Math.max(0,Math.round((m.mar/m.ing)*100)),100):0;
         const isActive=m.mk===S.finMonth;
-        const col=m.tasa>=20?'#16A34A':m.tasa>=10?'#65A96E':'#AAC8AA';
+        const col=m.tasa>=20?'#16A34A':m.tasa>=10?'#65A96E':'#D97706';
+        const marCol=m.mar>=0?'#085041':'#A32D2D';
         return `<div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer;${isActive?'background:rgba(21,128,61,0.06)':''}" onclick="S.finCat=null;S.finMonth='${m.mk}';render()">
           <span style="font-size:12px;font-weight:${isActive?700:500};width:28px;color:${isActive?'var(--text)':'var(--t2)'}">${m.lab}</span>
           <div style="flex:1;background:var(--bg);border-radius:999px;height:5px;overflow:hidden">
             <div style="background:${col};height:100%;width:${barW}%;border-radius:999px"></div>
           </div>
-          <span style="font-size:12px;font-weight:600;color:#085041;width:52px;text-align:right">${m.aho>0?m.aho.toFixed(0)+'€':'—'}</span>
+          <span style="font-size:12px;font-weight:600;color:${marCol};width:56px;text-align:right">${m.ing>0?(m.mar>=0?'+':'')+m.mar.toFixed(0)+'€':'—'}</span>
           <span style="font-size:11px;color:var(--t2);width:28px;text-align:right">${m.ing>0?m.tasa+'%':'—'}</span>
         </div>`;
       }).join('')}
