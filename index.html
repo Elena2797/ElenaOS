@@ -566,6 +566,7 @@ function areaView() {
     const totalAhorro=ahorros.reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const totalNomina=ingresos.filter(t=>t.category==='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const totalIngreso=ingresos.reduce((s,t)=>s+parseFloat(t.amount||0),0);
+    const balance=totalIngreso-totalGasto-totalAhorro;
 
     // Categories (excluye Transferencias y Ahorro del gráfico)
     const cats={};
@@ -604,6 +605,10 @@ function areaView() {
         <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Deuda Visa</div>
         <div style="font-size:18px;font-weight:700;color:${deuda&&parseFloat(deuda.value)>0?'#A32D2D':'#6B7280'}">${deuda?parseFloat(deuda.value).toFixed(0)+'€':'—'}</div>
       </div>
+    </div>
+    <div style="background:var(--surface);border-radius:var(--r-sm);padding:11px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:12px;color:var(--t2)">Nómina − Gastado − Ahorro <span style="font-size:10px">(solo Sabadell)</span></span>
+      <span style="font-size:16px;font-weight:700;color:${balance>=0?'#0F6E56':'#A32D2D'}">${balance>=0?'+':''}${balance.toFixed(0)}€</span>
     </div>
 
     ${catList.length?`<div class="card" style="margin-bottom:10px">
