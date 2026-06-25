@@ -564,7 +564,8 @@ function areaView() {
     const gastosReales=gastos.filter(t=>!EXCLUIR.includes(t.category));
     const totalGasto=gastosReales.reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const totalAhorro=ahorros.reduce((s,t)=>s+parseFloat(t.amount||0),0);
-    const totalIngreso=ingresos.filter(t=>t.category==='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
+    const totalNomina=ingresos.filter(t=>t.category==='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
+    const totalIngreso=ingresos.reduce((s,t)=>s+parseFloat(t.amount||0),0);
 
     // Categories (excluye Transferencias y Ahorro del gráfico)
     const cats={};
@@ -586,7 +587,7 @@ function areaView() {
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
       <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
-        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Nómina</div>
+        <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Ingresos <span style="font-weight:400;color:var(--t2)">(nómina ${totalNomina>0?totalNomina.toFixed(0)+'€':'—'})</span></div>
         <div style="font-size:18px;font-weight:700;color:#0F6E56">${totalIngreso>0?totalIngreso.toFixed(0)+'€':'—'}</div>
       </div>
       <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
