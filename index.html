@@ -550,7 +550,7 @@ function areaView() {
     const met=S.metrics.filter(x=>x.area_id===a.id);
     const get=k=>met.find(x=>x.key===k);
     const deuda=get('deuda_visa');
-    const ahorroTotal=get('ahorro_total');
+    const ahorroTotal=S.metrics.find(x=>x.key==='ahorro_total');
 
     // Month navigation
     const [yr,mo]=S.finMonth.split('-').map(Number);
