@@ -120,6 +120,9 @@ INSTRUCCIONES:
   for (const { type, params } of actions) {
     try {
       if (type === 'ADD_TASK') {
+        const titleNorm = params.title.toLowerCase().trim();
+        const exists = tasks.find(t => t.title.toLowerCase().trim() === titleNorm);
+        if (exists) { console.log('ADD_TASK skipped — ya existe:', params.title); continue; }
         const area = areas.find(a => a.name === params.area_name);
         await fetch(`${SUPABASE_URL}/rest/v1/tasks`, {
           method: 'POST',
@@ -146,9 +149,12 @@ INSTRUCCIONES:
         }
       } else if (type === 'UPDATE_METRIC') {
         const area = areas.find(a => a.name === params.area_name);
-        const metric = metrics.find(m =>
-          m.key === params.key && (!area || m.area_id === area.id)
-        );
+        const metric = metrics.find(m => {
+          const keyMatch = m.key && m.key === params.key;
+          const labelMatch = m.label && m.label.toLowerCase() === (params.key || '').toLowerCase();
+          const areaMatch = !area || m.area_id === area?.id;
+          return (keyMatch || labelMatch) && areaMatch;
+        });
         if (metric) {
           await fetch(`${SUPABASE_URL}/rest/v1/metrics?id=eq.${metric.id}`, {
             method: 'PATCH',
@@ -173,6 +179,8 @@ INSTRUCCIONES:
           })
         });
       } else if (type === 'ADD_OPERATOR') {
+        const opExists = operators.find(o => o.name.toLowerCase() === params.name.toLowerCase());
+        if (opExists) { console.log('ADD_OPERATOR skipped — ya existe:', params.name); continue; }
         await fetch(`${SUPABASE_URL}/rest/v1/operators`, {
           method: 'POST',
           headers: { ...h, 'Prefer': 'return=minimal' },
