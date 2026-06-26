@@ -73,12 +73,42 @@ CREATE TABLE IF NOT EXISTS decisions (
   created_at timestamptz DEFAULT now()
 );
 
+-- VistaJet: estado general
+CREATE TABLE IF NOT EXISTS vj_state (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  status text DEFAULT 'libre',
+  aircraft text DEFAULT '',
+  rotation_day int,
+  rotation_total int,
+  rotation_start date,
+  hours_month numeric DEFAULT 0,
+  hours_year numeric DEFAULT 0,
+  passport_exp date,
+  active_bag text DEFAULT '',
+  bag_checks jsonb DEFAULT '{}',
+  updated_at timestamptz DEFAULT now()
+);
+
+INSERT INTO vj_state (status) VALUES ('libre');
+
+-- VistaJet: tareas propias
+CREATE TABLE IF NOT EXISTS vj_tasks (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  title text NOT NULL,
+  status text DEFAULT 'pending',
+  priority text DEFAULT 'normal',
+  due_date date,
+  created_at timestamptz DEFAULT now()
+);
+
 -- Desactivar RLS (app personal, una sola usuaria)
 ALTER TABLE life_context DISABLE ROW LEVEL SECURITY;
 ALTER TABLE areas DISABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks DISABLE ROW LEVEL SECURITY;
 ALTER TABLE waiting_for DISABLE ROW LEVEL SECURITY;
 ALTER TABLE decisions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE vj_state DISABLE ROW LEVEL SECURITY;
+ALTER TABLE vj_tasks DISABLE ROW LEVEL SECURITY;
 
 -- Datos iniciales de Estefanía
 INSERT INTO tasks (title, status, priority, horizon, suitable_modes) VALUES

@@ -207,7 +207,7 @@ function pinPress(v) {
 const URL_ = 'https://cllubptdwydifomlnxds.supabase.co';
 const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsbHVicHRkd3lkaWZvbWxueGRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMDE1MTksImV4cCI6MjA5Nzg3NzUxOX0.jh_OJLmixJAYSmh0GdtxMszNMZCqBZVLkNGFQoG1MhI';
 
-let db, S = { mode:'OFF', view:'home', areaId:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], pendingImage:null, transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false };
+let db, S = { mode:'OFF', view:'home', areaId:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], pendingImage:null, transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[] };
 
 async function initApp() {
   db = supabase.createClient(URL_, KEY_);
@@ -219,7 +219,7 @@ async function initApp() {
 
 async function reload() {
   try {
-    const [c,a,t,w,d,m,op,tr] = await Promise.all([
+    const [c,a,t,w,d,m,op,tr,vjs,vjt] = await Promise.all([
       db.from('life_context').select('*').order('created_at',{ascending:false}).limit(1),
       db.from('areas').select('*').order('sort_order'),
       db.from('tasks').select('*,areas(name,color)').neq('status','done'),
@@ -227,11 +227,14 @@ async function reload() {
       db.from('decisions').select('*,areas(name,color)').eq('status','open'),
       db.from('metrics').select('*'),
       db.from('operators').select('*').order('created_at'),
-      db.from('transactions').select('*').order('date',{ascending:false})
+      db.from('transactions').select('*').order('date',{ascending:false}),
+      db.from('vj_state').select('*').limit(1),
+      db.from('vj_tasks').select('*').order('created_at')
     ]);
     if(c.data&&c.data[0]) S.mode=c.data[0].mode;
     S.areas=a.data||[]; S.tasks=t.data||[]; S.wf=w.data||[]; S.dec=d.data||[];
     S.metrics=m.data||[]; S.operators=op.data||[]; S.transactions=tr.data||[];
+    S.vjState=vjs.data&&vjs.data[0]||{}; S.vjTasks=vjt.data||[];
   } catch(e){ console.error(e); }
 }
 
@@ -290,9 +293,8 @@ function areaView() {
   const isVida=a.name==='Vida Personal';
 
   const vjView=isVJ?()=>{
-    const vj=JSON.parse(localStorage.getItem('vj_state')||'{}');
-    const vjTasks=JSON.parse(localStorage.getItem('vj_tasks')||'[]');
-    const vjBag=JSON.parse(localStorage.getItem('vj_bag')||'{}');
+    const vj=S.vjState;
+    const vjTasks=S.vjTasks;
     const status=vj.status||'libre';
     const statusMap={rotacion:{label:'En rotación',bg:'#FAEEDA',color:'#854F0B',icon:'✈️'},libre:{label:'Libre',bg:'#E1F5EE',color:'#085041',icon:'🏠'},standby:{label:'Standby',bg:'#EEEDFE',color:'#534AB7',icon:'⏳'}};
     const st=statusMap[status]||statusMap.libre;
@@ -326,8 +328,8 @@ function areaView() {
       {id:'long',name:'Rotación larga (+7 días)',items:['Todo de estándar','Ropa extra (4 días)','Vitaminas','Snacks','Auriculares','Libro/tablet personal']},
       {id:'visa',name:'Destino con visa',items:['Pasaporte vigente','Visa/permiso entrada','Seguro viaje','Formularios entrada','Fotos carnet']}
     ];
-    const activeBag=vj.activeBag||null;
-    const bagChecks=vj.bagChecks||{};
+    const activeBag=vj.active_bag||null;
+    const bagChecks=vj.bag_checks||{};
     const activeTpl=bagTemplates.find(t=>t.id===activeBag);
 
     const stateCardHtml=`
@@ -1050,15 +1052,16 @@ function openAdd() {
 function closeModal() { const m=document.getElementById('modal'); if(m)m.remove(); }
 
 // ---- VistaJet functions ----
-function saveVjState(patch) {
-  const vj=JSON.parse(localStorage.getItem('vj_state')||'{}');
-  Object.assign(vj,patch);
-  localStorage.setItem('vj_state',JSON.stringify(vj));
+async function saveVjState(patch) {
+  if(!S.vjState.id) return;
+  patch.updated_at=new Date().toISOString();
+  await db.from('vj_state').update(patch).eq('id',S.vjState.id);
+  Object.assign(S.vjState,patch);
   render();
 }
 
 function openVjState() {
-  const vj=JSON.parse(localStorage.getItem('vj_state')||'{}');
+  const vj=S.vjState;
   const el=document.createElement('div');
   el.className='overlay'; el.id='modal';
   el.innerHTML=`<div class="modal">
@@ -1091,15 +1094,16 @@ function openVjState() {
 }
 
 function saveVjStateForm() {
+  const toNull=v=>v===''?null:v;
   saveVjState({
     status:document.getElementById('vj-status').value,
-    aircraft:document.getElementById('vj-aircraft').value.trim(),
-    rotation_day:document.getElementById('vj-rday').value,
-    rotation_total:document.getElementById('vj-rtotal').value,
-    rotation_start:document.getElementById('vj-rstart').value,
-    hours_month:document.getElementById('vj-hmonth').value,
-    hours_year:document.getElementById('vj-hyear').value,
-    passport_exp:document.getElementById('vj-passport').value,
+    aircraft:document.getElementById('vj-aircraft').value.trim()||null,
+    rotation_day:toNull(document.getElementById('vj-rday').value)||null,
+    rotation_total:toNull(document.getElementById('vj-rtotal').value)||null,
+    rotation_start:toNull(document.getElementById('vj-rstart').value),
+    hours_month:toNull(document.getElementById('vj-hmonth').value)||0,
+    hours_year:toNull(document.getElementById('vj-hyear').value)||0,
+    passport_exp:toNull(document.getElementById('vj-passport').value),
   });
   closeModal();
 }
@@ -1124,55 +1128,51 @@ function openAddVjTask() {
   document.body.appendChild(el);
 }
 
-function saveVjTask() {
+async function saveVjTask() {
   const title=document.getElementById('vjt-title').value.trim();
   if(!title) return;
-  const tasks=JSON.parse(localStorage.getItem('vj_tasks')||'[]');
-  tasks.push({id:Date.now().toString(),title,due_date:document.getElementById('vjt-due').value||null,priority:document.getElementById('vjt-priority').value,status:'pending'});
-  localStorage.setItem('vj_tasks',JSON.stringify(tasks));
+  const due=document.getElementById('vjt-due').value||null;
+  const priority=document.getElementById('vjt-priority').value;
+  const {data}=await db.from('vj_tasks').insert({title,due_date:due,priority,status:'pending'}).select().single();
+  if(data) S.vjTasks.push(data);
   closeModal(); render();
 }
 
-function toggleVjTask(id) {
-  const tasks=JSON.parse(localStorage.getItem('vj_tasks')||'[]');
-  const t=tasks.find(x=>x.id===id);
-  if(t) t.status=t.status==='done'?'pending':'done';
-  localStorage.setItem('vj_tasks',JSON.stringify(tasks));
+async function toggleVjTask(id) {
+  const t=S.vjTasks.find(x=>x.id===id);
+  if(!t) return;
+  const newStatus=t.status==='done'?'pending':'done';
+  await db.from('vj_tasks').update({status:newStatus}).eq('id',id);
+  t.status=newStatus;
   render();
 }
 
-function deleteVjTask(id) {
-  const tasks=JSON.parse(localStorage.getItem('vj_tasks')||'[]').filter(x=>x.id!==id);
-  localStorage.setItem('vj_tasks',JSON.stringify(tasks));
+async function deleteVjTask(id) {
+  await db.from('vj_tasks').delete().eq('id',id);
+  S.vjTasks=S.vjTasks.filter(x=>x.id!==id);
   render();
 }
 
-function clearDoneVjTasks() {
-  const tasks=JSON.parse(localStorage.getItem('vj_tasks')||'[]').filter(x=>x.status!=='done');
-  localStorage.setItem('vj_tasks',JSON.stringify(tasks));
+async function clearDoneVjTasks() {
+  const ids=S.vjTasks.filter(x=>x.status==='done').map(x=>x.id);
+  if(!ids.length) return;
+  await db.from('vj_tasks').delete().in('id',ids);
+  S.vjTasks=S.vjTasks.filter(x=>x.status!=='done');
   render();
 }
 
 function selectVjBag(id) {
-  const vj=JSON.parse(localStorage.getItem('vj_state')||'{}');
-  vj.activeBag=id; vj.bagChecks={};
-  localStorage.setItem('vj_state',JSON.stringify(vj));
-  render();
+  saveVjState({active_bag:id,bag_checks:{}});
 }
 
-function toggleVjBagItem(key) {
-  const vj=JSON.parse(localStorage.getItem('vj_state')||'{}');
-  if(!vj.bagChecks) vj.bagChecks={};
-  vj.bagChecks[key]=!vj.bagChecks[key];
-  localStorage.setItem('vj_state',JSON.stringify(vj));
-  render();
+async function toggleVjBagItem(key) {
+  const checks=Object.assign({},S.vjState.bag_checks||{});
+  checks[key]=!checks[key];
+  await saveVjState({bag_checks:checks});
 }
 
 function resetVjBag() {
-  const vj=JSON.parse(localStorage.getItem('vj_state')||'{}');
-  vj.bagChecks={};
-  localStorage.setItem('vj_state',JSON.stringify(vj));
-  render();
+  saveVjState({bag_checks:{}});
 }
 
 async function incHabito(key) {
