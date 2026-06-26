@@ -227,7 +227,7 @@ async function reload() {
       db.from('decisions').select('*,areas(name,color)').eq('status','open'),
       db.from('metrics').select('*'),
       db.from('operators').select('*').order('created_at'),
-      db.from('transactions').select('*').order('date',{ascending:false}),
+      db.from('transactions').select('*').gte('date',new Date().getFullYear()+'-01-01').order('date',{ascending:false}),
       db.from('vj_state').select('*').limit(1),
       db.from('vj_tasks').select('*').order('created_at')
     ]);
@@ -235,6 +235,12 @@ async function reload() {
     S.areas=a.data||[]; S.tasks=t.data||[]; S.wf=w.data||[]; S.dec=d.data||[];
     S.metrics=m.data||[]; S.operators=op.data||[]; S.transactions=tr.data||[];
     S.vjState=vjs.data&&vjs.data[0]||{}; S.vjTasks=vjt.data||[];
+    // Rebuild budgets from metrics (key prefix 'budget_')
+    S.budgets={};
+    (m.data||[]).filter(x=>x.key&&x.key.startsWith('budget_')).forEach(x=>{
+      const cat=x.key.slice(7);
+      S.budgets[cat]=parseFloat(x.value)||0;
+    });
   } catch(e){ console.error(e); }
 }
 
@@ -521,8 +527,10 @@ function areaView() {
   const vidaView=isVida?()=>{
     const m=S.metrics.filter(x=>x.area_id===a.id);
     const get=k=>m.find(x=>x.key===k);
-    const cannabis=get('dias_sin_cannabis');
+    const cannabisStart=get('cannabis_start_date');
     const sueno=get('horas_sueno');
+    const diasSinCannabis=cannabisStart?Math.floor((Date.now()-new Date(cannabisStart.value))/(864e5)):0;
+    const cannabisColor=diasSinCannabis>30?'#0F6E56':diasSinCannabis>7?'#854F0B':'#A32D2D';
     const rels=[
       {name:'Jaime',status:'Pareja · conexión fuerte',icon:'❤️'},
       {name:'Madre',status:'Cercana · apoyo clave',icon:'💛'},
@@ -532,18 +540,15 @@ function areaView() {
       {icon:'🇨🇳',label:'China',desc:'Hong Kong · Shenzhen · Chongqing · Guilin'},
       {icon:'🇵🇹',label:'Portugal',desc:'Residencia fiscal norte Portugal — objetivo medio plazo'},
     ];
-    const habitos=[
-      {label:'Cannabis',key:'cannabis',val:cannabis?cannabis.value:'0',objetivo:'Eliminar',color:cannabis&&parseInt(cannabis.value)>7?'#0F6E56':'#A32D2D'},
-      {label:'Sueño',key:'sueno',val:sueno?sueno.value:'—',objetivo:'8h',color:'#185FA5'},
-    ];
     return `
     <div class="card" style="margin-bottom:10px">
       <div class="card-head"><span class="ch-icon">🌱</span><span class="ch-label">Hábitos</span></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)">
         <div style="background:var(--surface);padding:14px 12px;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:${cannabis&&parseInt(cannabis.value)>7?'#0F6E56':cannabis&&parseInt(cannabis.value)>3?'#854F0B':'#A32D2D'}">${cannabis?cannabis.value:'0'}</div>
+          <div style="font-size:28px;font-weight:700;color:${cannabisColor}">${diasSinCannabis}</div>
           <div style="font-size:10px;color:var(--t2);margin-top:2px">días sin cannabis</div>
-          <button onclick="incHabito('dias_sin_cannabis')" style="margin-top:6px;padding:4px 10px;border-radius:6px;background:var(--bg);border:1px solid var(--border);font-size:11px;cursor:pointer">+1 día</button>
+          ${cannabisStart?`<div style="font-size:9px;color:var(--t3);margin-top:2px">desde ${new Date(cannabisStart.value).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</div>`:''}
+          <button onclick="resetCannabis()" style="margin-top:6px;padding:4px 10px;border-radius:6px;background:var(--bg);border:1px solid var(--border);font-size:11px;cursor:pointer">Reiniciar</button>
         </div>
         <div style="background:var(--surface);padding:14px 12px;text-align:center">
           <div style="font-size:28px;font-weight:700">${sueno?sueno.value:'—'}<span style="font-size:14px;color:var(--t2);font-weight:400">h</span></div>
@@ -634,10 +639,11 @@ function areaView() {
     const m=S.metrics.filter(x=>x.area_id===a.id);
     const get=k=>m.find(x=>x.key===k);
     const ses=get('sesiones_semana');
-    const dias=get('dias_ultima_sesion');
+    const lastSession=get('last_session_date');
     const prensa=get('prensa_kg');
     const ext=get('extension_kg');
     const sesVal=ses?parseInt(ses.value):0;
+    const diasSinGym=lastSession?Math.floor((Date.now()-new Date(lastSession.value))/(864e5)):null;
     const ejercicios=[
       {name:'Aductora',kg:'70',series:'3×10-15'},
       {name:'Prensa 45°',kg:'120',series:'3×8'},
@@ -658,8 +664,9 @@ function areaView() {
           </div>
         </div>
         <div style="background:var(--surface);padding:14px 12px;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:${dias&&parseInt(dias.value)>7?'#A32D2D':dias&&parseInt(dias.value)>4?'#854F0B':'#3B6D11'}">${dias?dias.value:'—'}</div>
+          <div style="font-size:28px;font-weight:700;color:${diasSinGym===null?'var(--t3)':diasSinGym>7?'#A32D2D':diasSinGym>4?'#854F0B':'#3B6D11'}">${diasSinGym===null?'—':diasSinGym}</div>
           <div style="font-size:10px;color:var(--t2);margin-top:2px">días sin entrenar</div>
+          ${lastSession?`<div style="font-size:9px;color:var(--t3);margin-top:2px">última: ${new Date(lastSession.value).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</div>`:''}
         </div>
       </div>
       <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px">
@@ -744,9 +751,11 @@ function areaView() {
     const tasaMes=totalNomina>0?Math.max(0,Math.round((margen/totalNomina)*100)):0;
 
     // YTD + monthly breakdown
-    const SAVE_KEYS=['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'];
-    const SAVE_LABS=['Ene','Feb','Mar','Abr','May','Jun'];
-    const txsYTD=S.transactions.filter(t=>t.date&&t.date.startsWith('2026'));
+    const CY=new Date().getFullYear();
+    const CM=new Date().getMonth()+1;
+    const SAVE_KEYS=Array.from({length:CM},(_,i)=>CY+'-'+String(i+1).padStart(2,'0'));
+    const SAVE_LABS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'].slice(0,CM);
+    const txsYTD=S.transactions.filter(t=>t.date&&t.date.startsWith(String(CY)));
     const ytdIngreso=txsYTD.filter(t=>t.category==='Nómina').reduce((s,t)=>s+parseFloat(t.amount||0),0);
     const ytdGasto=txsYTD.filter(t=>t.type==='expense'&&!EXCLUIR.includes(t.category)).reduce((s,t)=>s+parseFloat(t.amount||0),0);
     // Solo cuenta como patrimonio las transferencias reales a ahorro (excluye redondeos Sabadell)
@@ -782,7 +791,7 @@ function areaView() {
     // === FLOW DATA ===
     const totalDep=ytdGasto+ytdAhorro;
     const ytdCatTots={};
-    S.transactions.filter(t=>t.date&&t.date.startsWith('2026')&&t.type==='expense'&&!EXCLUIR.includes(t.category)).forEach(t=>{const c=t.category||'Otros';ytdCatTots[c]=(ytdCatTots[c]||0)+parseFloat(t.amount||0);});
+    S.transactions.filter(t=>t.date&&t.date.startsWith(String(CY))&&t.type==='expense'&&!EXCLUIR.includes(t.category)).forEach(t=>{const c=t.category||'Otros';ytdCatTots[c]=(ytdCatTots[c]||0)+parseFloat(t.amount||0);});
     const flowItems=Object.entries(ytdCatTots).sort((a,b)=>b[1]-a[1]).slice(0,7).map(([c,v])=>({c,v,pct:totalDep>0?Math.round((v/totalDep)*100):0}));
     const flowAhoItem={c:'Ahorro',v:ytdAhorro,pct:totalDep>0?Math.round((ytdAhorro/totalDep)*100):0};
     const flowRestPct=Math.max(0,100-flowItems.reduce((s,x)=>s+x.pct,0)-flowAhoItem.pct);
@@ -826,7 +835,7 @@ function areaView() {
 
     const heatmapCardHtml=(()=>{
       if(!activeHeatCats.length) return '';
-      let h='<div class="card" style="margin-bottom:10px"><div class="card-head"><span class="ch-icon">🗓</span><span class="ch-label">Mapa de gastos</span><span class="ch-count">2026</span></div><div style="padding:10px 14px;overflow-x:auto"><table style="border-collapse:separate;border-spacing:3px;font-size:10px;width:100%">';
+      let h='<div class="card" style="margin-bottom:10px"><div class="card-head"><span class="ch-icon">🗓</span><span class="ch-label">Mapa de gastos</span><span class="ch-count">${CY}</span></div><div style="padding:10px 14px;overflow-x:auto"><table style="border-collapse:separate;border-spacing:3px;font-size:10px;width:100%">';
       h+='<tr><td style="padding-right:6px;min-width:72px"></td>'+SAVE_LABS.map(l=>'<td style="text-align:center;font-weight:700;color:var(--t2);padding:2px 4px;min-width:36px">'+l+'</td>').join('')+'</tr>';
       for(const cat of activeHeatCats){
         const rgb=hexRgb(catColors[cat]||'#9CA3AF');
@@ -919,7 +928,7 @@ function areaView() {
       <div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center">
         <div style="font-size:11px;color:var(--t2);margin-bottom:4px">Patrimonio</div>
         <div style="font-size:18px;font-weight:700;color:#085041">${fn(ytdAhorro.toFixed(0)+'€')}</div>
-        <div style="font-size:10px;color:var(--t3);margin-top:2px">total 2026</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:2px">total ${new Date().getFullYear()}</div>
       </div>
     </div>
     <div style="text-align:center;margin-bottom:8px">
@@ -928,7 +937,7 @@ function areaView() {
       ${totalNomina>0?`<span style="font-size:11px;color:var(--t2)"> · tasa ahorro: </span><span style="font-size:12px;font-weight:700;color:${tasaMes>=20?'#16A34A':tasaMes>=10?'#854F0B':'var(--t2)'}">${fn(tasaMes+'%')}</span>`:''}
     </div>
     <div class="card" style="margin-bottom:8px">
-      <div class="card-head"><span class="ch-icon">💰</span><span class="ch-label">2026 — Balance mensual</span><span class="ch-count">${ytdTasa}% tasa</span></div>
+      <div class="card-head"><span class="ch-icon">💰</span><span class="ch-label">${CY} — Balance mensual</span><span class="ch-count">${ytdTasa}% tasa</span></div>
       <div style="padding:10px 14px 4px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <span style="font-size:11px;color:var(--t2)">Tasa ahorro YTD (balance / ingreso)</span>
@@ -938,7 +947,7 @@ function areaView() {
           <div style="background:#16A34A;height:100%;width:${Math.min(ytdTasa,100)}%;border-radius:999px"></div>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t2);padding-top:8px;border-top:1px solid var(--border)">
-          <span>Patrimonio acumulado 2026</span>
+          <span>Patrimonio acumulado ${CY}</span>
           <span style="font-weight:700;color:#085041">${ytdAhorro.toFixed(0)}€</span>
         </div>
       </div>
@@ -1073,7 +1082,9 @@ function go(view, id=null) {
 
 async function toggleMode() {
   S.mode=S.mode==='ON'?'OFF':'ON'; render();
-  await db.from('life_context').insert({mode:S.mode});
+  const {data}=await db.from('life_context').select('id').order('created_at',{ascending:false}).limit(1);
+  if(data?.[0]) await db.from('life_context').update({mode:S.mode}).eq('id',data[0].id);
+  else await db.from('life_context').insert({mode:S.mode});
 }
 
 async function done(id) {
@@ -1257,14 +1268,6 @@ function resetVjBag() {
   saveVjState({bag_checks:{}});
 }
 
-async function incHabito(key) {
-  const a=S.areas.find(x=>x.name==='Vida Personal');
-  if(!a) return;
-  const m=S.metrics.find(x=>x.area_id===a.id&&x.key===key);
-  if(m){const nv=String(parseInt(m.value)+1);await db.from('metrics').update({value:nv,updated_at:new Date().toISOString()}).eq('id',m.id);m.value=nv;}
-  render();
-}
-
 async function setSueno(h) {
   const a=S.areas.find(x=>x.name==='Vida Personal');
   if(!a) return;
@@ -1273,13 +1276,25 @@ async function setSueno(h) {
   render();
 }
 
+async function resetCannabis() {
+  const a=S.areas.find(x=>x.name==='Vida Personal');
+  if(!a) return;
+  const today=new Date().toISOString().slice(0,10);
+  let m=S.metrics.find(x=>x.area_id===a.id&&x.key==='cannabis_start_date');
+  if(m){await db.from('metrics').update({value:today,updated_at:new Date().toISOString()}).eq('id',m.id);m.value=today;}
+  else{const{data}=await db.from('metrics').insert({area_id:a.id,key:'cannabis_start_date',value:today,label:'Inicio sin cannabis',unit:''}).select().single();if(data)S.metrics.push(data);}
+  render();
+}
+
 async function regSesion() {
   const a=S.areas.find(x=>x.name==='Gym');
   if(!a) return;
+  const today=new Date().toISOString().slice(0,10);
   const ses=S.metrics.find(x=>x.area_id===a.id&&x.key==='sesiones_semana');
-  const dias=S.metrics.find(x=>x.area_id===a.id&&x.key==='dias_ultima_sesion');
+  let lastSes=S.metrics.find(x=>x.area_id===a.id&&x.key==='last_session_date');
   if(ses){await db.from('metrics').update({value:String(parseInt(ses.value)+1),updated_at:new Date().toISOString()}).eq('id',ses.id);ses.value=String(parseInt(ses.value)+1);}
-  if(dias){await db.from('metrics').update({value:'0',updated_at:new Date().toISOString()}).eq('id',dias.id);dias.value='0';}
+  if(lastSes){await db.from('metrics').update({value:today,updated_at:new Date().toISOString()}).eq('id',lastSes.id);lastSes.value=today;}
+  else{const{data}=await db.from('metrics').insert({area_id:a.id,key:'last_session_date',value:today,label:'Última sesión',unit:''}).select().single();if(data)S.metrics.push(data);}
   render();
 }
 
@@ -1401,13 +1416,30 @@ function openBudgetEdit(cat,current){
   document.body.appendChild(m);
   setTimeout(()=>document.getElementById('bv')?.focus(),150);
 }
-function saveBudgetVal(cat){
+async function saveBudgetVal(cat){
   const val=parseFloat(document.getElementById('bv')?.value);
-  if(!isNaN(val)&&val>0){S.budgets[cat]=val;localStorage.setItem('life_budgets',JSON.stringify(S.budgets));}
+  if(!isNaN(val)&&val>0){
+    const key='budget_'+cat;
+    const existing=S.metrics.find(x=>x.key===key);
+    if(existing){
+      await db.from('metrics').update({value:String(val),updated_at:new Date().toISOString()}).eq('id',existing.id);
+      existing.value=String(val);
+    } else {
+      const{data}=await db.from('metrics').insert({key,value:String(val),label:'Presupuesto '+cat,unit:'€',area_id:null}).select().single();
+      if(data) S.metrics.push(data);
+    }
+    S.budgets[cat]=val;
+  }
   closeModal();render();
 }
-function deleteBudget(cat){
-  delete S.budgets[cat];localStorage.setItem('life_budgets',JSON.stringify(S.budgets));
+async function deleteBudget(cat){
+  const key='budget_'+cat;
+  const existing=S.metrics.find(x=>x.key===key);
+  if(existing){
+    await db.from('metrics').delete().eq('id',existing.id);
+    S.metrics=S.metrics.filter(x=>x.id!==existing.id);
+  }
+  delete S.budgets[cat];
   closeModal();render();
 }
 
@@ -1483,7 +1515,7 @@ async function saveAddIngreso(month){
   closeModal();
   const{data,error}=await db.from('transactions').insert({date,description:desc,amount:amt,type:'income',category:cat,source:src}).select();
   if(!error&&data?.[0]){S.transactions=[...S.transactions,data[0]];}
-  else{const{data:all}=await db.from('transactions').select('*').gte('date','2026-01-01').order('date',{ascending:false});if(all)S.transactions=all;}
+  else{const{data:all}=await db.from('transactions').select('*').gte('date',new Date().getFullYear()+'-01-01').order('date',{ascending:false});if(all)S.transactions=all;}
   render();
   openIngresoModal(month);
 }
@@ -1531,7 +1563,7 @@ async function saveNewTx(){
   closeModal();
   const {data,error}=await db.from('transactions').insert({date,description:desc,amount:amt,type,category:cat,source:src}).select();
   if(!error&&data?.[0]){S.transactions=[...S.transactions,data[0]];}
-  else{const{data:all}=await db.from('transactions').select('*').gte('date','2026-01-01').order('date',{ascending:false});if(all)S.transactions=all;}
+  else{const{data:all}=await db.from('transactions').select('*').gte('date',new Date().getFullYear()+'-01-01').order('date',{ascending:false});if(all)S.transactions=all;}
   render();
 }
 
