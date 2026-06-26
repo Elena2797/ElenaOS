@@ -1,5 +1,6 @@
 ﻿import './main.css';
 import { createClient } from '@supabase/supabase-js';
+import * as dbSvc from './services/db.js';
 
 const PIN = '1965';
 let pinVal = '';
@@ -50,6 +51,7 @@ let db, S = { mode:'OFF', view:'home', areaId:null, areas:[], tasks:[], wf:[], d
 
 async function initApp() {
   db = createClient(URL_, KEY_);
+  dbSvc.setClient(db);
   const now = new Date();
   document.getElementById('td').textContent = now.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
   await reload();
@@ -58,18 +60,7 @@ async function initApp() {
 
 async function reload() {
   try {
-    const [c,a,t,w,d,m,op,tr,vjs,vjt] = await Promise.all([
-      db.from('life_context').select('*').order('created_at',{ascending:false}).limit(1),
-      db.from('areas').select('*').order('sort_order'),
-      db.from('tasks').select('*,areas(name,color)').neq('status','done'),
-      db.from('waiting_for').select('*,areas(name,color)').eq('status','active'),
-      db.from('decisions').select('*,areas(name,color)').eq('status','open'),
-      db.from('metrics').select('*'),
-      db.from('operators').select('*').order('created_at'),
-      db.from('transactions').select('*').gte('date',new Date().getFullYear()+'-01-01').order('date',{ascending:false}),
-      db.from('vj_state').select('*').limit(1),
-      db.from('vj_tasks').select('*').order('created_at')
-    ]);
+    const {ctx:c,areas:a,tasks:t,waiting:w,decisions:d,metrics:m,operators:op,transactions:tr,vjState:vjs,vjTasks:vjt} = await dbSvc.loadAll();
     if(c.data&&c.data[0]) S.mode=c.data[0].mode;
     S.areas=a.data||[]; S.tasks=t.data||[]; S.wf=w.data||[]; S.dec=d.data||[];
     S.metrics=m.data||[]; S.operators=op.data||[]; S.transactions=tr.data||[];
@@ -921,14 +912,12 @@ function go(view, id=null) {
 
 async function toggleMode() {
   S.mode=S.mode==='ON'?'OFF':'ON'; render();
-  const {data}=await db.from('life_context').select('id').order('created_at',{ascending:false}).limit(1);
-  if(data?.[0]) await db.from('life_context').update({mode:S.mode}).eq('id',data[0].id);
-  else await db.from('life_context').insert({mode:S.mode});
+  await dbSvc.setMode(S.mode);
 }
 
 async function done(id) {
   S.tasks=S.tasks.filter(t=>t.id!==id); render();
-  await db.from('tasks').update({status:'done',completed_at:new Date().toISOString()}).eq('id',id);
+  await dbSvc.completeTask(id);
 }
 
 function openAdd() {
@@ -962,7 +951,7 @@ async function checkinSueno(h) {
   const a=S.areas.find(x=>x.name==='Vida Personal');
   if(!a) return;
   const m=S.metrics.find(x=>x.area_id===a.id&&x.key==='horas_sueno');
-  if(m){await db.from('metrics').update({value:String(h),updated_at:new Date().toISOString()}).eq('id',m.id);m.value=String(h);}
+  if(m){await dbSvc.updateMetric(m.id,h);m.value=String(h);}
   render();
 }
 
@@ -970,7 +959,7 @@ async function checkinDolor(n) {
   const a=S.areas.find(x=>x.name==='Salud');
   if(!a) return;
   const m=S.metrics.find(x=>x.area_id===a.id&&x.key==='dolor_hoy');
-  if(m){await db.from('metrics').update({value:String(n),updated_at:new Date().toISOString()}).eq('id',m.id);m.value=String(n);}
+  if(m){await dbSvc.updateMetric(m.id,n);m.value=String(n);}
   render();
 }
 
@@ -987,7 +976,7 @@ function completeCheckin() {
 async function saveVjState(patch) {
   if(!S.vjState.id) return;
   patch.updated_at=new Date().toISOString();
-  await db.from('vj_state').update(patch).eq('id',S.vjState.id);
+  await dbSvc.updateVjState(S.vjState.id, patch);
   Object.assign(S.vjState,patch);
   render();
 }
@@ -1065,7 +1054,7 @@ async function saveVjTask() {
   if(!title) return;
   const due=document.getElementById('vjt-due').value||null;
   const priority=document.getElementById('vjt-priority').value;
-  const {data}=await db.from('vj_tasks').insert({title,due_date:due,priority,status:'pending'}).select().single();
+  const data=await dbSvc.createVjTask({title,due_date:due,priority});
   if(data) S.vjTasks.push(data);
   closeModal(); render();
 }
@@ -1074,13 +1063,13 @@ async function toggleVjTask(id) {
   const t=S.vjTasks.find(x=>x.id===id);
   if(!t) return;
   const newStatus=t.status==='done'?'pending':'done';
-  await db.from('vj_tasks').update({status:newStatus}).eq('id',id);
+  await dbSvc.updateVjTaskStatus(id, newStatus);
   t.status=newStatus;
   render();
 }
 
 async function deleteVjTask(id) {
-  await db.from('vj_tasks').delete().eq('id',id);
+  await dbSvc.deleteVjTask(id);
   S.vjTasks=S.vjTasks.filter(x=>x.id!==id);
   render();
 }
@@ -1088,7 +1077,7 @@ async function deleteVjTask(id) {
 async function clearDoneVjTasks() {
   const ids=S.vjTasks.filter(x=>x.status==='done').map(x=>x.id);
   if(!ids.length) return;
-  await db.from('vj_tasks').delete().in('id',ids);
+  await dbSvc.deleteVjTasksByIds(ids);
   S.vjTasks=S.vjTasks.filter(x=>x.status!=='done');
   render();
 }
@@ -1111,7 +1100,7 @@ async function setSueno(h) {
   const a=S.areas.find(x=>x.name==='Vida Personal');
   if(!a) return;
   const m=S.metrics.find(x=>x.area_id===a.id&&x.key==='horas_sueno');
-  if(m){await db.from('metrics').update({value:String(h),updated_at:new Date().toISOString()}).eq('id',m.id);m.value=String(h);}
+  if(m){await dbSvc.updateMetric(m.id,h);m.value=String(h);}
   render();
 }
 
@@ -1120,8 +1109,8 @@ async function resetCannabis() {
   if(!a) return;
   const today=new Date().toISOString().slice(0,10);
   let m=S.metrics.find(x=>x.area_id===a.id&&x.key==='cannabis_start_date');
-  if(m){await db.from('metrics').update({value:today,updated_at:new Date().toISOString()}).eq('id',m.id);m.value=today;}
-  else{const{data}=await db.from('metrics').insert({area_id:a.id,key:'cannabis_start_date',value:today,label:'Inicio sin cannabis',unit:''}).select().single();if(data)S.metrics.push(data);}
+  if(m){await dbSvc.updateMetric(m.id,today);m.value=today;}
+  else{const data=await dbSvc.createMetric({area_id:a.id,key:'cannabis_start_date',value:today,label:'Inicio sin cannabis',unit:''});if(data)S.metrics.push(data);}
   render();
 }
 
@@ -1131,9 +1120,9 @@ async function regSesion() {
   const today=new Date().toISOString().slice(0,10);
   const ses=S.metrics.find(x=>x.area_id===a.id&&x.key==='sesiones_semana');
   let lastSes=S.metrics.find(x=>x.area_id===a.id&&x.key==='last_session_date');
-  if(ses){await db.from('metrics').update({value:String(parseInt(ses.value)+1),updated_at:new Date().toISOString()}).eq('id',ses.id);ses.value=String(parseInt(ses.value)+1);}
-  if(lastSes){await db.from('metrics').update({value:today,updated_at:new Date().toISOString()}).eq('id',lastSes.id);lastSes.value=today;}
-  else{const{data}=await db.from('metrics').insert({area_id:a.id,key:'last_session_date',value:today,label:'Última sesión',unit:''}).select().single();if(data)S.metrics.push(data);}
+  if(ses){await dbSvc.updateMetric(ses.id,parseInt(ses.value)+1);ses.value=String(parseInt(ses.value)+1);}
+  if(lastSes){await dbSvc.updateMetric(lastSes.id,today);lastSes.value=today;}
+  else{const data=await dbSvc.createMetric({area_id:a.id,key:'last_session_date',value:today,label:'Última sesión',unit:''});if(data)S.metrics.push(data);}
   render();
 }
 
@@ -1141,10 +1130,7 @@ async function updateDolor(n) {
   const a=S.areas.find(x=>x.name==='Salud');
   if(!a) return;
   const m=S.metrics.find(x=>x.area_id===a.id&&x.key==='dolor_hoy');
-  if(m){
-    await db.from('metrics').update({value:String(n),updated_at:new Date().toISOString()}).eq('id',m.id);
-    m.value=String(n);
-  }
+  if(m){await dbSvc.updateMetric(m.id,n);m.value=String(n);}
   render();
 }
 
@@ -1154,11 +1140,7 @@ async function addTask() {
   const priority=document.getElementById('np').value;
   if(!title) return;
   closeModal();
-  const {data}=await db.from('tasks').insert({
-    title,area_id,priority,
-    suitable_modes:['ON','OFF'],
-    horizon:priority==='critical'?'today':'this_week'
-  }).select('*,areas(name,color)').single();
+  const data=await dbSvc.createTask({title,area_id,priority,suitable_modes:['ON','OFF'],horizon:priority==='critical'?'today':'this_week'});
   if(data){S.tasks.unshift(data);render();}
 }
 
@@ -1251,7 +1233,7 @@ function scrollChat() {
 }
 
 async function updateTxCat(id, category) {
-  await db.from('transactions').update({category}).eq('id',id);
+  await dbSvc.updateTransactionCategory(id, category);
   const tx=S.transactions.find(t=>t.id===id);
   if(tx) tx.category=category;
 }
@@ -1266,24 +1248,18 @@ function openBudgetEdit(cat,current){
 async function saveBudgetVal(cat){
   const val=parseFloat(document.getElementById('bv')?.value);
   if(!isNaN(val)&&val>0){
-    const key='budget_'+cat;
-    const existing=S.metrics.find(x=>x.key===key);
-    if(existing){
-      await db.from('metrics').update({value:String(val),updated_at:new Date().toISOString()}).eq('id',existing.id);
-      existing.value=String(val);
-    } else {
-      const{data}=await db.from('metrics').insert({key,value:String(val),label:'Presupuesto '+cat,unit:'€',area_id:null}).select().single();
-      if(data) S.metrics.push(data);
-    }
+    const existing=S.metrics.find(x=>x.key==='budget_'+cat);
+    const data=await dbSvc.upsertBudget(cat, val, existing?.id);
+    if(existing){existing.value=String(val);}
+    else if(data){S.metrics.push(data);}
     S.budgets[cat]=val;
   }
   closeModal();render();
 }
 async function deleteBudget(cat){
-  const key='budget_'+cat;
-  const existing=S.metrics.find(x=>x.key===key);
+  const existing=S.metrics.find(x=>x.key==='budget_'+cat);
   if(existing){
-    await db.from('metrics').delete().eq('id',existing.id);
+    await dbSvc.deleteMetric(existing.id);
     S.metrics=S.metrics.filter(x=>x.id!==existing.id);
   }
   delete S.budgets[cat];
@@ -1360,9 +1336,9 @@ async function saveAddIngreso(month){
   const src=document.getElementById('ai-src')?.value;
   if(!date||!desc||isNaN(amt)||amt<=0){alert('Falta el importe');return;}
   closeModal();
-  const{data,error}=await db.from('transactions').insert({date,description:desc,amount:amt,type:'income',category:cat,source:src}).select();
+  const{data,error}=await dbSvc.createTransaction({date,description:desc,amount:amt,type:'income',category:cat,source:src});
   if(!error&&data?.[0]){S.transactions=[...S.transactions,data[0]];}
-  else{const{data:all}=await db.from('transactions').select('*').gte('date',new Date().getFullYear()+'-01-01').order('date',{ascending:false});if(all)S.transactions=all;}
+  else{S.transactions=await dbSvc.getTransactionsYTD();}
   render();
   openIngresoModal(month);
 }
@@ -1408,9 +1384,9 @@ async function saveNewTx(){
   const src=document.getElementById('tx-src')?.value;
   if(!date||!desc||isNaN(amt)||amt<=0){alert('Rellena todos los campos');return;}
   closeModal();
-  const {data,error}=await db.from('transactions').insert({date,description:desc,amount:amt,type,category:cat,source:src}).select();
+  const {data,error}=await dbSvc.createTransaction({date,description:desc,amount:amt,type,category:cat,source:src});
   if(!error&&data?.[0]){S.transactions=[...S.transactions,data[0]];}
-  else{const{data:all}=await db.from('transactions').select('*').gte('date',new Date().getFullYear()+'-01-01').order('date',{ascending:false});if(all)S.transactions=all;}
+  else{S.transactions=await dbSvc.getTransactionsYTD();}
   render();
 }
 
@@ -1446,7 +1422,7 @@ async function saveEditTx(id){
   const cat=document.getElementById('etx-cat')?.value;
   if(!date||!desc||isNaN(amt)||amt<=0){alert('Rellena todos los campos');return;}
   closeModal();
-  await db.from('transactions').update({date,description:desc,amount:amt,type,category:cat}).eq('id',id);
+  await dbSvc.updateTransaction(id, {date,description:desc,amount:amt,type,category:cat});
   const tx=S.transactions.find(t=>String(t.id)===String(id));
   if(tx){tx.date=date;tx.description=desc;tx.amount=amt;tx.type=type;tx.category=cat;}
   render();
@@ -1455,7 +1431,7 @@ async function saveEditTx(id){
 async function deleteTx(id){
   if(!confirm('¿Borrar esta transacción?'))return;
   closeModal();
-  await db.from('transactions').delete().eq('id',id);
+  await dbSvc.deleteTransaction(id);
   S.transactions=S.transactions.filter(t=>String(t.id)!==String(id));
   render();
 }
