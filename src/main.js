@@ -2,6 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import * as dbSvc from './services/db.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
+import * as isabelSvc from './services/isabel.js';
 
 const PIN = '1965';
 let pinVal = '';
@@ -51,6 +52,7 @@ let db, S = { mode:'OFF', view:'home', areaId:null, areas:[], tasks:[], wf:[], d
 async function initApp() {
   db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   dbSvc.setClient(db);
+  isabelSvc.setUrlGetter(() => S.metrics.find(m => m.key === 'agent_url')?.value || '');
   const now = new Date();
   document.getElementById('td').textContent = now.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
   await reload();
@@ -1190,23 +1192,20 @@ async function sendMsg() {
     scrollChat();
   }
   const ctx=S.areaId?(S.areas.find(a=>a.id===S.areaId)?.name||''):S.view;
-  try {
-    const body={message:msg,history:S.chatHistory.slice(0,-1),context:ctx};
-    if(S.pendingImage){body.image=S.pendingImage;S.pendingImage=null;}
-    const storedUrl=S.metrics.find(m=>m.key==='agent_url')?.value;
-    const AGENT_URL=localStorage.getItem('agent_url')||storedUrl||'';
-    const AGENT_TOKEN=localStorage.getItem('agent_token')||'isabel-bridge-2026';
-    if(!AGENT_URL){S.chatHistory.push({role:'assistant',content:'Isabel no está conectada. Abre "Arrancar Isabel.bat" en el escritorio.'});document.getElementById('chat-ld')?.remove();if(msgs){const a=document.createElement('div');a.className='msg-a';a.textContent='Isabel no está conectada. Abre "Arrancar Isabel.bat" en el escritorio.';msgs.appendChild(a);}return;}
-    const res=await fetch(AGENT_URL+'/chat',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+AGENT_TOKEN},
-      body:JSON.stringify({message:msg,history:S.chatHistory.slice(0,-1),context:ctx})
-    });
-    const data=await res.json();
-    S.chatHistory.push({role:'assistant',content:data.reply});
+  if(!isabelSvc.isAvailable()){
+    const unavail='Isabel no está conectada. Abre "Arrancar Isabel.bat" en el escritorio.';
+    S.chatHistory.push({role:'assistant',content:unavail});
     document.getElementById('chat-ld')?.remove();
-    if(msgs){const a=document.createElement('div');a.className='msg-a';a.textContent=data.reply;msgs.appendChild(a);}
-    if(data.actions?.length){await reload();render();}
+    if(msgs){const a=document.createElement('div');a.className='msg-a';a.textContent=unavail;msgs.appendChild(a);}
+    scrollChat(); return;
+  }
+  try {
+    const image=S.pendingImage||null; if(S.pendingImage) S.pendingImage=null;
+    const {reply,actions}=await isabelSvc.sendMessage({message:msg,history:S.chatHistory.slice(0,-1),context:ctx,image});
+    S.chatHistory.push({role:'assistant',content:reply});
+    document.getElementById('chat-ld')?.remove();
+    if(msgs){const a=document.createElement('div');a.className='msg-a';a.textContent=reply;msgs.appendChild(a);}
+    if(actions?.length){await reload();render();}
   } catch(e) {
     document.getElementById('chat-ld')?.remove();
     const errMsg='Error de conexión.';
