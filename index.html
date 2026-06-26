@@ -250,6 +250,7 @@ function render() {
 
 function homeView() {
   const now=Date.now();
+  const today=new Date().toISOString().slice(0,10);
   const filtered=S.tasks.filter(t=>!t.suitable_modes||t.suitable_modes.includes(S.mode));
   const importa=filtered.filter(t=>t.horizon==='today'||t.priority==='critical'||(t.due_date&&new Date(t.due_date)<=new Date(now+8*864e5)));
   const olv=filtered.filter(t=>{
@@ -257,10 +258,65 @@ function homeView() {
     return d>3&&t.status==='pending'&&!importa.find(i=>i.id===t.id);
   });
   const evit=S.tasks.filter(t=>t.status==='avoiding');
+
+  // --- Check-in matutino ---
+  const checkinDone=localStorage.getItem('checkin_date')===today;
+  const saludArea=S.areas.find(x=>x.name==='Salud');
+  const vidaArea=S.areas.find(x=>x.name==='Vida Personal');
+  const sueno=vidaArea?S.metrics.find(x=>x.area_id===vidaArea.id&&x.key==='horas_sueno'):null;
+  const dolor=saludArea?S.metrics.find(x=>x.area_id===saludArea.id&&x.key==='dolor_hoy'):null;
+  const checkinHtml=checkinDone?'':`
+  <div class="card" style="margin-bottom:10px;border-color:rgba(83,74,183,0.25)">
+    <div class="card-head" style="background:#EEEDFE18"><span class="ch-icon">🌅</span><span class="ch-label" style="color:#534AB7">Buenos días · Check-in</span></div>
+    <div style="padding:12px 14px">
+      <div style="font-size:12px;color:var(--t2);margin-bottom:8px">¿Cómo dormiste anoche?</div>
+      <div style="display:flex;gap:6px;margin-bottom:12px">
+        ${[5,6,7,8,9].map(h=>`<button onclick="checkinSueno(${h})" id="ci-s${h}" style="flex:1;padding:8px 4px;border-radius:8px;border:1.5px solid ${sueno&&parseInt(sueno.value)===h?'#534AB7':'var(--border)'};background:${sueno&&parseInt(sueno.value)===h?'#EEEDFE':'var(--surface)'};color:${sueno&&parseInt(sueno.value)===h?'#534AB7':'var(--t2)'};font-size:13px;font-weight:600;cursor:pointer">${h}h</button>`).join('')}
+      </div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:8px">Nivel de dolor / síntomas hoy (0 = ninguno)</div>
+      <div style="display:flex;gap:4px;margin-bottom:12px">
+        ${[0,1,2,3,4,5,6,7,8,9,10].map(n=>`<button onclick="checkinDolor(${n})" style="flex:1;padding:5px 2px;border-radius:6px;border:1.5px solid ${dolor&&parseInt(dolor.value)===n?'#A32D2D':'var(--border)'};background:${dolor&&parseInt(dolor.value)===n?'#FCEBEB':'var(--surface)'};color:${dolor&&parseInt(dolor.value)===n?'#A32D2D':'var(--t2)'};font-size:11px;font-weight:600;cursor:pointer">${n}</button>`).join('')}
+      </div>
+      <div style="font-size:12px;color:var(--t2);margin-bottom:8px">Estado VistaJet hoy</div>
+      <div style="display:flex;gap:6px;margin-bottom:14px">
+        ${[{v:'libre',label:'🏠 Libre'},{v:'rotacion',label:'✈️ Rotación'},{v:'standby',label:'⏳ Standby'}].map(o=>`<button onclick="checkinVJ('${o.v}')" style="flex:1;padding:8px 4px;border-radius:8px;border:1.5px solid ${S.vjState.status===o.v?'#854F0B':'var(--border)'};background:${S.vjState.status===o.v?'#FAEEDA':'var(--surface)'};color:${S.vjState.status===o.v?'#854F0B':'var(--t2)'};font-size:11px;font-weight:600;cursor:pointer">${o.label}</button>`).join('')}
+      </div>
+      <button onclick="completeCheckin()" style="width:100%;padding:12px;border-radius:var(--r-sm);background:#534AB7;color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer">Listo — empezar el día</button>
+    </div>
+  </div>`;
+
+  // --- Bloque contextual VJ si está en rotación ---
+  const vj=S.vjState;
+  const vjStatus=vj.status||'libre';
+  const vjAlerts=[];
+  S.vjTasks.filter(t=>t.status!=='done').forEach(t=>{
+    if(t.due_date){const d=Math.ceil((new Date(t.due_date)-new Date())/(864e5));if(d<=2&&d>=0)vjAlerts.push(t.title);}
+  });
+  if(vj.passport_exp){const d=Math.ceil((new Date(vj.passport_exp)-new Date())/(864e5));if(d<=90)vjAlerts.push('Pasaporte vence en '+d+' días');}
+  if(vj.rotation_start){const d=Math.ceil((new Date(vj.rotation_start)-new Date())/(864e5));if(d===1)vjAlerts.push('Rotación empieza mañana');if(d===0)vjAlerts.push('Rotación empieza hoy');}
+  const vjContextHtml=(vjStatus==='rotacion'||vjAlerts.length)?`
+  <div class="card" style="margin-bottom:10px;border-color:rgba(133,79,11,0.25)">
+    <div class="card-head" style="background:#FAEEDA18"><span class="ch-icon">✈️</span><span class="ch-label" style="color:#854F0B">VistaJet${vjStatus==='rotacion'&&vj.rotation_day&&vj.rotation_total?' · Día '+vj.rotation_day+' de '+vj.rotation_total:''}</span><button onclick="go('area','${S.areas.find(x=>x.name==='VistaJet')?.id}')" style="margin-left:auto;border:none;background:none;font-size:12px;color:var(--t3);cursor:pointer">ver todo →</button></div>
+    ${vjAlerts.map(a=>`<div style="padding:8px 14px;border-top:1px solid var(--border);font-size:12px;color:#854F0B;display:flex;gap:8px"><i class="ti ti-alert-triangle" style="font-size:13px;flex-shrink:0;margin-top:1px"></i>${a}</div>`).join('')}
+    ${S.vjTasks.filter(t=>t.status!=='done').slice(0,3).map(t=>`<div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px"><button onclick="toggleVjTask('${t.id}')" style="width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border);background:none;cursor:pointer;flex-shrink:0"></button><span style="font-size:13px">${t.title}</span></div>`).join('')}
+  </div>`:'';
+
+  // --- Bloque contextual JETMI si modo OFF ---
+  const jetmiArea=S.areas.find(x=>x.name==='JETMI');
+  const jetmiTasks=jetmiArea?S.tasks.filter(t=>t.area_id===jetmiArea.id):[];
+  const jetmiContextHtml=(S.mode==='OFF'&&jetmiArea)?`
+  <div class="card" style="margin-bottom:10px;border-color:rgba(83,74,183,0.25)">
+    <div class="card-head" style="background:#EEEDFE18"><span class="ch-icon">🚀</span><span class="ch-label" style="color:#534AB7">JETMI · Modo construcción</span><button onclick="go('area','${jetmiArea.id}')" style="margin-left:auto;border:none;background:none;font-size:12px;color:var(--t3);cursor:pointer">ver todo →</button></div>
+    ${jetmiTasks.length?jetmiTasks.slice(0,3).map(t=>taskEl(t)).join(''):`<div class="empty">Sin tareas activas en JETMI</div>`}
+  </div>`:'';
+
   const ctx=S.mode==='ON'?'Modo ON · energía limitada · solo lo urgente e ineludible':'Modo OFF · construcción · '+S.wf.length+' en espera · '+S.dec.length+' decisiones abiertas';
 
   return `
+  ${checkinHtml}
   <div class="ctx"><i class="ti ti-info-circle"></i>${ctx}</div>
+  ${vjContextHtml}
+  ${jetmiContextHtml}
   ${section('⚡','Qué importa hoy',importa.map(t=>taskEl(t)).join('')||empty('Todo bajo control'))}
   ${section('🔔','Qué estás olvidando',olv.map(t=>taskEl(t)).join('')||empty('Nada olvidado'))}
   ${section('⚠️','Qué estás evitando',evit.map(t=>taskEl(t,true)).join('')||empty('Sin bloqueos — bien'))}
@@ -1050,6 +1106,32 @@ function openAdd() {
 }
 
 function closeModal() { const m=document.getElementById('modal'); if(m)m.remove(); }
+
+// ---- Check-in matutino ----
+async function checkinSueno(h) {
+  const a=S.areas.find(x=>x.name==='Vida Personal');
+  if(!a) return;
+  const m=S.metrics.find(x=>x.area_id===a.id&&x.key==='horas_sueno');
+  if(m){await db.from('metrics').update({value:String(h),updated_at:new Date().toISOString()}).eq('id',m.id);m.value=String(h);}
+  render();
+}
+
+async function checkinDolor(n) {
+  const a=S.areas.find(x=>x.name==='Salud');
+  if(!a) return;
+  const m=S.metrics.find(x=>x.area_id===a.id&&x.key==='dolor_hoy');
+  if(m){await db.from('metrics').update({value:String(n),updated_at:new Date().toISOString()}).eq('id',m.id);m.value=String(n);}
+  render();
+}
+
+async function checkinVJ(status) {
+  await saveVjState({status});
+}
+
+function completeCheckin() {
+  localStorage.setItem('checkin_date',new Date().toISOString().slice(0,10));
+  render();
+}
 
 // ---- VistaJet functions ----
 async function saveVjState(patch) {
