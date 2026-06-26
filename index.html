@@ -1373,7 +1373,15 @@ async function sendMsg() {
   try {
     const body={message:msg,history:S.chatHistory.slice(0,-1),context:ctx};
     if(S.pendingImage){body.image=S.pendingImage;S.pendingImage=null;}
-    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const storedUrl=S.metrics.find(m=>m.key==='agent_url')?.value;
+    const AGENT_URL=localStorage.getItem('agent_url')||storedUrl||'';
+    const AGENT_TOKEN=localStorage.getItem('agent_token')||'isabel-bridge-2026';
+    if(!AGENT_URL){S.chatHistory.push({role:'assistant',content:'Isabel no está conectada. Abre "Arrancar Isabel.bat" en el escritorio.'});document.getElementById('chat-ld')?.remove();if(msgs){const a=document.createElement('div');a.className='msg-a';a.textContent='Isabel no está conectada. Abre "Arrancar Isabel.bat" en el escritorio.';msgs.appendChild(a);}return;}
+    const res=await fetch(AGENT_URL+'/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+AGENT_TOKEN},
+      body:JSON.stringify({message:msg,history:S.chatHistory.slice(0,-1),context:ctx})
+    });
     const data=await res.json();
     S.chatHistory.push({role:'assistant',content:data.reply});
     document.getElementById('chat-ld')?.remove();
