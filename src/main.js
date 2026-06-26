@@ -1,6 +1,7 @@
 ﻿import './main.css';
 import { createClient } from '@supabase/supabase-js';
 import * as dbSvc from './services/db.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
 const PIN = '1965';
 let pinVal = '';
@@ -44,13 +45,11 @@ function pinPress(v) {
     }
   }
 }
-const URL_ = 'https://cllubptdwydifomlnxds.supabase.co';
-const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsbHVicHRkd3lkaWZvbWxueGRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMDE1MTksImV4cCI6MjA5Nzg3NzUxOX0.jh_OJLmixJAYSmh0GdtxMszNMZCqBZVLkNGFQoG1MhI';
 
 let db, S = { mode:'OFF', view:'home', areaId:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], pendingImage:null, transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[] };
 
 async function initApp() {
-  db = createClient(URL_, KEY_);
+  db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   dbSvc.setClient(db);
   const now = new Date();
   document.getElementById('td').textContent = now.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
