@@ -289,18 +289,134 @@ function areaView() {
   const isMarca=a.name==='Marca Personal';
   const isVida=a.name==='Vida Personal';
 
-  const vjTools=isVJ?`
-  <div class="card" style="margin-bottom:10px">
-    <div class="card-head"><span class="ch-icon">✈️</span><span class="ch-label">Herramientas</span></div>
-    <a href="/ch-tools.html" style="display:flex;align-items:center;gap:12px;padding:14px;text-decoration:none;color:var(--text)">
-      <div style="width:40px;height:40px;border-radius:10px;background:#854F0B18;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📋</div>
-      <div>
-        <div style="font-size:14px;font-weight:600">CH Tools</div>
-        <div style="font-size:12px;color:var(--t2);margin-top:2px">HO/TO · Inventario por avión</div>
+  const vjView=isVJ?()=>{
+    const vj=JSON.parse(localStorage.getItem('vj_state')||'{}');
+    const vjTasks=JSON.parse(localStorage.getItem('vj_tasks')||'[]');
+    const vjBag=JSON.parse(localStorage.getItem('vj_bag')||'{}');
+    const status=vj.status||'libre';
+    const statusMap={rotacion:{label:'En rotación',bg:'#FAEEDA',color:'#854F0B',icon:'✈️'},libre:{label:'Libre',bg:'#E1F5EE',color:'#085041',icon:'🏠'},standby:{label:'Standby',bg:'#EEEDFE',color:'#534AB7',icon:'⏳'}};
+    const st=statusMap[status]||statusMap.libre;
+    const now=new Date();
+    const pendTasks=vjTasks.filter(t=>t.status!=='done');
+    const doneTasks=vjTasks.filter(t=>t.status==='done');
+
+    // Alerts
+    const alerts=[];
+    vjTasks.forEach(t=>{
+      if(t.status==='done') return;
+      if(t.due_date){
+        const days=Math.ceil((new Date(t.due_date)-now)/(864e5));
+        if(days<=2&&days>=0) alerts.push(`Quedan ${days===0?'hoy':days+' día'+(days>1?'s':'')} para: ${t.title}`);
+        if(days<0) alerts.push(`Vencido hace ${Math.abs(days)} día(s): ${t.title}`);
+      }
+    });
+    if(vj.passport_exp){
+      const days=Math.ceil((new Date(vj.passport_exp)-now)/(864e5));
+      if(days<=90) alerts.push(`Pasaporte vence en ${days} días`);
+    }
+    if(vj.rotation_start){
+      const days=Math.ceil((new Date(vj.rotation_start)-now)/(864e5));
+      if(days===1) alerts.push('Empieza la rotación mañana');
+      if(days===0) alerts.push('La rotación empieza hoy');
+    }
+
+    // Bag templates
+    const bagTemplates=JSON.parse(localStorage.getItem('vj_bag_templates')||'null')||[
+      {id:'standard',name:'Rotación estándar',items:['Uniforme completo','Zapatos negros','Medias/calcetines','Documentos de identidad','Pasaporte','Licencia','Manuals tablet','Cargadores','Neceser','Medicación','Ropa casual (3 días)','Pijama']},
+      {id:'long',name:'Rotación larga (+7 días)',items:['Todo de estándar','Ropa extra (4 días)','Vitaminas','Snacks','Auriculares','Libro/tablet personal']},
+      {id:'visa',name:'Destino con visa',items:['Pasaporte vigente','Visa/permiso entrada','Seguro viaje','Formularios entrada','Fotos carnet']}
+    ];
+    const activeBag=vj.activeBag||null;
+    const bagChecks=vj.bagChecks||{};
+    const activeTpl=bagTemplates.find(t=>t.id===activeBag);
+
+    const stateCardHtml=`
+    <div class="card" style="margin-bottom:10px">
+      <div style="padding:14px;display:flex;align-items:center;gap:12px">
+        <div style="width:48px;height:48px;border-radius:12px;background:${st.bg};display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">${st.icon}</div>
+        <div style="flex:1">
+          <div style="font-size:16px;font-weight:700;color:${st.color}">${st.label}</div>
+          ${status==='rotacion'&&vj.rotation_day&&vj.rotation_total?`<div style="font-size:12px;color:var(--t2)">Día ${vj.rotation_day} de ${vj.rotation_total}</div>`:''}
+          ${vj.aircraft?`<div style="font-size:12px;color:var(--t2)">Avión: ${vj.aircraft}</div>`:''}
+        </div>
+        <button onclick="openVjState()" style="border:none;background:var(--bg);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--t2)">Editar</button>
       </div>
-      <i class="ti ti-chevron-right" style="margin-left:auto;color:var(--t3)"></i>
-    </a>
-  </div>`:'';
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)">
+        <div style="background:var(--surface);padding:12px;text-align:center">
+          <div style="font-size:24px;font-weight:700">${vj.hours_month||'—'}<span style="font-size:12px;color:var(--t2);font-weight:400"> h</span></div>
+          <div style="font-size:10px;color:var(--t2);margin-top:1px">Horas mes</div>
+        </div>
+        <div style="background:var(--surface);padding:12px;text-align:center">
+          <div style="font-size:24px;font-weight:700">${vj.hours_year||'—'}<span style="font-size:12px;color:var(--t2);font-weight:400"> h</span></div>
+          <div style="font-size:10px;color:var(--t2);margin-top:1px">Horas año</div>
+        </div>
+      </div>
+    </div>`;
+
+    const alertsHtml=alerts.length?`
+    <div style="margin-bottom:10px;display:flex;flex-direction:column;gap:6px">
+      ${alerts.map(a=>`<div style="background:#FAEEDA;border-radius:var(--r-sm);padding:10px 12px;font-size:12px;color:#854F0B;display:flex;align-items:center;gap:8px"><i class="ti ti-alert-triangle" style="font-size:14px;flex-shrink:0"></i>${a}</div>`).join('')}
+    </div>`:'';
+
+    const tasksHtml=`
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">☑️</span><span class="ch-label">Pendientes VJ</span><span class="ch-count">${pendTasks.length}</span>
+        <button onclick="openAddVjTask()" style="border:none;background:var(--text);color:#fff;border-radius:999px;padding:4px 11px;font-size:11px;font-weight:600;cursor:pointer;margin-left:6px">+ Añadir</button>
+      </div>
+      ${pendTasks.length===0&&doneTasks.length===0?`<div class="empty">Sin pendientes</div>`:''}
+      ${pendTasks.map(t=>`
+      <div style="padding:11px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px">
+        <button onclick="toggleVjTask('${t.id}')" style="width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center"></button>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px">${t.title}</div>
+          ${t.due_date?`<div style="font-size:11px;color:${Math.ceil((new Date(t.due_date)-now)/(864e5))<=2?'#A32D2D':'var(--t2)'}">⏰ ${fmtDate(t.due_date)}</div>`:''}
+        </div>
+        ${t.priority==='alta'?`<span class="pill p-urg">Alta</span>`:''}
+        <button onclick="deleteVjTask('${t.id}')" style="border:none;background:none;cursor:pointer;color:var(--t3);font-size:13px;padding:2px 4px"><i class="ti ti-x"></i></button>
+      </div>`).join('')}
+      ${doneTasks.length?`<div style="padding:8px 14px;font-size:11px;color:var(--t3);border-top:1px solid var(--border)">${doneTasks.length} completada(s) — <button onclick="clearDoneVjTasks()" style="border:none;background:none;color:var(--t3);font-size:11px;cursor:pointer;text-decoration:underline">limpiar</button></div>`:''}
+    </div>`;
+
+    const bagHtml=`
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">🧳</span><span class="ch-label">Checklist maleta</span></div>
+      <div style="padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap">
+        ${bagTemplates.map(t=>`<button onclick="selectVjBag('${t.id}')" style="padding:6px 12px;border-radius:999px;border:1.5px solid ${activeBag===t.id?'var(--text)':'var(--border)'};background:${activeBag===t.id?'var(--text)':'var(--surface)'};color:${activeBag===t.id?'#fff':'var(--t2)'};font-size:12px;font-weight:500;cursor:pointer">${t.name}</button>`).join('')}
+      </div>
+      ${activeTpl?`
+      <div style="border-top:1px solid var(--border)">
+        ${activeTpl.items.map((item,i)=>{
+          const key=activeBag+'_'+i;
+          const checked=bagChecks[key];
+          return `<div onclick="toggleVjBagItem('${key}')" style="padding:10px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer">
+            <div style="width:20px;height:20px;border-radius:5px;border:1.5px solid ${checked?'var(--ok)':'var(--border)'};background:${checked?'var(--ok)':'none'};flex-shrink:0;display:flex;align-items:center;justify-content:center">
+              ${checked?'<i class="ti ti-check" style="color:#fff;font-size:12px"></i>':''}
+            </div>
+            <span style="font-size:14px;color:${checked?'var(--t3)':'var(--text)'};text-decoration:${checked?'line-through':'none'}">${item}</span>
+          </div>`;
+        }).join('')}
+        <div style="padding:10px 14px;border-top:1px solid var(--border)">
+          <button onclick="resetVjBag()" style="border:none;background:none;color:var(--t3);font-size:12px;cursor:pointer;text-decoration:underline">Reiniciar checklist</button>
+        </div>
+      </div>`:'<div class="empty">Selecciona una plantilla</div>'}
+    </div>`;
+
+    const toolsHtml=`
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">✈️</span><span class="ch-label">Herramientas</span></div>
+      <a href="/ch-tools.html" style="display:flex;align-items:center;gap:12px;padding:14px;text-decoration:none;color:var(--text)">
+        <div style="width:40px;height:40px;border-radius:10px;background:#854F0B18;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📋</div>
+        <div>
+          <div style="font-size:14px;font-weight:600">CH Tools</div>
+          <div style="font-size:12px;color:var(--t2);margin-top:2px">HO/TO · Inventario por avión</div>
+        </div>
+        <i class="ti ti-chevron-right" style="margin-left:auto;color:var(--t3)"></i>
+      </a>
+    </div>`;
+
+    return stateCardHtml+alertsHtml+tasksHtml+bagHtml+toolsHtml;
+  }:'';
+  const vjTools='';
 
   const jetmiView=isJETMI?()=>{
     const m=S.metrics.filter(x=>x.area_id===a.id);
@@ -817,7 +933,7 @@ function areaView() {
     <span class="dot" style="background:${a.color};width:12px;height:12px"></span>
     <h2>${a.name}</h2>
   </div>
-  ${vjTools}
+  ${isVJ?vjView():''}
   ${isJETMI?jetmiView():''}
   ${isFin?finView():''}
   ${isSalud?saludView():''}
@@ -932,6 +1048,132 @@ function openAdd() {
 }
 
 function closeModal() { const m=document.getElementById('modal'); if(m)m.remove(); }
+
+// ---- VistaJet functions ----
+function saveVjState(patch) {
+  const vj=JSON.parse(localStorage.getItem('vj_state')||'{}');
+  Object.assign(vj,patch);
+  localStorage.setItem('vj_state',JSON.stringify(vj));
+  render();
+}
+
+function openVjState() {
+  const vj=JSON.parse(localStorage.getItem('vj_state')||'{}');
+  const el=document.createElement('div');
+  el.className='overlay'; el.id='modal';
+  el.innerHTML=`<div class="modal">
+    <h3>Estado VistaJet</h3>
+    <select class="fi" id="vj-status">
+      <option value="libre"${vj.status==='libre'?' selected':''}>🏠 Libre</option>
+      <option value="rotacion"${vj.status==='rotacion'?' selected':''}>✈️ En rotación</option>
+      <option value="standby"${vj.status==='standby'?' selected':''}>⏳ Standby</option>
+    </select>
+    <input class="fi" id="vj-aircraft" placeholder="Avión actual (ej. 9H-VCF)" value="${vj.aircraft||''}">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <input class="fi" id="vj-rday" type="number" placeholder="Día rotación" value="${vj.rotation_day||''}" style="margin-bottom:0">
+      <input class="fi" id="vj-rtotal" type="number" placeholder="Total días" value="${vj.rotation_total||''}" style="margin-bottom:0">
+    </div>
+    <div style="height:8px"></div>
+    <input class="fi" id="vj-rstart" type="date" placeholder="Inicio rotación" value="${vj.rotation_start||''}">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <input class="fi" id="vj-hmonth" type="number" placeholder="Horas mes" value="${vj.hours_month||''}" style="margin-bottom:0">
+      <input class="fi" id="vj-hyear" type="number" placeholder="Horas año" value="${vj.hours_year||''}" style="margin-bottom:0">
+    </div>
+    <div style="height:8px"></div>
+    <input class="fi" id="vj-passport" type="date" placeholder="Vencimiento pasaporte" value="${vj.passport_exp||''}">
+    <div class="ma">
+      <button class="btn btn-s" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-p" onclick="saveVjStateForm()">Guardar</button>
+    </div>
+  </div>`;
+  el.addEventListener('click',e=>{if(e.target===el)closeModal();});
+  document.body.appendChild(el);
+}
+
+function saveVjStateForm() {
+  saveVjState({
+    status:document.getElementById('vj-status').value,
+    aircraft:document.getElementById('vj-aircraft').value.trim(),
+    rotation_day:document.getElementById('vj-rday').value,
+    rotation_total:document.getElementById('vj-rtotal').value,
+    rotation_start:document.getElementById('vj-rstart').value,
+    hours_month:document.getElementById('vj-hmonth').value,
+    hours_year:document.getElementById('vj-hyear').value,
+    passport_exp:document.getElementById('vj-passport').value,
+  });
+  closeModal();
+}
+
+function openAddVjTask() {
+  const el=document.createElement('div');
+  el.className='overlay'; el.id='modal';
+  el.innerHTML=`<div class="modal">
+    <h3>Nueva tarea VJ</h3>
+    <input class="fi" id="vjt-title" placeholder="Título (ej. Enviar facturas)">
+    <input class="fi" id="vjt-due" type="date" placeholder="Fecha límite">
+    <select class="fi" id="vjt-priority">
+      <option value="normal">Prioridad normal</option>
+      <option value="alta">Alta prioridad</option>
+    </select>
+    <div class="ma">
+      <button class="btn btn-s" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-p" onclick="saveVjTask()">Guardar</button>
+    </div>
+  </div>`;
+  el.addEventListener('click',e=>{if(e.target===el)closeModal();});
+  document.body.appendChild(el);
+}
+
+function saveVjTask() {
+  const title=document.getElementById('vjt-title').value.trim();
+  if(!title) return;
+  const tasks=JSON.parse(localStorage.getItem('vj_tasks')||'[]');
+  tasks.push({id:Date.now().toString(),title,due_date:document.getElementById('vjt-due').value||null,priority:document.getElementById('vjt-priority').value,status:'pending'});
+  localStorage.setItem('vj_tasks',JSON.stringify(tasks));
+  closeModal(); render();
+}
+
+function toggleVjTask(id) {
+  const tasks=JSON.parse(localStorage.getItem('vj_tasks')||'[]');
+  const t=tasks.find(x=>x.id===id);
+  if(t) t.status=t.status==='done'?'pending':'done';
+  localStorage.setItem('vj_tasks',JSON.stringify(tasks));
+  render();
+}
+
+function deleteVjTask(id) {
+  const tasks=JSON.parse(localStorage.getItem('vj_tasks')||'[]').filter(x=>x.id!==id);
+  localStorage.setItem('vj_tasks',JSON.stringify(tasks));
+  render();
+}
+
+function clearDoneVjTasks() {
+  const tasks=JSON.parse(localStorage.getItem('vj_tasks')||'[]').filter(x=>x.status!=='done');
+  localStorage.setItem('vj_tasks',JSON.stringify(tasks));
+  render();
+}
+
+function selectVjBag(id) {
+  const vj=JSON.parse(localStorage.getItem('vj_state')||'{}');
+  vj.activeBag=id; vj.bagChecks={};
+  localStorage.setItem('vj_state',JSON.stringify(vj));
+  render();
+}
+
+function toggleVjBagItem(key) {
+  const vj=JSON.parse(localStorage.getItem('vj_state')||'{}');
+  if(!vj.bagChecks) vj.bagChecks={};
+  vj.bagChecks[key]=!vj.bagChecks[key];
+  localStorage.setItem('vj_state',JSON.stringify(vj));
+  render();
+}
+
+function resetVjBag() {
+  const vj=JSON.parse(localStorage.getItem('vj_state')||'{}');
+  vj.bagChecks={};
+  localStorage.setItem('vj_state',JSON.stringify(vj));
+  render();
+}
 
 async function incHabito(key) {
   const a=S.areas.find(x=>x.name==='Vida Personal');
