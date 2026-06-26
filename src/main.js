@@ -1474,4 +1474,22 @@ function finNext() {
   S.finCat=null; render();
 }
 
-window.addEventListener('load',showPin);
+// Expose functions to global scope for inline onclick handlers (required in ES module context)
+Object.assign(window, {
+  showPin, pinPress,
+  go, toggleMode, openAdd, openChat, closeChat, sendMsg, handleFile,
+  done, closeModal,
+  checkinSueno, checkinDolor, checkinVJ, completeCheckin,
+  saveVjState, openVjState, saveVjStateForm,
+  openAddVjTask, saveVjTask, toggleVjTask, deleteVjTask, clearDoneVjTasks,
+  selectVjBag, toggleVjBagItem, resetVjBag,
+  setSueno, resetCannabis, regSesion, updateDolor,
+  addTask,
+  updateTxCat, openBudgetEdit, saveBudgetVal, deleteBudget,
+  openIngresoModal, openAddIngreso, saveAddIngreso,
+  openAddTx, txTypeChanged, saveNewTx,
+  openEditTx, saveEditTx, deleteTx,
+  finPrev, finNext,
+});
+
+window.addEventListener('load', showPin);
