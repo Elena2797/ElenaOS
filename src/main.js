@@ -586,7 +586,7 @@ function domainDashboardIntro(a) {
       <p>${bp.purpose}</p>
       <div class="domain-hero-meta"><span>${activeLabel}</span><span>${fmtLastActivity(st.lastAt)}</span><span>Especialista: ${bp.specialist}</span></div>
     </div>
-    ${isStrategic?`<div class="brief-card"><div class="brief-label">Contribuciones de Isabel</div>${contributionList(contribs)}</div>`:''}
+    ${isStrategic&&contribs.length?`<div class="brief-card"><div class="brief-label">Contribuciones de Isabel</div>${contributionList(contribs)}</div>`:''}
     ${projects.length?`<div class="visual-projects"><div class="section-title-inline">Proyectos reales del dominio</div>${projects.slice(0,4).map(projectVisualCard).join('')}</div>`:''}
     <details class="prd-card-collapsible">
       <summary><span class="brief-label" style="display:inline">PRD / mapa del dominio</span> <span style="font-size:12px;color:var(--t2)">${bp.prd}</span></summary>
