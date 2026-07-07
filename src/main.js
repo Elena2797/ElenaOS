@@ -4,6 +4,7 @@ import * as dbSvc from './services/db.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import * as isabelSvc from './services/isabel.js';
 import * as invSvc from './services/inventory.js';
+import * as hotoSvc from './services/hoto.js';
 
 const PIN = '1965';
 const VJ_HOTO_SECTIONS=[
@@ -92,6 +93,7 @@ async function initApp() {
   db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   dbSvc.setClient(db);
   invSvc.setClient(db);
+  hotoSvc.setClient(db);
   isabelSvc.setUrlGetter(() => S.metrics.find(m => m.key === 'agent_url')?.value || '');
   const now = new Date();
   document.getElementById('td').textContent = now.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
@@ -1653,29 +1655,119 @@ function updateLaundryItem(itemId,delta){
 function resetLaundry(){localStorage.removeItem('vj_laundry_items');localStorage.removeItem('vj_laundry_date');render();}
 
 function vjHotoView(){
+  const head=`<div class="ph"><button class="back" onclick="hotoBack()"><i class="ti ti-arrow-left"></i></button><h2>HOTO</h2></div>`;
+
+  // ── Carga asíncrona del HOTO activo ──────────────────────────────────────
+  if(!S._hotoLoaded){
+    S._hotoLoaded=true;
+    (async()=>{
+      try{
+        S.hotoRec=await hotoSvc.loadActiveHoto();
+        S.hotoItems=S.hotoRec?await hotoSvc.loadItems(S.hotoRec.id):[];
+      }catch(e){ console.error('hoto load',e); S.hotoErr=e.message; }
+      render();
+    })();
+    return `${head}<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--t3);font-size:13px">Cargando HOTO…</div>`;
+  }
+
+  if(S.hotoErr){
+    return `${head}<div style="background:var(--surface);border-radius:12px;padding:20px;border:0.5px solid var(--border);font-size:13px;color:var(--t2);line-height:1.6">No se pudo cargar el HOTO.<br><span style="color:var(--t3);font-size:12px">${S.hotoErr}</span><br><br>Si las tablas del HOTO aún no existen, ejecuta la migración <code>hoto_migration.sql</code> en Supabase.</div>`;
+  }
+
+  const tab=S.vjHotoTab==='checklist'?'checklist':'entrega';
+  const tabs=[['entrega','Entrega'],['checklist','Checklist']];
+  const tabBar=`<div style="display:flex;gap:2px;margin-bottom:14px;background:var(--surface);border-radius:10px;padding:3px;border:0.5px solid var(--border)">${tabs.map(([k,l])=>`<button onclick="setVjTab('vjHotoTab','${k}')" style="flex:1;padding:8px 2px;border:none;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;background:${tab===k?'var(--text)':'transparent'};color:${tab===k?'#fff':'var(--t2)'}">${l}</button>`).join('')}</div>`;
+
+  if(tab==='checklist') return head+tabBar+hotoChecklistTab();
+  return head+tabBar+hotoEntregaTab();
+}
+
+// ── Pestaña Entrega: editor vivo + exportación al PDF oficial ────────────────
+function hotoEntregaTab(){
+  const rec=S.hotoRec;
+  const lbl=(t)=>`<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:14px 0 6px">${t}</div>`;
+  const fieldStyle=`width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg);color:var(--text)`;
+
+  // Sin HOTO activo → crear uno nuevo
+  if(!rec){
+    return `
+    <div style="background:var(--surface);border-radius:12px;padding:20px;border:0.5px solid var(--border)">
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">Nuevo HOTO</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px">No hay ningún HOTO activo. Empieza uno para esta rotación. Se irá construyendo solo mientras trabajas; el día de la entrega solo exportas el PDF oficial.</div>
+      <label style="font-size:11px;font-weight:600;color:var(--t2)">Matrícula</label>
+      <input id="hoto-new-tail" placeholder="9H-JHK" style="${fieldStyle};margin:4px 0 10px;text-transform:uppercase">
+      <label style="font-size:11px;font-weight:600;color:var(--t2)">ICAO destino</label>
+      <input id="hoto-new-icao" placeholder="LPFR" style="${fieldStyle};margin:4px 0 10px;text-transform:uppercase">
+      <label style="font-size:11px;font-weight:600;color:var(--t2)">Pattern</label>
+      <select id="hoto-new-pattern" style="${fieldStyle};margin:4px 0 10px">
+        <option value="">—</option><option>Summer - P2</option><option>Winter - P1</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);margin:4px 0 16px"><input type="checkbox" id="hoto-new-noprior" checked> No recibí HOTO previo (reconstruido durante esta rotación)</label>
+      <button onclick="hotoCreate()" style="width:100%;padding:13px;border:none;background:var(--text);color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Crear HOTO</button>
+    </div>`;
+  }
+
+  const v=(x)=>x==null?'':String(x).replace(/"/g,'&quot;');
+  const opt=(val,cur)=>`<option${val===cur?' selected':''}>${val}</option>`;
+
+  // Sección de líneas (defects / comments / offload) con añadir y borrar
+  const section=(title,sec,placeholder,max)=>{
+    const list=(S.hotoItems||[]).filter(i=>i.section===sec).sort((a,b)=>a.position-b.position);
+    const rows=list.map(i=>`<div style="display:flex;align-items:flex-start;gap:8px;padding:10px 0;border-bottom:0.5px solid var(--border)">
+      <span style="flex:1;font-size:13px;color:var(--text);line-height:1.4">${v(i.content)}</span>
+      <button onclick="hotoDelItem('${i.id}')" style="border:none;background:none;color:var(--t3);cursor:pointer;font-size:15px;line-height:1"><i class="ti ti-x"></i></button>
+    </div>`).join('');
+    const full=max&&list.length>=max;
+    return `${lbl(title+' · '+list.length+(max?'/'+max:''))}
+    <div style="background:var(--surface);border-radius:12px;padding:4px 14px;border:0.5px solid var(--border)">
+      ${rows||'<div style="padding:10px 0;font-size:12px;color:var(--t3)">Sin registros todavía.</div>'}
+      ${full?'':`<div style="display:flex;gap:8px;padding:10px 0">
+        <input id="hoto-add-${sec}" placeholder="${placeholder}" style="flex:1;box-sizing:border-box;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text)" onkeydown="if(event.key==='Enter')hotoAddItem('${sec}')">
+        <button onclick="hotoAddItem('${sec}')" style="border:none;background:var(--text);color:#fff;border-radius:8px;padding:0 14px;font-size:13px;font-weight:600;cursor:pointer">+</button>
+      </div>`}
+    </div>`;
+  };
+
+  const prior=rec.has_prior_hoto;
+  const bannerNoPrior=!prior?`<div style="background:#FBF3E4;border:0.5px solid #E8D9B5;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#7A5B12;line-height:1.5">No existe HOTO previo. Las fechas históricas no pueden verificarse. Este HOTO se ha reconstruido durante esta rotación.</div>`:'';
+
+  return `
+  ${bannerNoPrior}
+  <div style="background:var(--surface);border-radius:12px;padding:16px;border:0.5px solid var(--border)">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label style="font-size:10px;font-weight:600;color:var(--t3)">MATRÍCULA</label>
+        <input value="${v(rec.tail_number)}" onchange="hotoField('tail_number',this.value)" style="${fieldStyle};margin-top:4px;text-transform:uppercase"></div>
+      <div><label style="font-size:10px;font-weight:600;color:var(--t3)">ICAO</label>
+        <input value="${v(rec.icao)}" onchange="hotoField('icao',this.value)" style="${fieldStyle};margin-top:4px;text-transform:uppercase"></div>
+      <div><label style="font-size:10px;font-weight:600;color:var(--t3)">ESTADO</label>
+        <select onchange="hotoField('aircraft_status',this.value)" style="${fieldStyle};margin-top:4px">${['Good','Bad','Requires Attention'].map(o=>opt(o,rec.aircraft_status)).join('')}</select></div>
+      <div><label style="font-size:10px;font-weight:600;color:var(--t3)">PATTERN</label>
+        <select onchange="hotoField('pattern',this.value)" style="${fieldStyle};margin-top:4px"><option value="">—</option>${['Summer - P2','Winter - P1'].map(o=>opt(o,rec.pattern)).join('')}</select></div>
+      <div><label style="font-size:10px;font-weight:600;color:var(--t3)">CH CODE</label>
+        <input value="${v(rec.ch_code)}" onchange="hotoField('ch_code',this.value)" style="${fieldStyle};margin-top:4px;text-transform:uppercase"></div>
+      <div><label style="font-size:10px;font-weight:600;color:var(--t3)">DÍAS A BORDO</label>
+        <input value="${v(rec.days_on_aircraft)}" onchange="hotoField('days_on_aircraft',this.value)" style="${fieldStyle};margin-top:4px"></div>
+      <div style="grid-column:1/3"><label style="font-size:10px;font-weight:600;color:var(--t3)">FECHA DE RECEPCIÓN</label>
+        <input value="${v(rec.received_date)}" onchange="hotoField('received_date',this.value)" placeholder="25-May-26" style="${fieldStyle};margin-top:4px"></div>
+    </div>
+  </div>
+
+  ${section('Defects','defect','Añadir defecto…',6)}
+  ${section('Additional Comments','comment','Añadir comentario…',null)}
+  ${section('Items to offload','offload','Añadir item a descargar…',3)}
+
+  <button onclick="hotoExport()" style="width:100%;margin-top:18px;padding:15px;border:none;background:#0F6E56;color:#fff;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ti ti-file-download"></i> Exportar HOTO PDF oficial</button>
+  <div style="text-align:center;font-size:11px;color:var(--t3);margin-top:8px;line-height:1.5">Genera el PDF oficial de VistaJet con estos datos.<br>El PDF nunca se edita a mano: siempre se exporta desde aquí.</div>`;
+}
+
+// ── Pestaña Checklist: la lista "Leaving Aircraft" (localStorage, sin cambios) ─
+function hotoChecklistTab(){
   const checks=JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
   const allItems=VJ_HOTO_SECTIONS.flatMap(s=>s.items);
   const completed=allItems.filter(i=>checks[i.id]).length;
   const total=allItems.length;
   const pct=Math.round(completed/total*100);
-  const tab=S.vjHotoTab||'checklist';
-  const tabs=['resumen','checklist','documento'];
-  const tabBar=`<div style="display:flex;gap:2px;margin-bottom:14px;background:var(--surface);border-radius:10px;padding:3px;border:0.5px solid var(--border)">${tabs.map(t=>`<button onclick="setVjTab('vjHotoTab','${t}')" style="flex:1;padding:8px 2px;border:none;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;background:${tab===t?'var(--text)':'transparent'};color:${tab===t?'#fff':'var(--t2)'}">${t.charAt(0).toUpperCase()+t.slice(1)}</button>`).join('')}</div>`;
-  const resumen=`
-    <div style="background:var(--surface);border-radius:12px;padding:16px;margin-bottom:12px;border:0.5px solid var(--border)">
-      <div style="font-size:11px;color:var(--t3);margin-bottom:8px">Leaving Aircraft Checklist</div>
-      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:12px">
-        <span style="font-size:28px;font-weight:700;color:var(--text)">${pct}%</span>
-        <span style="font-size:12px;color:var(--t2)">${completed} de ${total} completado</span>
-      </div>
-      <div style="background:var(--border);border-radius:999px;height:6px;overflow:hidden">
-        <div style="width:${pct}%;height:100%;background:${pct===100?'#0F6E56':'#185FA5'};border-radius:999px"></div>
-      </div>
-      <div style="margin-top:12px;font-size:13px;color:${pct===100?'#0F6E56':'var(--t2)'}">${pct===100?'Avión entregado correctamente.':completed===0?'Checklist no iniciado.':(total-completed)+' ítem'+(total-completed>1?'s':'')+' pendiente'+(total-completed>1?'s':'')+'.'}
-      </div>
-    </div>
-    <button onclick="setVjTab('vjHotoTab','checklist')" style="width:100%;padding:14px;border:none;background:var(--text);color:#fff;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer">Ir al Checklist →</button>`;
-  const checklist=`
+  return `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <span style="font-size:12px;color:var(--t2)">${completed}/${total} · ${pct}%</span>
       <button onclick="resetHotoChecks()" style="border:none;background:none;color:var(--t3);font-size:11px;cursor:pointer;text-decoration:underline">Reiniciar</button>
@@ -1692,13 +1784,6 @@ function vjHotoView(){
         </div>
       </div>`;
     }).join('')}`;
-  const documento=`
-    <div style="background:var(--surface);border-radius:12px;padding:24px 16px;text-align:center;border:0.5px solid var(--border)">
-      <div style="font-size:32px;margin-bottom:12px">📄</div>
-      <div style="font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px">Sincronización PDF</div>
-      <div style="font-size:12px;color:var(--t2);line-height:1.6">La sincronización automática con el PDF de HO/TO estará disponible próximamente. Por ahora usa el checklist para registrar el estado del avión.</div>
-    </div>`;
-  return `<div class="ph"><button class="back" onclick="go('area','${S.areaId}')"><i class="ti ti-arrow-left"></i></button><h2>HOTO</h2></div>${tabBar}${tab==='resumen'?resumen:tab==='checklist'?checklist:documento}`;
 }
 
 function vjInventarioView(){
@@ -2040,6 +2125,73 @@ async function invExport(){
     a.click();
     URL.revokeObjectURL(a.href);
   }catch(e){ alert('Error exportando: '+e.message); }
+}
+
+// ═══ HOTO — módulo vivo ═══════════════════════════════════════════════════════
+function hotoBack(){ S._hotoLoaded=false; S.hotoErr=null; go('area',S.areaId); }
+
+async function hotoReload(){
+  try{
+    S.hotoRec=await hotoSvc.loadActiveHoto();
+    S.hotoItems=S.hotoRec?await hotoSvc.loadItems(S.hotoRec.id):[];
+    S.hotoErr=null;
+  }catch(e){ S.hotoErr=e.message; }
+  render();
+}
+
+async function hotoCreate(){
+  const tail=(document.getElementById('hoto-new-tail')?.value||'').trim().toUpperCase();
+  const icao=(document.getElementById('hoto-new-icao')?.value||'').trim().toUpperCase();
+  const pattern=document.getElementById('hoto-new-pattern')?.value||null;
+  const noPrior=document.getElementById('hoto-new-noprior')?.checked;
+  if(!tail){ alert('Introduce la matrícula.'); return; }
+  try{
+    await hotoSvc.createHoto({ tail_number:tail, icao, pattern, has_prior_hoto:!noPrior });
+    await hotoReload();
+  }catch(e){ alert('No se pudo crear el HOTO: '+e.message); }
+}
+
+async function hotoField(field,value){
+  if(!S.hotoRec) return;
+  const val=value===''?null:value;
+  S.hotoRec[field]=val;              // optimista, sin re-render (no perder foco)
+  try{ await hotoSvc.updateHoto(S.hotoRec.id,{ [field]:val }); }
+  catch(e){ alert('No se pudo guardar: '+e.message); }
+}
+
+async function hotoAddItem(section){
+  const input=document.getElementById('hoto-add-'+section);
+  const content=(input?.value||'').trim();
+  if(!content||!S.hotoRec) return;
+  try{
+    await hotoSvc.addItem(S.hotoRec.id,section,content);
+    S.hotoItems=await hotoSvc.loadItems(S.hotoRec.id);
+    render();
+  }catch(e){ alert('No se pudo añadir: '+e.message); }
+}
+
+async function hotoDelItem(id){
+  try{
+    await hotoSvc.deleteItem(id);
+    S.hotoItems=(S.hotoItems||[]).filter(i=>i.id!==id);
+    render();
+  }catch(e){ alert('No se pudo borrar: '+e.message); }
+}
+
+async function hotoExport(){
+  if(!S.hotoRec) return;
+  try{
+    const res=await fetch(`${ISABEL_API}/v1/hoto/${S.hotoRec.id}/export`,{headers:{'x-api-key':ISABEL_KEY}});
+    if(!res.ok) throw new Error(`Export ${res.status}`);
+    const blob=await res.blob();
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    const cd=res.headers.get('Content-Disposition')||'';
+    const m=cd.match(/filename="([^"]+)"/);
+    a.download=m?m[1]:'HOTO.pdf';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }catch(e){ alert('Error exportando HOTO: '+e.message); }
 }
 
 function go(view, id=null) {
@@ -2918,6 +3070,7 @@ Object.assign(window, {
   selectProposal, empezarPropuesta,
   setVjTab, toggleHotoCheck, resetHotoChecks, updateLaundryItem, resetLaundry,
   invBack, invPreviewFile, invCreateSession, invSendMessage, invConfirm, invSetSearch, invCloseSession, invExport,
+  hotoBack, hotoCreate, hotoField, hotoAddItem, hotoDelItem, hotoExport,
 });
 
 window.addEventListener('load', showPin);
