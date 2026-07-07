@@ -1,0 +1,31 @@
+{
+  "name": "life-os-app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Elena2797/ElenaOS.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/Elena2797/ElenaOS/issues"
+  },
+  "homepage": "https://github.com/Elena2797/ElenaOS#readme",
+  "devDependencies": {
+    "vite": "^8.1.0",
+    "vite-plugin-pwa": "^1.3.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
+    "xlsx": "^0.18.5"
+  }
+}
