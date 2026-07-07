@@ -72,3 +72,14 @@ export async function deleteItem(id) {
   const { error } = await _db.from('vj_hoto_items').delete().eq('id', id);
   if (error) throw error;
 }
+
+// Borra TODAS las líneas de una sección de UN hoto (reset por sección).
+// Acotado por hoto_id + section: nunca puede tocar otro HOTO ni otras tablas.
+export async function deleteSectionItems(hoto_id, section) {
+  const { error } = await _db
+    .from('vj_hoto_items')
+    .delete()
+    .eq('hoto_id', hoto_id)
+    .eq('section', section);
+  if (error) throw error;
+}

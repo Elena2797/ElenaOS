@@ -105,7 +105,7 @@ const VJ_SHOPPING_ITEMS=[
   {key:'evian',label:'Evian',opts:null,inv:['evian']},
   {key:'volvic',label:'Volvic',opts:null,inv:['volvic']},
   {key:'herbs',label:'Selection of Herbs',opts:null,inv:['herb']},
-  {key:'magazines',label:'Magazines',opts:null,inv:['magazine']},
+  // Magazines NO está aquí: es una sección propia (shopping.magazines_list).
 ];
 const VJ_LAUNDRY_ITEMS=[
   {id:'pillowcases',name:'Pillowcases'},
@@ -1713,7 +1713,11 @@ function toggleHotoCheck(itemId){
   render();
 }
 
-function resetHotoChecks(){localStorage.removeItem('vj_hoto_checks');render();}
+function resetHotoChecks(){
+  if(!confirm('¿Reiniciar el checklist de Daily Duties?\n\nSolo se desmarcan los ticks del checklist. Nada más.')) return;
+  localStorage.removeItem('vj_hoto_checks');
+  render();
+}
 
 function updateLaundryItem(itemId,delta){
   const today=new Date().toISOString().slice(0,10);
@@ -1796,7 +1800,7 @@ function hotoEntregaTab(){
       <button onclick="hotoDelItem('${i.id}')" style="border:none;background:none;color:var(--t3);cursor:pointer;font-size:15px;line-height:1"><i class="ti ti-x"></i></button>
     </div>`).join('');
     const full=max&&list.length>=max;
-    return `${lbl(title+' · '+list.length+(max?'/'+max:''))}
+    return `${hotoSecHead(title+' · '+list.length+(max?'/'+max:''),sec)}
     <div style="background:var(--surface);border-radius:12px;padding:4px 14px;border:0.5px solid var(--border)">
       ${rows||'<div style="padding:10px 0;font-size:12px;color:var(--t3)">Sin registros todavía.</div>'}
       ${full?'':`<div style="display:flex;gap:8px;padding:10px 0">
@@ -1833,6 +1837,8 @@ function hotoEntregaTab(){
   ${hotoCabinCareSection()}
 
   ${hotoShoppingSection()}
+
+  ${hotoMagazinesSection()}
 
   ${section('Defects','defect','Añadir defecto…',6)}
   ${section('Additional Comments','comment','Añadir comentario…',null)}
@@ -2344,7 +2350,7 @@ function hotoCabinCareSection(){
       </div>${editor}
     </div>`;
   }).join('');
-  return `<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:14px 0 6px">Cabin Care · Date last done · ${withDate}/${VJ_CABIN_CARE_LABELS.length}</div>
+  return `${hotoSecHead('Cabin Care · Date last done · '+withDate+'/'+VJ_CABIN_CARE_LABELS.length,'care')}
   <div style="background:var(--surface);border-radius:12px;padding:2px 14px;border:0.5px solid var(--border)">${rows}</div>`;
 }
 
@@ -2405,9 +2411,156 @@ function hotoShoppingSection(){
       </div>${editor}
     </div>`;
   }).join('');
-  return `<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:14px 0 6px">Aircraft Shopping · ${filled}/${VJ_SHOPPING_ITEMS.length}</div>
+  return `${hotoSecHead('Aircraft Shopping · '+filled+'/'+VJ_SHOPPING_ITEMS.length,'shopping')}
   <div style="background:var(--surface);border-radius:12px;padding:2px 14px;border:0.5px solid var(--border)">${rows}</div>
   <div style="font-size:11px;color:var(--t3);margin-top:6px;line-height:1.5">Editar aquí solo cambia el HOTO. El stock real vive en Inventario; "Usar" copia su valor como foto de la entrega.</div>`;
+}
+
+// ── Header de sección con botón "reiniciar" (reset por sección) ──────────────
+function hotoSecHead(text,kind){
+  return `<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 6px">
+    <span style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3)">${text}</span>
+    <button onclick="hotoResetSection('${kind}')" style="border:none;background:none;color:var(--t3);font-size:10px;cursor:pointer;text-decoration:underline;padding:0">reiniciar</button>
+  </div>`;
+}
+
+// Reset por sección: borra SOLO esa sección de ESTE HOTO, con confirmación.
+// Nunca toca el resto del HOTO, ni Inventario, ni ninguna otra tabla.
+async function hotoResetSection(kind){
+  if(!S.hotoRec) return;
+  const names={shopping:'Fresh / Shopping',magazines:'Magazines',care:'Cabin Care (fechas)',defect:'Defects',comment:'Additional Comments',offload:'Offload'};
+  if(!confirm(`¿Reiniciar la sección "${names[kind]||kind}"?\n\nSolo se borra esa sección de este HOTO. Nada más.`)) return;
+  try{
+    if(kind==='care'){
+      S.hotoRec.cabin_care=[];
+      await hotoSvc.updateHoto(S.hotoRec.id,{cabin_care:[]});
+    }else if(kind==='shopping'){
+      // Conserva Magazines (lista y valor heredado): tienen su propia sección/reset.
+      const keep={};
+      const cur=S.hotoRec.shopping||{};
+      if(cur.magazines_list) keep.magazines_list=cur.magazines_list;
+      if(cur.magazines) keep.magazines=cur.magazines;
+      S.hotoRec.shopping=keep;
+      await hotoSvc.updateHoto(S.hotoRec.id,{shopping:keep});
+    }else if(kind==='magazines'){
+      const shopping={...(S.hotoRec.shopping||{})};
+      delete shopping.magazines_list;
+      delete shopping.magazines;          // incluye el string heredado ("All may")
+      S.hotoRec.shopping=shopping;
+      await hotoSvc.updateHoto(S.hotoRec.id,{shopping});
+    }else{
+      await hotoSvc.deleteSectionItems(S.hotoRec.id,kind);   // defect | comment | offload
+      S.hotoItems=(S.hotoItems||[]).filter(i=>i.section!==kind);
+    }
+    render();
+  }catch(e){ alert('No se pudo reiniciar: '+e.message); }
+}
+
+// ── Magazines — sección estructurada (shopping.magazines_list) ───────────────
+// Cada revista: {name, edition, status: up_to_date|needs_renewal|missing, checked, note, confirmed}
+// confirmed = mes AAAA-MM en que se marcó up_to_date → si cambia el mes, se marca sospechosa.
+const MAG_STATUS={
+  up_to_date:{label:'Up to date',color:'#0F6E56'},
+  needs_renewal:{label:'Needs renewal',color:'#B87A00'},
+  missing:{label:'Missing',color:'#A33636'},
+};
+
+function hotoMagsList(){ return Array.isArray(S.hotoRec?.shopping?.magazines_list)?S.hotoRec.shopping.magazines_list:[]; }
+
+async function hotoMagsSave(list){
+  const shopping={...(S.hotoRec.shopping||{}),magazines_list:list};
+  S.hotoRec.shopping=shopping;
+  try{ await hotoSvc.updateHoto(S.hotoRec.id,{shopping}); }
+  catch(e){ alert('No se pudo guardar Magazines: '+e.message); }
+}
+
+function hotoMagToggle(i){ S.hotoMagOpen=S.hotoMagOpen===i?null:i; render(); }
+
+async function hotoMagAdd(){
+  const input=document.getElementById('hoto-mag-name');
+  const name=(input?.value||'').trim();
+  if(!name) return;
+  const list=[...hotoMagsList(),{name,edition:'',status:'needs_renewal',checked:false,note:'',confirmed:null}];
+  await hotoMagsSave(list);
+  S.hotoMagOpen=list.length-1;
+  render();
+}
+
+async function hotoMagSet(i,field,value){
+  const list=hotoMagsList().map(m=>({...m}));
+  if(!list[i]) return;
+  if(field==='status'){
+    list[i].status=value;
+    list[i].confirmed=value==='up_to_date'?new Date().toISOString().slice(0,7):null;
+  }else if(field==='checked'){
+    list[i].checked=!list[i].checked;
+  }else{
+    list[i][field]=value;
+  }
+  await hotoMagsSave(list);
+  // inputs de texto guardan sin re-render para no perder el foco
+  if(field!=='edition'&&field!=='note') render();
+}
+
+async function hotoMagDel(i){
+  if(!confirm('¿Eliminar esta revista de la lista?')) return;
+  const list=hotoMagsList().filter((_,j)=>j!==i);
+  await hotoMagsSave(list);
+  S.hotoMagOpen=null;
+  render();
+}
+
+async function hotoMagDropLegacy(){
+  const shopping={...(S.hotoRec.shopping||{})};
+  delete shopping.magazines;
+  S.hotoRec.shopping=shopping;
+  try{ await hotoSvc.updateHoto(S.hotoRec.id,{shopping}); }
+  catch(e){ alert(e.message); }
+  render();
+}
+
+function hotoMagazinesSection(){
+  const list=hotoMagsList();
+  const open=S.hotoMagOpen;
+  const esc=(s)=>String(s??'').replace(/"/g,'&quot;');
+  const curMonth=new Date().toISOString().slice(0,7);
+  const legacy=S.hotoRec?.shopping?.magazines;
+  const legacyBox=legacy?`<div style="background:#FBF3E4;border:0.5px solid #E8D9B5;border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:12px;color:#7A5B12;line-height:1.5">Valor heredado del PDF anterior: "${esc(legacy)}". <b>Ya no se exporta</b> — el PDF solo usa la lista de abajo. <button onclick="hotoMagDropLegacy()" style="border:none;background:none;color:#7A5B12;font-size:11px;cursor:pointer;text-decoration:underline;padding:0">Descartar</button></div>`:'';
+  const rows=list.map((m,i)=>{
+    const st=MAG_STATUS[m.status]||MAG_STATUS.needs_renewal;
+    const isOpen=open===i;
+    const stale=m.status==='up_to_date'&&m.confirmed&&m.confirmed<curMonth;
+    const staleBadge=stale?`<div style="font-size:11px;color:#B87A00;padding:0 0 8px">⚠ Confirmada en ${m.confirmed} — cambió el mes, ¿sigue al día?</div>`:'';
+    const chips=Object.entries(MAG_STATUS).map(([k,v])=>`<button onclick="hotoMagSet(${i},'status','${k}')" style="padding:7px 11px;border:0.5px solid ${m.status===k?v.color:'var(--border)'};background:${m.status===k?v.color:'var(--bg)'};color:${m.status===k?'#fff':'var(--text)'};border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">${v.label}</button>`).join('');
+    const editor=!isOpen?'':`
+      <div style="padding:2px 0 12px;display:flex;flex-direction:column;gap:8px">
+        ${staleBadge}
+        <input value="${esc(m.edition)}" placeholder="Mes / edición (p.ej. Jul 26)" onchange="hotoMagSet(${i},'edition',this.value)" style="box-sizing:border-box;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;font-size:12px;background:var(--bg);color:var(--text)">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);cursor:pointer"><input type="checkbox" ${m.checked?'checked':''} onchange="hotoMagSet(${i},'checked')"> Checked (revisada físicamente)</label>
+        <input value="${esc(m.note)}" placeholder="Nota (solo en la app)" onchange="hotoMagSet(${i},'note',this.value)" style="box-sizing:border-box;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;font-size:12px;background:var(--bg);color:var(--text)">
+        <button onclick="hotoMagDel(${i})" style="align-self:flex-start;border:none;background:none;color:#A33636;font-size:11px;cursor:pointer;text-decoration:underline;padding:0">Eliminar revista</button>
+      </div>`;
+    return `<div style="${i<list.length-1||true?'border-bottom:0.5px solid var(--border);':''}">
+      <div onclick="hotoMagToggle(${i})" style="display:flex;align-items:center;gap:8px;padding:11px 0;cursor:pointer">
+        <span style="flex:1;font-size:13px;color:var(--text)">${esc(m.name)}${m.edition?` <span style="color:var(--t3);font-size:12px">· ${esc(m.edition)}</span>`:''}</span>
+        ${stale?'<span style="font-size:12px">⚠</span>':''}
+        ${m.checked?'<i class="ti ti-check" style="font-size:13px;color:#0F6E56"></i>':''}
+        <span style="font-size:11px;font-weight:600;color:${st.color};white-space:nowrap">${st.label}</span>
+        <i class="ti ti-chevron-${isOpen?'up':'down'}" style="font-size:12px;color:var(--t3)"></i>
+      </div>${editor}
+    </div>`;
+  }).join('');
+  return `${hotoSecHead('Magazines · '+list.length,'magazines')}
+  ${legacyBox}
+  <div style="background:var(--surface);border-radius:12px;padding:2px 14px;border:0.5px solid var(--border)">
+    ${rows||'<div style="padding:10px 0;font-size:12px;color:var(--t3)">Sin revistas registradas. Añade las que debe llevar el avión.</div>'}
+    <div style="display:flex;gap:8px;padding:10px 0">
+      <input id="hoto-mag-name" placeholder="Nombre de la revista…" style="flex:1;box-sizing:border-box;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text)" onkeydown="if(event.key==='Enter')hotoMagAdd()">
+      <button onclick="hotoMagAdd()" style="border:none;background:var(--text);color:#fff;border-radius:8px;padding:0 14px;font-size:13px;font-weight:600;cursor:pointer">+</button>
+    </div>
+  </div>
+  <div style="font-size:11px;color:var(--t3);margin-top:6px;line-height:1.5">Al PDF: las <b>up to date</b> salen con nombre y edición; needs renewal y missing salen como pendientes. Lista vacía = celda Magazines vacía.</div>`;
 }
 
 function go(view, id=null) {
@@ -3291,7 +3444,8 @@ Object.assign(window, {
   invBack, invPreviewFile, invCreateSession, invSendMessage, invConfirm, invSetSearch, invCloseSession, invExport,
   hotoBack, hotoCreate, hotoField, hotoAddItem, hotoDelItem, hotoExport,
   hotoCareToggle, hotoCareToday, hotoCareUnknown, hotoCareDate, hotoCareNote,
-  hotoShopToggle, hotoShopSet,
+  hotoShopToggle, hotoShopSet, hotoResetSection,
+  hotoMagToggle, hotoMagAdd, hotoMagSet, hotoMagDel, hotoMagDropLegacy,
 });
 
 window.addEventListener('load', showPin);
