@@ -88,6 +88,25 @@ const VJ_CABIN_CARE_LABELS=[
   'Empty, clean & refill olive oil and vinegar servers',
   'Customer iPads updated with new content',
 ];
+// Aircraft Shopping — los 14 items reales de la página 2 del PDF oficial.
+// opts = opciones del dropdown oficial (null = campo de texto libre en el PDF).
+// inv = palabras clave para buscar el item en Inventario (solo lectura, referencia).
+const VJ_SHOPPING_ITEMS=[
+  {key:'lemons',label:'Lemons',opts:['0','1','2','3','+4'],inv:['lemon']},
+  {key:'limes',label:'Limes',opts:['0','1','2','3','+4'],inv:['lime']},
+  {key:'celery',label:'Celery',opts:['0','1 pack'],inv:['celery']},
+  {key:'green_olives',label:'Green Olives',opts:['0','1 Jar','2 Jar'],inv:['olive']},
+  {key:'oranges',label:'Oranges',opts:['0','1','2','3','+4'],inv:['orange']},
+  {key:'cucumber',label:'Cucumber',opts:['0','1','2'],inv:['cucumber']},
+  {key:'milk_full',label:'Milk Full Fat',opts:['0','1','2'],inv:['full fat','whole milk']},
+  {key:'milk_skimmed',label:'Milk Skimmed',opts:['0','1','2'],inv:['skimmed']},
+  {key:'oat_milk',label:'Oat Milk',opts:null,inv:['oat milk','oat']},
+  {key:'almond_milk',label:'Almond Milk',opts:null,inv:['almond']},
+  {key:'evian',label:'Evian',opts:null,inv:['evian']},
+  {key:'volvic',label:'Volvic',opts:null,inv:['volvic']},
+  {key:'herbs',label:'Selection of Herbs',opts:null,inv:['herb']},
+  {key:'magazines',label:'Magazines',opts:null,inv:['magazine']},
+];
 const VJ_LAUNDRY_ITEMS=[
   {id:'pillowcases',name:'Pillowcases'},
   {id:'blankets',name:'Blankets'},
@@ -1718,6 +1737,12 @@ function vjHotoView(){
         S.hotoRec=await hotoSvc.loadActiveHoto();
         S.hotoItems=S.hotoRec?await hotoSvc.loadItems(S.hotoRec.id):[];
       }catch(e){ console.error('hoto load',e); S.hotoErr=e.message; }
+      // Inventario: SOLO LECTURA, como referencia para Aircraft Shopping.
+      // Si falla o no hay sesión abierta, la sección funciona igual en modo manual.
+      try{
+        const invSess=await invSvc.loadActiveSession();
+        S.hotoInvItems=invSess?await invSvc.loadSessionItems(invSess.id):[];
+      }catch(e){ S.hotoInvItems=[]; }
       render();
     })();
     return `${head}<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--t3);font-size:13px">Cargando HOTO…</div>`;
@@ -1806,6 +1831,8 @@ function hotoEntregaTab(){
   </div>
 
   ${hotoCabinCareSection()}
+
+  ${hotoShoppingSection()}
 
   ${section('Defects','defect','Añadir defecto…',6)}
   ${section('Additional Comments','comment','Añadir comentario…',null)}
@@ -2319,6 +2346,68 @@ function hotoCabinCareSection(){
   }).join('');
   return `<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:14px 0 6px">Cabin Care · Date last done · ${withDate}/${VJ_CABIN_CARE_LABELS.length}</div>
   <div style="background:var(--surface);border-radius:12px;padding:2px 14px;border:0.5px solid var(--border)">${rows}</div>`;
+}
+
+// ── Aircraft Shopping · interactivo ──────────────────────────────────────────
+// Regla HOTO ↔ Inventario: Inventario es la verdad del stock; el HOTO copia un
+// valor con gesto explícito ("Usar"). Editar aquí NUNCA modifica Inventario.
+function hotoInvRef(item){
+  const items=S.hotoInvItems||[];
+  for(const kw of item.inv){
+    const hit=items.find(x=>(x.description||'').toLowerCase().includes(kw));
+    if(hit) return hit;
+  }
+  return null;
+}
+
+function hotoShopToggle(i){ S.hotoShopOpen=S.hotoShopOpen===i?null:i; render(); }
+
+async function hotoShopSet(key,val){
+  if(!S.hotoRec) return;
+  const shopping={...(S.hotoRec.shopping||{})};
+  if(val==null||String(val).trim()==='') delete shopping[key];
+  else shopping[key]=String(val).trim();
+  S.hotoRec.shopping=shopping;
+  try{ await hotoSvc.updateHoto(S.hotoRec.id,{shopping}); }
+  catch(e){ alert('No se pudo guardar: '+e.message); }
+  render();
+}
+
+function hotoShoppingSection(){
+  const shopping=S.hotoRec?.shopping||{};
+  const open=S.hotoShopOpen;
+  const filled=VJ_SHOPPING_ITEMS.filter(it=>shopping[it.key]!=null&&shopping[it.key]!=='').length;
+  const esc=(s)=>String(s??'').replace(/"/g,'&quot;');
+  const rows=VJ_SHOPPING_ITEMS.map((it,i)=>{
+    const val=shopping[it.key];
+    const has=val!=null&&val!=='';
+    const isOpen=open===i;
+    const ref=hotoInvRef(it);
+    const refLine=ref?`<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2)">
+        <span>Inventario: <b>${ref.current_qty??'?'}</b>${ref.verified?' · verificado':''}</span>
+        <button onclick="hotoShopSet('${it.key}','${esc(ref.current_qty)}')" style="border:0.5px solid var(--border);background:var(--bg);color:var(--text);border-radius:7px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer">Usar</button>
+      </div>`:'';
+    const chips=it.opts
+      ?`<div style="display:flex;gap:6px;flex-wrap:wrap">${it.opts.map(o=>`<button onclick="hotoShopSet('${it.key}','${esc(o)}')" style="padding:8px 13px;border:0.5px solid ${val===o?'#0F6E56':'var(--border)'};background:${val===o?'#0F6E56':'var(--bg)'};color:${val===o?'#fff':'var(--text)'};border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">${o}</button>`).join('')}</div>`
+      :`<input value="${esc(val)}" placeholder="Cantidad o nota…" onchange="hotoShopSet('${it.key}',this.value)" style="box-sizing:border-box;width:100%;padding:9px 11px;border:0.5px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg);color:var(--text)">`;
+    const editor=!isOpen?'':`
+      <div style="padding:4px 0 12px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:12px;color:var(--t2)">¿Cuántos <b>${it.label}</b> quedan?</div>
+        ${chips}
+        ${refLine}
+        ${has?`<button onclick="hotoShopSet('${it.key}','')" style="align-self:flex-start;border:none;background:none;color:var(--t3);font-size:11px;cursor:pointer;text-decoration:underline;padding:0">Dejar vacío en el PDF</button>`:''}
+      </div>`;
+    return `<div style="${i<VJ_SHOPPING_ITEMS.length-1?'border-bottom:0.5px solid var(--border);':''}">
+      <div onclick="hotoShopToggle(${i})" style="display:flex;align-items:center;gap:10px;padding:11px 0;cursor:pointer">
+        <span style="flex:1;font-size:13px;color:var(--text)">${it.label}</span>
+        <span style="font-size:12px;font-weight:600;color:${has?'#0F6E56':'var(--t3)'};max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${has?esc(val):'—'}</span>
+        <i class="ti ti-chevron-${isOpen?'up':'down'}" style="font-size:12px;color:var(--t3)"></i>
+      </div>${editor}
+    </div>`;
+  }).join('');
+  return `<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:14px 0 6px">Aircraft Shopping · ${filled}/${VJ_SHOPPING_ITEMS.length}</div>
+  <div style="background:var(--surface);border-radius:12px;padding:2px 14px;border:0.5px solid var(--border)">${rows}</div>
+  <div style="font-size:11px;color:var(--t3);margin-top:6px;line-height:1.5">Editar aquí solo cambia el HOTO. El stock real vive en Inventario; "Usar" copia su valor como foto de la entrega.</div>`;
 }
 
 function go(view, id=null) {
@@ -3202,6 +3291,7 @@ Object.assign(window, {
   invBack, invPreviewFile, invCreateSession, invSendMessage, invConfirm, invSetSearch, invCloseSession, invExport,
   hotoBack, hotoCreate, hotoField, hotoAddItem, hotoDelItem, hotoExport,
   hotoCareToggle, hotoCareToday, hotoCareUnknown, hotoCareDate, hotoCareNote,
+  hotoShopToggle, hotoShopSet,
 });
 
 window.addEventListener('load', showPin);
