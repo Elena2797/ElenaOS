@@ -269,22 +269,7 @@ function isabelContributions(areaId=null, limit=4) {
   const areaProjects=areaId?S.projects.filter(p=>p.area_id===areaId).map(p=>p.id):[];
   let evs=S.eventos.filter(e=>['ia','isabel'].includes(e.origen));
   if(areaId) evs=evs.filter(e=>e.area_id===areaId||areaProjects.includes(e.project_id));
-  const mapped=evs.slice(0,limit).map(e=>({title:e.resumen||e.texto,meta:(e.herramienta||e.origen)+' · '+new Date(e.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'}),type:e.origen}));
-  if(mapped.length) return mapped;
-  const area=areaId?S.areas.find(a=>a.id===areaId):null;
-  if(area?.name==='JETMI') return [
-    {title:'PRD Semilla de JETMI estructurado y listo para construir',meta:'Isabel · base de dominio',type:'ia'},
-    {title:'Proyectos derivados del PRD visibles en el sistema',meta:'Isabel · mapa operativo',type:'ia'},
-    {title:'Bloqueo detectado: constitución legal pendiente',meta:'Isabel · bloqueo',type:'ia'},
-  ];
-  if(area?.name==='VistaJet') return [
-    {title:'Protocolo operativo VistaJet preparado para rotación',meta:'Isabel · acompañamiento',type:'ia'},
-    {title:'Checklist de maleta y estado de rotación disponibles',meta:'Isabel · preparación',type:'ia'},
-  ];
-  return [
-    {title:'Mapa visual de dominios activado',meta:'Isabel · UX LIFEOS',type:'ia'},
-    {title:'PRDs, proyectos y próximos pasos reunidos en un solo lugar',meta:'Isabel · claridad',type:'ia'},
-  ].slice(0,limit);
+  return evs.slice(0,limit).map(e=>({title:e.resumen||e.texto,meta:(e.herramienta||e.origen)+' · '+new Date(e.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'}),type:e.origen}));
 }
 
 function contributionList(items) {
