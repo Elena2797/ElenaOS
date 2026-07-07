@@ -10,7 +10,7 @@ export function setClient(client) {
 // ─── Carga inicial ────────────────────────────────────────────────────────────
 
 export async function loadAll() {
-  const [ctx, areas, tasks, waiting, decisions, metrics, operators, transactions, vjState, vjTasks] =
+  const [ctx, areas, tasks, waiting, decisions, metrics, operators, transactions, vjState, vjTasks, projects, eventos, alertas] =
     await Promise.all([
       _db.from('life_context').select('*').order('created_at', { ascending: false }).limit(1),
       _db.from('areas').select('*').order('sort_order'),
@@ -22,8 +22,11 @@ export async function loadAll() {
       _db.from('transactions').select('*').gte('date', new Date().getFullYear() + '-01-01').order('date', { ascending: false }),
       _db.from('vj_state').select('*').limit(1),
       _db.from('vj_tasks').select('*').order('created_at'),
+      _db.from('projects').select('*').in('status', ['active', 'paused']).order('last_activity_at', { ascending: false }),
+      _db.from('eventos').select('*').order('created_at', { ascending: false }).limit(50),
+      _db.from('alertas').select('*').eq('status', 'active').order('created_at', { ascending: false }),
     ]);
-  return { ctx, areas, tasks, waiting, decisions, metrics, operators, transactions, vjState, vjTasks };
+  return { ctx, areas, tasks, waiting, decisions, metrics, operators, transactions, vjState, vjTasks, projects, eventos, alertas };
 }
 
 // ─── Modo ─────────────────────────────────────────────────────────────────────
@@ -128,4 +131,35 @@ export async function updateTransaction(id, { date, description, amount, type, c
 
 export async function deleteTransaction(id) {
   await _db.from('transactions').delete().eq('id', id);
+}
+
+// ─── Proyectos ────────────────────────────────────────────────────────────────
+
+export async function createProject({ title, area_id, next_action, ia_context }) {
+  const { data } = await _db.from('projects').insert({
+    title, area_id: area_id || null, next_action: next_action || null,
+    ia_context: ia_context || null, status: 'active',
+  }).select().single();
+  return data;
+}
+
+export async function updateProject(id, patch) {
+  await _db.from('projects').update(patch).eq('id', id);
+}
+
+// ─── Eventos ──────────────────────────────────────────────────────────────────
+
+export async function createEvento({ project_id, area_id, origen, texto, herramienta, resumen, resultado_ubicacion }) {
+  const { data } = await _db.from('eventos').insert({
+    project_id: project_id || null, area_id: area_id || null,
+    origen: origen || 'manual', texto, herramienta: herramienta || null,
+    resumen: resumen || null, resultado_ubicacion: resultado_ubicacion || null,
+  }).select().single();
+  return data;
+}
+
+// ─── Alertas ──────────────────────────────────────────────────────────────────
+
+export async function dismissAlerta(id) {
+  await _db.from('alertas').update({ status: 'dismissed' }).eq('id', id);
 }
