@@ -43,6 +43,18 @@ export async function loadActiveSession() {
   return data?.[0] ?? null;
 }
 
+// Última sesión en cualquier estado (open o closed). Solo lectura — la usa
+// Aircraft Readiness para evaluar la evidencia de inventario.
+export async function loadLastSession() {
+  const { data, error } = await _db
+    .from('vj_inventory_sessions')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  return data?.[0] ?? null;
+}
+
 export async function closeSession(id) {
   await _db.from('vj_inventory_sessions').update({
     status: 'closed',

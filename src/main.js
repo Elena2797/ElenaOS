@@ -5,6 +5,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import * as isabelSvc from './services/isabel.js';
 import * as invSvc from './services/inventory.js';
 import * as hotoSvc from './services/hoto.js';
+import * as readiSvc from './services/readiness.js';
 
 const PIN = '1965';
 // Secciones e items EXACTOS del PDF oficial "Handover / Takeover Checklist" de VistaJet.
@@ -701,6 +702,18 @@ function areaView() {
     const vj=S.vjState;
     const now=new Date();
     const status=vj.status||'libre';
+
+    // Aircraft Readiness: carga async de señales reales (una vez por visita al área)
+    if(!S._readiLoaded){
+      S._readiLoaded=true;
+      (async()=>{
+        try{
+          const sig=await readiSvc.collectSignals({hotoSvc,invSvc,vjTasks:S.vjTasks,vjState:vj});
+          S.vjReadiness=readiSvc.assess(sig);
+        }catch(e){ console.error('readiness',e); S.vjReadiness={error:e.message}; }
+        render();
+      })();
+    }
     const statusMap={rotacion:{label:'En rotación',bg:'#FAEEDA',color:'#854F0B'},libre:{label:'Libre',bg:'#E1F5EE',color:'#0F6E56'},standby:{label:'Standby',bg:'#EEEDFE',color:'#534AB7'}};
     const st=statusMap[status]||statusMap.libre;
     const pendTasks=S.vjTasks.filter(t=>t.status!=='done');
@@ -825,18 +838,45 @@ function areaView() {
     const maletaSB=!activeTpl?'#F5F5F5':bagDone===bagTotal?'#E1F5EE':bagDone===0?'#FAEEDA':'#EEF4FD';
     const maletaSummary=!activeTpl?'Selecciona una plantilla':bagDone===bagTotal?'Todo preparado':bagDone+' de '+bagTotal+' preparados';
 
-    return `
-    <div style="background:var(--surface);border-radius:12px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3)">Isabel · copiloto</div>
+    // ── Tarjeta Isabel = Aircraft Readiness: evaluación desde datos reales ──
+    // La UI solo renderiza el objeto de services/readiness.js; sin lógica aquí.
+    const R=S.vjReadiness;
+    const readiCard=(()=>{
+      const head=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3)">Isabel · copiloto de entrega</div>
         <button onclick="openVjState()" style="border:none;background:var(--bg);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:500;cursor:pointer;color:var(--t2)">${st.label}</button>
       </div>
-      ${vj.aircraft?`<div style="font-size:11px;color:var(--t3);margin-bottom:8px">${vj.aircraft}${status==='rotacion'&&vj.rotation_day&&vj.rotation_total?' · Día '+vj.rotation_day+'/'+vj.rotation_total:''}</div>`:''}
-      <div style="font-size:15px;font-weight:500;color:var(--text);line-height:1.55;margin-bottom:${primaryCTA?12:10}px">${isabelCriterion}</div>
+      ${vj.aircraft?`<div style="font-size:11px;color:var(--t3);margin-bottom:8px">${vj.aircraft}${status==='rotacion'&&vj.rotation_day&&vj.rotation_total?' · Día '+vj.rotation_day+'/'+vj.rotation_total:''}</div>`:''}`;
+      if(!R) return `${head}<div style="font-size:13px;color:var(--t3);padding:4px 0">Evaluando el estado real de los módulos…</div>`;
+      if(R.error) return `${head}<div style="font-size:13px;color:var(--t2)">No pude evaluar el estado: ${R.error}</div>`;
+      const rm={ready:{label:'Listo para entregar',color:'#0F6E56',bg:'#E1F5EE'},almost_ready:{label:'Casi listo',color:'#854F0B',bg:'#FAEEDA'},not_ready:{label:'No entregaría aún',color:'#A33636',bg:'#FBEAEA'}}[R.readiness];
+      const cf={high:'alta',medium:'media',low:'baja'}[R.confidence];
+      const lvlIcon={ok:'✓',warn:'⚠',block:'✗',missing:'?'};
+      const lvlColor={ok:'#0F6E56',warn:'#B87A00',block:'#A33636',missing:'#9CA3AF'};
+      const detail=!S.readiDetail?'':`<div style="margin-top:10px;border-top:0.5px solid var(--border);padding-top:8px">
+        ${R.modules.map(m=>`<div style="margin-bottom:8px">
+          <div style="font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--t3);margin-bottom:3px">${m.name}</div>
+          ${m.lines.map(l=>`<div style="display:flex;gap:7px;font-size:12px;line-height:1.5;color:var(--t2)"><span style="color:${lvlColor[l.level]};font-weight:700;flex-shrink:0">${lvlIcon[l.level]}</span><span>${l.text}</span></div>`).join('')}
+        </div>`).join('')}
+      </div>`;
+      return `${head}
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:9px">
+        <span style="font-size:11px;font-weight:700;color:${rm.color};background:${rm.bg};border-radius:999px;padding:3px 10px">${rm.label}</span>
+        <span style="font-size:10px;color:var(--t3)">confianza ${cf} · ${R.phase}</span>
+        <button onclick="readiRefresh()" title="Recalcular" style="border:none;background:none;color:var(--t3);cursor:pointer;font-size:13px;padding:0;margin-left:auto"><i class="ti ti-refresh"></i></button>
+      </div>
+      <div style="font-size:14px;font-weight:500;color:var(--text);line-height:1.55;margin-bottom:10px">${R.recommendation}</div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        ${primaryCTA?`<button onclick="go('${primaryCTA.view}')" style="border:none;background:var(--text);color:#fff;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer">${primaryCTA.label}</button>`:''}
+        <button onclick="readiToggleDetail()" style="border:none;background:var(--bg);color:var(--t2);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer">${S.readiDetail?'Ocultar evaluación':'Ver evaluación por módulos'}</button>
+        ${primaryCTA?`<button onclick="go('${primaryCTA.view}')" style="border:none;background:var(--text);color:#fff;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer">${primaryCTA.label}</button>`:''}
         <button onclick="openChat()" style="border:none;background:none;padding:0;font-size:12px;font-weight:500;color:var(--t2);cursor:pointer">Hablar con Isabel →</button>
       </div>
+      ${detail}`;
+    })();
+
+    return `
+    <div style="background:var(--surface);border-radius:12px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)">
+      ${readiCard}
     </div>
 
     ${(()=>{
@@ -1829,8 +1869,10 @@ function hotoEntregaTab(){
         <input value="${v(rec.ch_code)}" onchange="hotoField('ch_code',this.value)" style="${fieldStyle};margin-top:4px;text-transform:uppercase"></div>
       <div><label style="font-size:10px;font-weight:600;color:var(--t3)">DÍAS A BORDO</label>
         <input value="${v(rec.days_on_aircraft)}" onchange="hotoField('days_on_aircraft',this.value)" style="${fieldStyle};margin-top:4px"></div>
-      <div style="grid-column:1/3"><label style="font-size:10px;font-weight:600;color:var(--t3)">FECHA DE RECEPCIÓN</label>
+      <div><label style="font-size:10px;font-weight:600;color:var(--t3)">FECHA DE RECEPCIÓN</label>
         <input value="${v(rec.received_date)}" onchange="hotoField('received_date',this.value)" placeholder="25-May-26" style="${fieldStyle};margin-top:4px"></div>
+      <div><label style="font-size:10px;font-weight:600;color:var(--t3)">FECHA DE ENTREGA</label>
+        <input type="date" value="${v(rec.delivery_date)}" onchange="hotoField('delivery_date',this.value)" style="${fieldStyle};margin-top:4px"></div>
     </div>
   </div>
 
@@ -2215,8 +2257,13 @@ async function invExport(){
   }catch(e){ alert('Error exportando: '+e.message); }
 }
 
+// ═══ Aircraft Readiness ═══════════════════════════════════════════════════════
+function readiRefresh(){ S._readiLoaded=false; S.vjReadiness=null; render(); }
+function readiToggleDetail(){ S.readiDetail=!S.readiDetail; render(); }
+
 // ═══ HOTO — módulo vivo ═══════════════════════════════════════════════════════
-function hotoBack(){ S._hotoLoaded=false; S.hotoErr=null; go('area',S.areaId); }
+// Al salir del HOTO se invalida el readiness: se recalcula con los datos frescos.
+function hotoBack(){ S._hotoLoaded=false; S.hotoErr=null; S._readiLoaded=false; S.vjReadiness=null; go('area',S.areaId); }
 
 async function hotoReload(){
   try{
@@ -2244,7 +2291,11 @@ async function hotoField(field,value){
   const val=value===''?null:value;
   S.hotoRec[field]=val;              // optimista, sin re-render (no perder foco)
   try{ await hotoSvc.updateHoto(S.hotoRec.id,{ [field]:val }); }
-  catch(e){ alert('No se pudo guardar: '+e.message); }
+  catch(e){
+    if(field==='delivery_date'&&/column|delivery_date/i.test(e.message))
+      alert('La columna delivery_date no existe todavía. Ejecuta hoto_migration_v2.sql en Supabase (1 línea) y vuelve a intentarlo.');
+    else alert('No se pudo guardar: '+e.message);
+  }
 }
 
 async function hotoAddItem(section){
@@ -3446,6 +3497,7 @@ Object.assign(window, {
   hotoCareToggle, hotoCareToday, hotoCareUnknown, hotoCareDate, hotoCareNote,
   hotoShopToggle, hotoShopSet, hotoResetSection,
   hotoMagToggle, hotoMagAdd, hotoMagSet, hotoMagDel, hotoMagDropLegacy,
+  readiRefresh, readiToggleDetail,
 });
 
 window.addEventListener('load', showPin);
