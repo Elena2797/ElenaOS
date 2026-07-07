@@ -7,33 +7,86 @@ import * as invSvc from './services/inventory.js';
 import * as hotoSvc from './services/hoto.js';
 
 const PIN = '1965';
+// Secciones e items EXACTOS del PDF oficial "Handover / Takeover Checklist" de VistaJet.
+// No inventar items: este checklist replica el documento real.
 const VJ_HOTO_SECTIONS=[
-  {id:'cabin',name:'CABIN',items:[
-    {id:'cabin_cleaned',text:'Cabin cleaned'},
-    {id:'coffee_cleaned',text:'Coffee machine cleaned'},
-    {id:'kettle_checked',text:'Kettle checked'},
-    {id:'drawers_empty',text:'Drawers and bins empty'},
-    {id:'seatbelts',text:'Seat belts stowed'},
-    {id:'tables_cleaned',text:'Table areas cleaned'},
+  {id:'galley',name:'GALLEY DAILY DUTIES',items:[
+    {id:'g1',text:'Clean and disinfect all surfaces'},
+    {id:'g2',text:'Clean Oven'},
+    {id:'g3',text:'Clean Microwave'},
+    {id:'g4',text:'Clean Coffee Machine'},
+    {id:'g5',text:'Replenish tea and coffee from aft storage to galley'},
+    {id:'g6',text:'Clean and disinfect Chiller'},
+    {id:'g7',text:'Clean and disinfect Fridge (Global), Chiller (Challenger)'},
+    {id:'g8',text:'Clean drawers (also rims)'},
+    {id:'g9',text:'Wipe Oil/Vinegar servers and protect nozzle with aluminum'},
+    {id:'g10',text:'Wipe Salt and Pepper grinders and refill'},
+    {id:'g11',text:'Clean sink and washing up bowl'},
+    {id:'g12',text:'Empty ice from ice drawer — no item left inside (butter, lemon slice…)'},
+    {id:'g13',text:'All bottles protected by wine sleeve in ice drawer, sealed properly'},
+    {id:'g14',text:'No item left opened in galley/crew box · no nuts in Zanetto bowls'},
+    {id:'g15',text:'Empty bin, clean inside, replace bag (double bag)'},
+    {id:'g16',text:'When leaving aircraft open: Bin, Chiller, Fridge, Oven, Sink'},
+    {id:'g17',text:'Organise compartments/drawers according to stowage guide'},
   ]},
-  {id:'galley',name:'GALLEY',items:[
-    {id:'oven_cleaned',text:'Oven cleaned'},
-    {id:'microwave_cleaned',text:'Microwave cleaned'},
-    {id:'trolleys_locked',text:'Trolleys cleaned and locked'},
+  {id:'cabin',name:'CABIN DAILY DUTIES',items:[
+    {id:'c1',text:'Vacuum carpets and mats'},
+    {id:'c2',text:'Clean side pockets'},
+    {id:'c3',text:'Clean cup holders'},
+    {id:'c4',text:'Clean and polish wooden surfaces'},
+    {id:'c5',text:'Reposition seats and fold seatbelts correctly'},
+    {id:'c6',text:'Polish monitor screens with dry microfibre'},
+    {id:'c7',text:'Polish iPods'},
+    {id:'c8',text:'Clean windows'},
+    {id:'c9',text:'Organize every cupboard/storage according to stowage guide'},
+    {id:'c10',text:'Check headphones are clean, neatly stacked and fully charged'},
+    {id:'c11',text:'Polish handrail'},
+    {id:'c12',text:'Clean service trays and ensure they are in good condition'},
   ]},
-  {id:'cockpit',name:'COCKPIT',items:[
-    {id:'crew_items',text:'Crew personal items removed'},
-    {id:'flight_docs',text:'Flight documents handed over'},
+  {id:'washroom',name:'WASHROOM DAILY DUTIES',items:[
+    {id:'w1',text:'Clean and disinfect toilet bowl and surrounding'},
+    {id:'w2',text:'Clean and disinfect surfaces'},
+    {id:'w3',text:'Clean and shine water basin and taps'},
+    {id:'w4',text:'Clean and wipe soap/lotion/leather holders'},
+    {id:'w5',text:'Refill paper tissues and fold into a point'},
+    {id:'w6',text:'Refill toilet paper, fold into a point'},
+    {id:'w7',text:'Polish mirrors'},
+    {id:'w8',text:'Empty toilet bin, replace bag'},
+    {id:'w9',text:'Organise compartments/drawers according to stowage guide'},
   ]},
-  {id:'exterior',name:'EXTERIOR',items:[
-    {id:'exterior_check',text:'Exterior walkaround completed'},
-    {id:'stairs_secured',text:'Stairs secured'},
+  {id:'stock',name:'AIRCRAFT STOCK MANAGEMENT',items:[
+    {id:'s1',text:'Dishes Offloaded'},
+    {id:'s2',text:'Fridge Bag offloaded'},
+    {id:'s3',text:'Laundry Offloaded'},
+    {id:'s4',text:'Linens correct to AC type, neatly folded, good condition'},
+    {id:'s5',text:'Chinaware in good condition (silver rim)'},
+    {id:'s6',text:'CH iPad — minimum charge 80%'},
+    {id:'s7',text:'Customer iPad — minimum charge 80%'},
+    {id:'s8',text:'Global 7500 Jet Bed Pumps charged'},
+    {id:'s9',text:'Winter/Summer Ops performed'},
   ]},
-  {id:'documents',name:'DOCUMENTS',items:[
-    {id:'hoto_email',text:'HO/TO email sent and confirmed'},
-    {id:'defects_noted',text:'Defects noted and communicated'},
-    {id:'tech_log',text:'Tech log entries completed'},
-  ]},
+];
+// Cabin Care "Date last done" — 17 filas del PDF oficial, en el MISMO orden que los
+// campos de fecha del formulario (verificado por posición). El índice i de este array
+// corresponde a cabin_care[i] del registro HOTO y a la fila i del PDF exportado.
+const VJ_CABIN_CARE_LABELS=[
+  'Blankets dry cleaned',
+  'Pillow covers dry cleaned',
+  'Wipe leather surfaces and seats',
+  'Hoover bag changed / empty Dyson after each use',
+  'Cutlery polished',
+  'Stairs cleaned',
+  'Check no watermarks/stickers on the glasses',
+  'Kettle descaled',
+  'Remove bin insert and clean below',
+  'Toppers/Duvets properly vacuum packed',
+  'Check no unwanted content on iPods (notes/pictures)',
+  'Safety Cards in good condition',
+  'Magazines free of adverts, no price stickers on cover',
+  'Full Stock Check',
+  'Expiry dates checked — including Crew Box',
+  'Empty, clean & refill olive oil and vinegar servers',
+  'Customer iPads updated with new content',
 ];
 const VJ_LAUNDRY_ITEMS=[
   {id:'pillowcases',name:'Pillowcases'},
@@ -1752,6 +1805,8 @@ function hotoEntregaTab(){
     </div>
   </div>
 
+  ${hotoCabinCareSection()}
+
   ${section('Defects','defect','Añadir defecto…',6)}
   ${section('Additional Comments','comment','Añadir comentario…',null)}
   ${section('Items to offload','offload','Añadir item a descargar…',3)}
@@ -2178,20 +2233,92 @@ async function hotoDelItem(id){
   }catch(e){ alert('No se pudo borrar: '+e.message); }
 }
 
-async function hotoExport(){
+function hotoExport(){
   if(!S.hotoRec) return;
-  try{
-    const res=await fetch(`${ISABEL_API}/v1/hoto/${S.hotoRec.id}/export`,{headers:{'x-api-key':ISABEL_KEY}});
-    if(!res.ok) throw new Error(`Export ${res.status}`);
-    const blob=await res.blob();
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
-    const cd=res.headers.get('Content-Disposition')||'';
-    const m=cd.match(/filename="([^"]+)"/);
-    a.download=m?m[1]:'HOTO.pdf';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }catch(e){ alert('Error exportando HOTO: '+e.message); }
+  // Navegación directa (no fetch+blob): en iOS/PWA los blobs de descarga fallan,
+  // pero abrir la URL muestra el PDF en el visor nativo con compartir/guardar.
+  const url=`${ISABEL_API}/v1/hoto/${S.hotoRec.id}/export?inline=1&api_key=${encodeURIComponent(ISABEL_KEY)}`;
+  window.open(url,'_blank');
+}
+
+// ── Cabin Care · Date last done ──────────────────────────────────────────────
+// cabin_care[i] ↔ VJ_CABIN_CARE_LABELS[i] ↔ fila i del PDF. Cada elemento {d,n}:
+// d = fecha M/D/YY o null (unknown), n = nota (solo app; el PDF no tiene celda).
+function hotoCareArr(){
+  const raw=Array.isArray(S.hotoRec?.cabin_care)?S.hotoRec.cabin_care:[];
+  return VJ_CABIN_CARE_LABELS.map((_,i)=>{
+    const x=raw[i];
+    if(typeof x==='string') return {d:x||null,n:''};
+    return {d:x?.d||null,n:x?.n||''};
+  });
+}
+
+async function hotoCareSave(arr){
+  S.hotoRec.cabin_care=arr;
+  try{ await hotoSvc.updateHoto(S.hotoRec.id,{cabin_care:arr}); }
+  catch(e){ alert('No se pudo guardar Cabin Care: '+e.message); }
+}
+
+function hotoCareToggle(i){ S.hotoCareOpen=S.hotoCareOpen===i?null:i; render(); }
+
+function hotoCareToday(i){
+  const t=new Date();
+  const arr=hotoCareArr();
+  arr[i].d=`${t.getMonth()+1}/${t.getDate()}/${String(t.getFullYear()).slice(2)}`;
+  hotoCareSave(arr); render();
+}
+
+function hotoCareUnknown(i){
+  const arr=hotoCareArr();
+  arr[i].d=null;
+  hotoCareSave(arr); render();
+}
+
+function hotoCareDate(i,val){
+  if(!val) return;                      // yyyy-mm-dd del <input type="date">
+  const [y,m,d]=val.split('-');
+  const arr=hotoCareArr();
+  arr[i].d=`${parseInt(m)}/${parseInt(d)}/${y.slice(2)}`;
+  hotoCareSave(arr); render();
+}
+
+function hotoCareNote(i,val){
+  const arr=hotoCareArr();
+  arr[i].n=val;
+  hotoCareSave(arr);                    // sin render: no perder el foco del input
+}
+
+function hotoCabinCareSection(){
+  const arr=hotoCareArr();
+  const withDate=arr.filter(x=>x.d).length;
+  const open=S.hotoCareOpen;
+  // M/D/YY → yyyy-mm-dd para precargar el input date
+  const toISO=(s)=>{
+    const m=String(s||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+    return m?`20${m[3]}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`:'';
+  };
+  const rows=VJ_CABIN_CARE_LABELS.map((label,i)=>{
+    const {d,n}=arr[i];
+    const isOpen=open===i;
+    const editor=!isOpen?'':`
+      <div style="padding:10px 0 12px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:8px">
+          <button onclick="hotoCareToday(${i})" style="flex:1;padding:9px;border:none;background:#0F6E56;color:#fff;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">Hecho hoy</button>
+          <button onclick="hotoCareUnknown(${i})" style="flex:1;padding:9px;border:0.5px solid var(--border);background:var(--bg);color:var(--t2);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">Unknown</button>
+          <input type="date" value="${toISO(d)}" onchange="hotoCareDate(${i},this.value)" style="flex:1.4;box-sizing:border-box;padding:8px;border:0.5px solid var(--border);border-radius:8px;font-size:12px;background:var(--bg);color:var(--text)">
+        </div>
+        <input value="${(n||'').replace(/"/g,'&quot;')}" placeholder="Nota (solo en la app, no va al PDF)" onchange="hotoCareNote(${i},this.value)" style="box-sizing:border-box;padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;font-size:12px;background:var(--bg);color:var(--text)">
+      </div>`;
+    return `<div style="${i<VJ_CABIN_CARE_LABELS.length-1?'border-bottom:0.5px solid var(--border);':''}">
+      <div onclick="hotoCareToggle(${i})" style="display:flex;align-items:center;gap:10px;padding:11px 0;cursor:pointer">
+        <span style="flex:1;font-size:13px;color:var(--text);line-height:1.35">${label}${n?' <i class="ti ti-note" style="font-size:11px;color:var(--t3)"></i>':''}</span>
+        <span style="font-size:12px;font-weight:600;color:${d?'#0F6E56':'var(--t3)'};white-space:nowrap">${d||'unknown'}</span>
+        <i class="ti ti-chevron-${isOpen?'up':'down'}" style="font-size:12px;color:var(--t3)"></i>
+      </div>${editor}
+    </div>`;
+  }).join('');
+  return `<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:14px 0 6px">Cabin Care · Date last done · ${withDate}/${VJ_CABIN_CARE_LABELS.length}</div>
+  <div style="background:var(--surface);border-radius:12px;padding:2px 14px;border:0.5px solid var(--border)">${rows}</div>`;
 }
 
 function go(view, id=null) {
@@ -2967,7 +3094,10 @@ async function invCreateSession() {
   }
 }
 
-const ISABEL_API = import.meta.env.VITE_ISABEL_API_URL || 'http://localhost:3002';
+// Fallback = producción: el build desplegado no tiene .env.local, y un fallback
+// a localhost rompe la app en móvil ("Load failed"). Para dev local, define
+// VITE_ISABEL_API_URL=http://localhost:3002 en .env.local.
+const ISABEL_API = import.meta.env.VITE_ISABEL_API_URL || 'https://isabel-api-production.up.railway.app';
 const ISABEL_KEY = import.meta.env.VITE_ISABEL_KEY || 'isabel-api-2026';
 
 async function isabelPost(path, body) {
@@ -3071,6 +3201,7 @@ Object.assign(window, {
   setVjTab, toggleHotoCheck, resetHotoChecks, updateLaundryItem, resetLaundry,
   invBack, invPreviewFile, invCreateSession, invSendMessage, invConfirm, invSetSearch, invCloseSession, invExport,
   hotoBack, hotoCreate, hotoField, hotoAddItem, hotoDelItem, hotoExport,
+  hotoCareToggle, hotoCareToday, hotoCareUnknown, hotoCareDate, hotoCareNote,
 });
 
 window.addEventListener('load', showPin);
