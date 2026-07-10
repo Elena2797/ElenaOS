@@ -666,7 +666,8 @@ function areaView() {
     const hotoTasksExist=pendTasks.some(t=>/hoto|hand.?over|defect/i.test(t.title));
     const primaryCTA=hotoTasksExist?{label:'Ir al HOTO',view:'vj_hoto'}:status==='rotacion'?{label:'Ver Laundry Form',view:'vj_laundry'}:null;
 
-    const hoToChecks=JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
+    // Fuente real = Supabase (si el HOTO ya se cargó); localStorage como fallback pre-migración.
+    const hoToChecks=S.hotoRec?.daily_duties||JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
     const allHotoItems=VJ_HOTO_SECTIONS.flatMap(s=>s.items);
     const hotoCompleted=allHotoItems.filter(i=>hoToChecks[i.id]).length;
     const hotoTotal=allHotoItems.length;
@@ -1656,17 +1657,28 @@ function fmtDate(s) {
 
 function setVjTab(field,value){S[field]=value;render();}
 
-function toggleHotoCheck(itemId){
-  const c=JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
-  c[itemId]=!c[itemId];
-  localStorage.setItem('vj_hoto_checks',JSON.stringify(c));
-  render();
+// Checklist de Daily Duties → Supabase (vj_hoto_records.daily_duties).
+// No-optimista: guarda primero, actualiza la UI solo tras éxito.
+async function toggleHotoCheck(itemId){
+  if(!S.hotoRec) return;
+  const duties={...(S.hotoRec.daily_duties||{})};
+  if(duties[itemId]) delete duties[itemId];   // ausente = vacío en el PDF
+  else duties[itemId]=true;
+  try{
+    await hotoSvc.updateHoto(S.hotoRec.id,{daily_duties:duties});
+    S.hotoRec.daily_duties=duties;
+    render();
+  }catch(e){ alert('No se pudo guardar el tick: '+e.message); }
 }
 
-function resetHotoChecks(){
-  if(!confirm('¿Reiniciar el checklist de Daily Duties?\n\nSolo se desmarcan los ticks del checklist. Nada más.')) return;
-  localStorage.removeItem('vj_hoto_checks');
-  render();
+async function resetHotoChecks(){
+  if(!S.hotoRec) return;
+  if(!confirm('¿Reiniciar el checklist de Daily Duties?\n\nSolo se desmarcan los ticks. Nada más.')) return;
+  try{
+    await hotoSvc.updateHoto(S.hotoRec.id,{daily_duties:{}});
+    S.hotoRec.daily_duties={};
+    render();
+  }catch(e){ alert('No se pudo reiniciar: '+e.message); }
 }
 
 function updateLaundryItem(itemId,delta){
@@ -1691,6 +1703,23 @@ function vjHotoView(){
         S.hotoRec=await hotoSvc.loadActiveHoto();
         S.hotoItems=S.hotoRec?await hotoSvc.loadItems(S.hotoRec.id):[];
       }catch(e){ console.error('hoto load',e); S.hotoErr=e.message; }
+      // Migración one-time del checklist: localStorage → Supabase (corre en ESTE
+      // dispositivo). Solo si Supabase está vacío y hay ticks locales sin migrar.
+      // Espera confirmación antes de marcar migrado y NO borra localStorage.
+      if(S.hotoRec){
+        try{
+          const local=JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
+          const ticks=Object.keys(local).filter(k=>local[k]);
+          const supaEmpty=!S.hotoRec.daily_duties||Object.keys(S.hotoRec.daily_duties).length===0;
+          if(ticks.length>0 && supaEmpty && !localStorage.getItem('vj_hoto_checks_migrated')){
+            const duties={}; ticks.forEach(k=>duties[k]=true);
+            await hotoSvc.updateHoto(S.hotoRec.id,{daily_duties:duties}); // sube y espera OK
+            S.hotoRec.daily_duties=duties;
+            localStorage.setItem('vj_hoto_checks_migrated','1');          // solo tras éxito
+            console.log('[hoto] checklist migrado a Supabase:',ticks.length,'ticks');
+          }
+        }catch(e){ console.error('[hoto] migración checklist falló (reintentará):',e.message); }
+      }
       // Inventario: SOLO LECTURA, como referencia para Aircraft Shopping.
       // Si falla o no hay sesión abierta, la sección funciona igual en modo manual.
       try{
@@ -1781,8 +1810,6 @@ function hotoEntregaTab(){
         <input value="${v(rec.days_on_aircraft)}" onchange="hotoField('days_on_aircraft',this.value)" style="${fieldStyle};margin-top:4px"></div>
       <div><label style="font-size:10px;font-weight:600;color:var(--t3)">FECHA DE RECEPCIÓN</label>
         <input value="${v(rec.received_date)}" onchange="hotoField('received_date',this.value)" placeholder="25-May-26" style="${fieldStyle};margin-top:4px"></div>
-      <div><label style="font-size:10px;font-weight:600;color:var(--t3)">FECHA DE ENTREGA</label>
-        <input type="date" value="${v(rec.delivery_date)}" onchange="hotoField('delivery_date',this.value)" style="${fieldStyle};margin-top:4px"></div>
     </div>
   </div>
 
@@ -1800,9 +1827,13 @@ function hotoEntregaTab(){
   <div style="text-align:center;font-size:11px;color:var(--t3);margin-top:8px;line-height:1.5">Genera el PDF oficial de VistaJet con estos datos.<br>El PDF nunca se edita a mano: siempre se exporta desde aquí.</div>`;
 }
 
-// ── Pestaña Checklist: la lista "Leaving Aircraft" (localStorage, sin cambios) ─
+// Items del checklist que NO tienen checkbox en el PDF oficial (visibles en la
+// app, pero su tick no se exporta — no fingimos que aparece en el documento).
+const DUTY_NO_CHECKBOX=new Set(['s9']);   // "Winter/Summer Ops performed"
+
+// ── Pestaña Checklist: Daily Duties. Fuente de verdad = Supabase (daily_duties). ─
 function hotoChecklistTab(){
-  const checks=JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
+  const checks=S.hotoRec?.daily_duties||{};
   const allItems=VJ_HOTO_SECTIONS.flatMap(s=>s.items);
   const completed=allItems.filter(i=>checks[i.id]).length;
   const total=allItems.length;
@@ -1820,7 +1851,7 @@ function hotoChecklistTab(){
       return `<div style="margin-bottom:12px">
         <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:6px">${sec.name} · ${sDone}/${sec.items.length}</div>
         <div style="background:var(--surface);border-radius:12px;border:0.5px solid var(--border)">
-          ${sec.items.map((item,i,arr)=>{const done=checks[item.id];return `<div onclick="toggleHotoCheck('${item.id}')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;${i<arr.length-1?'border-bottom:0.5px solid var(--border)':''}cursor:pointer"><div style="width:20px;height:20px;border-radius:5px;border:1.5px solid ${done?'#0F6E56':'var(--border)'};background:${done?'#0F6E56':'none'};flex-shrink:0;display:flex;align-items:center;justify-content:center">${done?'<i class="ti ti-check" style="color:#fff;font-size:11px"></i>':''}</div><span style="font-size:13px;color:${done?'var(--t3)':'var(--text)'};text-decoration:${done?'line-through':'none'}">${item.text}</span></div>`;}).join('')}
+          ${sec.items.map((item,i,arr)=>{const done=checks[item.id];const noCb=DUTY_NO_CHECKBOX.has(item.id);return `<div onclick="toggleHotoCheck('${item.id}')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;${i<arr.length-1?'border-bottom:0.5px solid var(--border)':''}cursor:pointer"><div style="width:20px;height:20px;border-radius:5px;border:1.5px solid ${done?'#0F6E56':'var(--border)'};background:${done?'#0F6E56':'none'};flex-shrink:0;display:flex;align-items:center;justify-content:center">${done?'<i class="ti ti-check" style="color:#fff;font-size:11px"></i>':''}</div><span style="font-size:13px;color:${done?'var(--t3)':'var(--text)'};text-decoration:${done?'line-through':'none'}">${item.text}${noCb?' <span style="font-size:10px;color:var(--t3);font-style:italic">(no está en el PDF)</span>':''}</span></div>`;}).join('')}
         </div>
       </div>`;
     }).join('')}`;
@@ -2196,15 +2227,17 @@ async function hotoCreate(){
   }catch(e){ alert('No se pudo crear el HOTO: '+e.message); }
 }
 
+// No-optimista: guarda en Supabase PRIMERO; la UI solo refleja el valor tras éxito.
+// Si falla, revierte (el estado no cambió) y muestra el error.
 async function hotoField(field,value){
   if(!S.hotoRec) return;
   const val=value===''?null:value;
-  S.hotoRec[field]=val;              // optimista, sin re-render (no perder foco)
-  try{ await hotoSvc.updateHoto(S.hotoRec.id,{ [field]:val }); }
-  catch(e){
-    if(field==='delivery_date'&&/column|delivery_date/i.test(e.message))
-      alert('La columna delivery_date no existe todavía. Ejecuta hoto_migration_v2.sql en Supabase (1 línea) y vuelve a intentarlo.');
-    else alert('No se pudo guardar: '+e.message);
+  try{
+    await hotoSvc.updateHoto(S.hotoRec.id,{ [field]:val });
+    S.hotoRec[field]=val;
+  }catch(e){
+    alert('No se pudo guardar: '+e.message);
+    render();   // el input vuelve al valor previo (S.hotoRec[field] no cambió)
   }
 }
 
@@ -2248,9 +2281,11 @@ function hotoCareArr(){
 }
 
 async function hotoCareSave(arr){
-  S.hotoRec.cabin_care=arr;
-  try{ await hotoSvc.updateHoto(S.hotoRec.id,{cabin_care:arr}); }
-  catch(e){ alert('No se pudo guardar Cabin Care: '+e.message); }
+  try{
+    await hotoSvc.updateHoto(S.hotoRec.id,{cabin_care:arr});  // guarda primero
+    S.hotoRec.cabin_care=arr;                                  // estado solo tras éxito
+  }catch(e){ alert('No se pudo guardar Cabin Care: '+e.message); }
+  render();
 }
 
 function hotoCareToggle(i){ S.hotoCareOpen=S.hotoCareOpen===i?null:i; render(); }
@@ -2259,13 +2294,13 @@ function hotoCareToday(i){
   const t=new Date();
   const arr=hotoCareArr();
   arr[i].d=`${t.getMonth()+1}/${t.getDate()}/${String(t.getFullYear()).slice(2)}`;
-  hotoCareSave(arr); render();
+  hotoCareSave(arr);
 }
 
 function hotoCareUnknown(i){
   const arr=hotoCareArr();
   arr[i].d=null;
-  hotoCareSave(arr); render();
+  hotoCareSave(arr);
 }
 
 function hotoCareDate(i,val){
@@ -2273,7 +2308,7 @@ function hotoCareDate(i,val){
   const [y,m,d]=val.split('-');
   const arr=hotoCareArr();
   arr[i].d=`${parseInt(m)}/${parseInt(d)}/${y.slice(2)}`;
-  hotoCareSave(arr); render();
+  hotoCareSave(arr);
 }
 
 function hotoCareNote(i,val){
@@ -2334,9 +2369,10 @@ async function hotoShopSet(key,val){
   const shopping={...(S.hotoRec.shopping||{})};
   if(val==null||String(val).trim()==='') delete shopping[key];
   else shopping[key]=String(val).trim();
-  S.hotoRec.shopping=shopping;
-  try{ await hotoSvc.updateHoto(S.hotoRec.id,{shopping}); }
-  catch(e){ alert('No se pudo guardar: '+e.message); }
+  try{
+    await hotoSvc.updateHoto(S.hotoRec.id,{shopping});   // guarda primero
+    S.hotoRec.shopping=shopping;                          // estado solo tras éxito
+  }catch(e){ alert('No se pudo guardar: '+e.message); }
   render();
 }
 
@@ -2426,9 +2462,10 @@ function hotoMagsList(){ return Array.isArray(S.hotoRec?.shopping?.magazines_lis
 
 async function hotoMagsSave(list){
   const shopping={...(S.hotoRec.shopping||{}),magazines_list:list};
-  S.hotoRec.shopping=shopping;
-  try{ await hotoSvc.updateHoto(S.hotoRec.id,{shopping}); }
-  catch(e){ alert('No se pudo guardar Magazines: '+e.message); }
+  try{
+    await hotoSvc.updateHoto(S.hotoRec.id,{shopping});   // guarda primero
+    S.hotoRec.shopping=shopping;                          // estado solo tras éxito
+  }catch(e){ alert('No se pudo guardar Magazines: '+e.message); }
 }
 
 function hotoMagToggle(i){ S.hotoMagOpen=S.hotoMagOpen===i?null:i; render(); }
