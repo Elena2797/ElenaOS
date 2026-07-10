@@ -29,6 +29,6 @@ Este documento no sustituye a `PRODUCT_PRINCIPLES.md` ni a `EVOLUTION.md` en la 
 
 ## Principios de esta documentación
 
-9. **Un chat nuevo no debe necesitar este chat.** Toda decisión con consecuencias futuras se registra en `DECISIONS.md`; toda grieta conocida en `KNOWN_PROBLEMS.md`; el estado real en `SYSTEM_STATE.md`.
+9. **Un chat nuevo no debe necesitar este chat.** Toda decisión con consecuencias futuras se registra en `DECISIONS.md`; toda grieta conocida en `KNOWN_PROBLEMS.md`; el estado real en `CURRENT_STATE.md`; el handoff exacto de la última sesión en `NEXT_SESSION.md`.
 
 10. **Distinguir siempre implementado / parcial / diseñado / idea futura**, de forma visible (header de metadatos), no enterrado en el texto.

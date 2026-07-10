@@ -14,8 +14,9 @@ Cada dato vive en **un solo documento**. Si ves el mismo dato repetido en dos si
 
 | Tu tarea es... | Lee esto primero |
 |---|---|
+| Empezar una sesión nueva, sin más contexto | `CURRENT_STATE.md` (fotografía del proyecto) → `NEXT_SESSION.md` (handoff exacto) |
 | Continuar donde se quedó la última sesión | `NEXT_SESSION.md` |
-| Entender qué funciona y qué no, ahora mismo | `SYSTEM_STATE.md` |
+| Entender qué funciona y qué no, ahora mismo | `CURRENT_STATE.md` |
 | Tocar código de un módulo concreto (HOTO, Inventario, etc.) | `modules/<MÓDULO>.md` correspondiente |
 | Entender cómo está construido el sistema | `ARCHITECTURE.md` |
 | Saber qué tablas existen y sus columnas | `DATA_MODEL.md` |
@@ -30,7 +31,7 @@ Cada dato vive en **un solo documento**. Si ves el mismo dato repetido en dos si
 ```
 docs/
   README.md              ← estás aquí
-  SYSTEM_STATE.md         foto del sistema ahora
+  CURRENT_STATE.md        fotografía del proyecto, 1 página, 5 campos fijos
   ARCHITECTURE.md         cómo está construido, real vs objetivo
   DATA_MODEL.md           única fuente de las tablas de Supabase
   PRINCIPLES.md           principios vigentes, destilados
@@ -60,14 +61,22 @@ Si el header dice "diseñado" o "idea futura", el resto del documento describe u
 ## Relación con los documentos de la raíz del proyecto
 Fuera de `/docs`, en `LIFE OS/` (que no es un repositorio git), existen documentos de visión y filosofía profunda: `VISION.md`, `MODEL.md`, `ISABEL_CORE.md` ("la constitución"), `MASTER_PLAN.md`, `EVOLUTION.md`, `KNOWLEDGE.md`, `USER_FLOW.md`, `ARQUITECTURA_FUSION.md`, `JETMI_PRD_Semilla.md`, `ISABEL_INVENTORY_SPECIALIST_CONTRACT.md`, `PRODUCT_PRINCIPLES.md`. No se han movido ni duplicado. `/docs` los referencia cuando hace falta la visión completa detrás de una decisión — pero `/docs` es la verdad operativa del día a día; esos documentos son la capa de pensamiento largo que la originó.
 
-## Protocolo: "Actualiza la documentación"
-Cuando se pida esto en una sesión nueva:
-1. Revisar qué cambió desde la última actualización (`git log` de ambos repos + lo trabajado en la sesión).
-2. Modificar **solo** los documentos afectados — nunca reescribir todo `/docs` por rutina.
-3. Actualizar `CHANGELOG.md` siempre.
-4. Reescribir `NEXT_SESSION.md` siempre (y `SYSTEM_STATE.md` si el estado global cambió).
-5. Decisiones que quedan obsoletas se mueven a `archive/`, nunca se borran.
-6. Commit exclusivo de documentación, sin mezclar con cambios de código.
+## Comando oficial de cierre: "Cerrar sesión de desarrollo"
+
+Es el único comando estándar para terminar una sesión de trabajo en LIFEOS. No depende de que se recuerde pedir "actualiza la documentación" — es el protocolo por defecto al cerrar. Ejecuta siempre, en este orden:
+
+1. **Revisar todos los cambios realizados durante la sesión** (`git log`/`git diff` de los repos afectados + lo trabajado en la conversación).
+2. **Actualizar únicamente los documentos afectados** — nunca reescribir `/docs` entero por rutina. Un cambio en HOTO no toca `modules/FINANCE.md`.
+3. **Actualizar siempre, sin excepción**, estos tres:
+   - `CHANGELOG.md` — se añade una entrada nueva, nunca se reescribe lo anterior.
+   - `CURRENT_STATE.md` — se reescribe entero si algo del estado general cambió (deploy, bloqueo, objetivo).
+   - `NEXT_SESSION.md` — se reescribe entero, siempre, sea cual sea el tamaño del cambio.
+4. **Comprobar que no existan contradicciones entre documentos** (ej.: `CURRENT_STATE.md` dice "sin bloqueos" mientras `KNOWN_PROBLEMS.md` describe uno nuevo sin registrar).
+5. **Confirmar explícitamente** que un chat completamente nuevo podría continuar el desarrollo leyendo únicamente: `README.md` → `CURRENT_STATE.md` → `NEXT_SESSION.md` → los documentos específicos de la tarea siguiente. Si algo necesario no está en esa ruta de lectura, añadirlo antes de dar la sesión por cerrada.
+6. Decisiones que quedan obsoletas se mueven a `archive/`, nunca se borran.
+7. Commit exclusivo de documentación, sin mezclar con cambios de código.
+
+Este comando reemplaza cualquier frase anterior tipo "actualiza la documentación" — a partir de ahora, "Cerrar sesión de desarrollo" es la única forma estándar de invocarlo.
 
 ## Estado de esta documentación
 Creada el 2026-07-10 a partir de una auditoría completa del código, migraciones y configuración de los tres repos (`life-os-app`, `isabel-api`, `lifeos-agent`). Todo lo marcado como "implementado" fue verificado directamente contra el código o contra Supabase — nada se documentó por asunción. Lo que no se pudo verificar con certeza está declarado explícitamente como tal en el documento correspondiente, nunca inventado.
