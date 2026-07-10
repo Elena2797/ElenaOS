@@ -70,13 +70,25 @@ Es el único comando estándar para terminar una sesión de trabajo en LIFEOS. N
 3. **Actualizar siempre, sin excepción**, estos tres:
    - `CHANGELOG.md` — se añade una entrada nueva, nunca se reescribe lo anterior.
    - `CURRENT_STATE.md` — se reescribe entero si algo del estado general cambió (deploy, bloqueo, objetivo).
-   - `NEXT_SESSION.md` — se reescribe entero, siempre, sea cual sea el tamaño del cambio.
+   - `NEXT_SESSION.md` — se reescribe entero, siempre, sea cual sea el tamaño del cambio (ver regla de contenido fijo abajo).
 4. **Comprobar que no existan contradicciones entre documentos** (ej.: `CURRENT_STATE.md` dice "sin bloqueos" mientras `KNOWN_PROBLEMS.md` describe uno nuevo sin registrar).
 5. **Confirmar explícitamente** que un chat completamente nuevo podría continuar el desarrollo leyendo únicamente: `README.md` → `CURRENT_STATE.md` → `NEXT_SESSION.md` → los documentos específicos de la tarea siguiente. Si algo necesario no está en esa ruta de lectura, añadirlo antes de dar la sesión por cerrada.
 6. Decisiones que quedan obsoletas se mueven a `archive/`, nunca se borran.
 7. Commit exclusivo de documentación, sin mezclar con cambios de código.
 
 Este comando reemplaza cualquier frase anterior tipo "actualiza la documentación" — a partir de ahora, "Cerrar sesión de desarrollo" es la única forma estándar de invocarlo.
+
+### Regla de contenido fijo de NEXT_SESSION.md — nunca crece indefinidamente
+
+`NEXT_SESSION.md` es un **handoff corto, no un historial acumulativo**. En cada cierre de sesión contiene únicamente estos 5 campos, y nada más:
+
+1. Qué se terminó en esta sesión.
+2. Qué quedó pendiente.
+3. Qué debe hacerse inmediatamente después.
+4. Qué no debe romperse.
+5. Qué documentos debe leer el siguiente chat.
+
+Si algo que estaba en `NEXT_SESSION.md` ya quedó reflejado permanentemente en `CURRENT_STATE.md`, en `CHANGELOG.md`, o en la documentación del módulo correspondiente, **se elimina de `NEXT_SESSION.md`** en ese mismo cierre — no se arrastra "por si acaso". El paso 3 del protocolo de cierre (reescribir `NEXT_SESSION.md` entero) implica podar, no solo añadir.
 
 ## Estado de esta documentación
 Creada el 2026-07-10 a partir de una auditoría completa del código, migraciones y configuración de los tres repos (`life-os-app`, `isabel-api`, `lifeos-agent`). Todo lo marcado como "implementado" fue verificado directamente contra el código o contra Supabase — nada se documentó por asunción. Lo que no se pudo verificar con certeza está declarado explícitamente como tal en el documento correspondiente, nunca inventado.
