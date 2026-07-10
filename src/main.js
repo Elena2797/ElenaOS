@@ -1718,7 +1718,7 @@ function vjHotoView(){
             localStorage.setItem('vj_hoto_checks_migrated','1');          // solo tras éxito
             console.log('[hoto] checklist migrado a Supabase:',ticks.length,'ticks');
           }
-        }catch(e){ console.error('[hoto] migración checklist falló (reintentará):',e.message); }
+        }catch(e){ console.error('[hoto] migración checklist falló (reintentará):',e.message); S.hotoMigrationErr=e.message; }
       }
       // Inventario: SOLO LECTURA, como referencia para Aircraft Shopping.
       // Si falla o no hay sesión abierta, la sección funciona igual en modo manual.
@@ -1735,12 +1735,16 @@ function vjHotoView(){
     return `${head}<div style="background:var(--surface);border-radius:12px;padding:20px;border:0.5px solid var(--border);font-size:13px;color:var(--t2);line-height:1.6">No se pudo cargar el HOTO.<br><span style="color:var(--t3);font-size:12px">${S.hotoErr}</span><br><br>Si las tablas del HOTO aún no existen, ejecuta la migración <code>hoto_migration.sql</code> en Supabase.</div>`;
   }
 
+  const migrationWarning=S.hotoMigrationErr
+    ?`<div style="background:#FAEEDA;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:12px;color:#854F0B;line-height:1.5">No se pudo migrar el checklist guardado en este dispositivo a Supabase.<br><span style="opacity:.85">${String(S.hotoMigrationErr).replace(/"/g,'&quot;')}</span><br>Tus ticks locales siguen intactos; se reintentará la próxima vez que abras el HOTO.</div>`
+    :'';
+
   const tab=S.vjHotoTab==='checklist'?'checklist':'entrega';
   const tabs=[['entrega','Entrega'],['checklist','Checklist']];
   const tabBar=`<div style="display:flex;gap:2px;margin-bottom:14px;background:var(--surface);border-radius:10px;padding:3px;border:0.5px solid var(--border)">${tabs.map(([k,l])=>`<button onclick="setVjTab('vjHotoTab','${k}')" style="flex:1;padding:8px 2px;border:none;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;background:${tab===k?'var(--text)':'transparent'};color:${tab===k?'#fff':'var(--t2)'}">${l}</button>`).join('')}</div>`;
 
-  if(tab==='checklist') return head+tabBar+hotoChecklistTab();
-  return head+tabBar+hotoEntregaTab();
+  if(tab==='checklist') return head+migrationWarning+tabBar+hotoChecklistTab();
+  return head+migrationWarning+tabBar+hotoEntregaTab();
 }
 
 // ── Pestaña Entrega: editor vivo + exportación al PDF oficial ────────────────
@@ -2123,7 +2127,8 @@ function vjStatusView(){
   const invPend=items.filter(i=>(i.current_qty??i.std_qty??0)<(i.std_qty??0)).length;
   const sess=S.invSession;
 
-  const hoToChecks=JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
+  // Fuente real = Supabase (si el HOTO ya se cargó); localStorage como fallback pre-migración.
+  const hoToChecks=S.hotoRec?.daily_duties||JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
   const allHotoItems=VJ_HOTO_SECTIONS.flatMap(s=>s.items);
   const hotoDone=allHotoItems.filter(i=>hoToChecks[i.id]).length;
   const hotoTotal=allHotoItems.length;
@@ -2204,7 +2209,7 @@ function readiToggleDetail(){ S.readiDetail=!S.readiDetail; render(); }
 
 // ═══ HOTO — módulo vivo ═══════════════════════════════════════════════════════
 // Al salir del HOTO se invalida el readiness: se recalcula con los datos frescos.
-function hotoBack(){ S._hotoLoaded=false; S.hotoErr=null; S._readiLoaded=false; S.vjReadiness=null; go('area',S.areaId); }
+function hotoBack(){ S._hotoLoaded=false; S.hotoErr=null; S.hotoMigrationErr=null; S._readiLoaded=false; S.vjReadiness=null; go('area',S.areaId); }
 
 async function hotoReload(){
   try{
