@@ -1823,6 +1823,8 @@ function hotoEntregaTab(){
 
   ${hotoMagazinesSection()}
 
+  ${hotoFocusSection()}
+
   ${section('Defects','defect','Añadir defecto…',6)}
   ${section('Additional Comments','comment','Añadir comentario…',null)}
   ${section('Items to offload','offload','Añadir item a descargar…',3)}
@@ -2560,6 +2562,24 @@ function hotoMagazinesSection(){
     </div>
   </div>
   <div style="font-size:11px;color:var(--t3);margin-top:6px;line-height:1.5">Al PDF: las <b>up to date</b> salen con nombre y edición; needs renewal y missing salen como pendientes. Lista vacía = celda Magazines vacía.</div>`;
+}
+
+// ── Focus of the Month — texto libre + checkbox de completado ───────────────
+// Mapea a los campos oficiales "Input Monthly Focus" / "Tick to confirm focus
+// completed" del PDF (ver isabel-api/src/hoto/fieldMap.js). Guardado no-optimista
+// vía hotoField(), igual que el resto de campos sueltos del HOTO.
+function hotoFocusSection(){
+  const rec=S.hotoRec;
+  const focus=rec.monthly_focus||'';
+  const completed=!!rec.monthly_focus_completed;
+  const esc=(s)=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  return `<div style="margin:14px 0 6px"><span style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3)">Focus of the Month</span></div>
+  <div style="background:var(--surface);border-radius:12px;padding:14px;border:0.5px solid var(--border)">
+    <textarea placeholder="Focus de este mes…" onchange="hotoField('monthly_focus',this.value)" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg);color:var(--text);min-height:56px;resize:vertical;font-family:inherit">${esc(focus)}</textarea>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin-top:10px;cursor:pointer">
+      <input type="checkbox" ${completed?'checked':''} onchange="hotoField('monthly_focus_completed',this.checked)"> Completed
+    </label>
+  </div>`;
 }
 
 function go(view, id=null) {
