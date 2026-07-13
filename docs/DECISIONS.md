@@ -57,3 +57,11 @@ Formato: decisión · fecha · contexto · alternativa descartada · razón · e
 **Alternativa descartada:** crear un repo `lifeos-docs` separado, o documentar dentro de `isabel-api`.
 **Razón:** `life-os-app` es el punto de entrada real del sistema para la usuaria y ya tenía la disciplina de README más cuidada de los tres repos.
 **Estado:** vigente.
+
+### JETMI-D1 — JETMI se posiciona como broker de aviación privada, no como plataforma de descubrimiento ni como herramienta para vender leads a otros brokers
+**Fecha:** 2026-07-14
+**Contexto:** al crear `research/JETMI/` se detectó una contradicción de posicionamiento entre dos documentos de la raíz: `jetmi.md` (junio 2026) describe JETMI como "plataforma de descubrimiento de oportunidades... No es broker ni operador"; `JETMI_PRD_Semilla.md` (v0.4, 2026-06-29) ya modela un negocio de brokeraje (vocabulario de Solicitud/Cotización/Reserva, Motor Financiero). Ver `research/JETMI/HYPOTHESES.md` C1 para el detalle de la contradicción.
+**Alternativa descartada:** (a) mantener el marco de "plataforma de descubrimiento" de `jetmi.md`; (b) un modelo donde el negocio principal fuera generar y vender oportunidades/leads a otros brokers en vez de operar el brokerage directamente.
+**Razón:** decisión de negocio explícita de Estefanía — JETMI existe para construir y operar un broker de aviación privada propio, no para intermediar entre operadores y otros brokers ni para quedarse en la capa de descubrimiento/marketing.
+**Estado:** vigente. `jetmi.md` (raíz) queda marcado como superseded en su propia cabecera, sin borrar ni reescribir su contenido — ver `archive/deprecated-decisions.md`. `JETMI_PRD_Semilla.md` no se modifica en esta decisión; su lenguaje en la línea 22 ("empresa de descubrimiento, comercialización y gestión de oportunidades") antecede a esta decisión y queda anotado como nota pendiente en `research/JETMI/HYPOTHESES.md`, no como acción tomada.
+**Nota de estado real:** a fecha de esta decisión, JETMI está en fase de definición, investigación y diseño. No existe todavía ninguna sociedad JETMI LDA constituida en Portugal ni en ninguna otra jurisdicción — ver `modules/JETMI.md`.

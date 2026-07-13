@@ -11,5 +11,6 @@ Decisiones que dejaron de aplicar, movidas aquí en vez de borradas. Ninguna ent
 No son decisiones en formato ADR, pero cumplen la misma función de "ya no vigente, conservado como historial":
 - `Elena OS - Arquitectura v2.md` — se autodeclara reemplazado por `MODEL.md` v4.0.
 - `Elena OS - Arquitectura v3 DEFINITIVA.md` — mismo caso.
+- `jetmi.md` — se autodeclara superseded en su propia cabecera desde 2026-07-14. Describía JETMI como "plataforma de descubrimiento de oportunidades... no broker ni operador", framing reemplazado por la decisión `JETMI-D1` en `DECISIONS.md` (JETMI = broker de aviación privada). Ver también `research/JETMI/HYPOTHESES.md` C1.
 
 No se movieron físicamente (la raíz del proyecto no es un repositorio git, y ya se autodeclaran obsoletos en su propia cabecera) — se referencian aquí para que quien busque "documentos obsoletos" los encuentre desde `/docs`.

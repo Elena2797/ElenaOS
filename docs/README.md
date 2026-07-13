@@ -25,6 +25,7 @@ Cada dato vive en **un solo documento**. Si ves el mismo dato repetido en dos si
 | Saber si un problema ya es conocido | `KNOWN_PROBLEMS.md` |
 | Trabajar con "el chat de Isabel" | `core/ISABEL_CHANNELS.md` **primero** — hay 4 sistemas distintos, solo uno activo |
 | Entender qué principios no se deben romper | `PRINCIPLES.md` |
+| Investigar o decidir algo de negocio de un dominio (ej. JETMI) | `research/<DOMINIO>/LOG.md` (mapa de cobertura) → `KNOWLEDGE.md` (lo verificado) → `HYPOTHESES.md` (lo abierto) |
 
 ## Estructura
 
@@ -46,6 +47,7 @@ docs/
   modules/                cada dominio: VistaJet (6 sub-módulos), Finanzas, JETMI, Salud/Gym, Marca Personal, Vida Personal
   operations/             cómo desplegar, verificar y recuperar el sistema
   archive/                decisiones y documentos ya no vigentes, preservados
+  research/               investigación externa por dominio: evidencia (sources/), conocimiento consolidado (KNOWLEDGE.md), hipótesis abiertas (HYPOTHESES.md), mapa de cobertura (LOG.md) — hoy solo research/JETMI/
 ```
 
 ## Convención de metadatos
