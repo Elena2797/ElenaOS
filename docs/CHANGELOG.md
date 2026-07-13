@@ -9,10 +9,10 @@ No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí
 
 ## 2026-07-14
 
-- Creación de `docs/research/` como categoría de primer nivel de `/docs`: investigación externa por dominio, separada de estado de implementación (`modules/`) y de visión/requisitos (raíz). Estructura: `research/README.md` (convenciones + escala de cobertura NO INVESTIGADO→...→SUFICIENTE PARA DECIDIR + pipeline de ingestión fuente→conocimiento) y `research/JETMI/` (`LOG.md`, `KNOWLEDGE.md`, `HYPOTHESES.md`, `sources/`) como primer dominio.
+- `life-os-app` `258d2f5` — Creación de `docs/research/` como categoría de primer nivel de `/docs`: investigación externa por dominio, separada de estado de implementación (`modules/`) y de visión/requisitos (raíz). Estructura: `research/README.md` (convenciones + escala de cobertura NO INVESTIGADO→...→SUFICIENTE PARA DECIDIR + pipeline de ingestión fuente→conocimiento) y `research/JETMI/` (`LOG.md`, `KNOWLEDGE.md`, `HYPOTHESES.md`, `sources/`) como primer dominio.
 - **JETMI-D1** (`DECISIONS.md`): JETMI se posiciona como broker de aviación privada, no como plataforma de descubrimiento ni como herramienta para vender leads a otros brokers. Resuelve la contradicción entre `jetmi.md` (raíz, ahora marcado superseded en su propia cabecera) y `JETMI_PRD_Semilla.md`. JETMI sigue en fase de definición/investigación/diseño — no existe sociedad JETMI LDA constituida.
-- Trabajo puramente documental — no se diseñó ni implementó ninguna funcionalidad operativa de JETMI (workflows, agentes, automatizaciones, CRM, modelo de datos).
-- Pendiente: recibir e ingerir el texto del "Manual Operativo del Broker de Aviación Privada" (cap. 1 + índice preliminar) en `research/JETMI/sources/` — es el primer artefacto de investigación anunciado, todavía sin contenido en el repositorio.
+- **Ingestión de los tres primeros artefactos de investigación** en `research/JETMI/sources/`: Manual Operativo del Broker de Aviación Privada (Cap. 1 + índice preliminar de 15 capítulos), Mapa Maestro de Investigación (diagnóstico del índice original, 24 dominios en 7 fases, 7 preguntas estratégicas abiertas), e Investigación 1.1 (41 funciones del día a día de un broker en 11 clusters, mapas de decisión/información, 9 preguntas abiertas). `LOG.md` y `HYPOTHESES.md` actualizados con la cobertura y las preguntas resultantes; `KNOWLEDGE.md` recibió una sección separada de "candidatos a consolidación futura" (6 candidatos), sin promover ninguno a conocimiento oficial.
+- Trabajo puramente documental en ambos commits de la sesión — no se diseñó ni implementó ninguna funcionalidad operativa de JETMI (workflows, agentes, automatizaciones, CRM, modelo de datos).
 
 ## 2026-07-10
 
