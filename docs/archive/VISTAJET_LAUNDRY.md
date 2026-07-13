@@ -1,9 +1,12 @@
-Estado: implementado mínimo
-Última verificación: 2026-07-10
+Estado: archivado — reemplazado, ya no vigente
+Última verificación: 2026-07-10 (última vigente antes del archivado)
+Archivado: 2026-07-13
 Verificado en: grep de vj_laundry_* en life-os-app/src/main.js
 Fuente de verdad de datos: ninguna (localStorage, no Supabase)
 
-# modules/VISTAJET_LAUNDRY.md
+# modules/VISTAJET_LAUNDRY.md (ARCHIVADO)
+
+**Reemplazado por [VISTAJET_LAUNDRY_CLEANING.md](../modules/VISTAJET_LAUNDRY_CLEANING.md)** — el stub `vjLaundryView()` descrito abajo (contador local, sin backend) fue retirado de `main.js` y sustituido por un módulo con Supabase como fuente de verdad y exportación al PDF oficial "Laundry & Cleaning Form". Contenido conservado tal cual por historial, según la regla de `/docs`: lo obsoleto se archiva, no se borra.
 
 # Objetivo
 Registrar la lavandería preparada para offload durante la rotación.

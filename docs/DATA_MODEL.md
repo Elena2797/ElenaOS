@@ -1,13 +1,13 @@
 Estado: implementado
-Última verificación: 2026-07-10
-Verificado en: lectura directa de setup.sql, migration_v1.sql, migration_v2.sql, hoto_migration.sql, hoto_migration_v2.sql + muestreo de filas reales vía REST de Supabase
+Última verificación: 2026-07-13
+Verificado en: lectura directa de setup.sql, migration_v1.sql, migration_v2.sql, hoto_migration.sql, hoto_migration_v2.sql, laundry_cleaning_migration_v1.sql + muestreo de filas reales vía REST de Supabase
 Fuente de verdad de datos: este documento ES la fuente de verdad de tablas
 
 # DATA_MODEL.md — Única fuente de verdad de las tablas de Supabase
 
 Ningún otro documento debe repetir columnas. Si necesitas saber qué campos tiene una tabla, es aquí. Los `/modules/*.md` solo enlazan a la sección correspondiente.
 
-Proyecto Supabase: `cllubptdwydifomlnxds`. RLS **desactivado en las 18 tablas** (ver [SECURITY.md](SECURITY.md) — es una decisión consciente para app de un solo usuario, no un descuido).
+Proyecto Supabase: `cllubptdwydifomlnxds`. RLS **desactivado en las 19 tablas** (ver [SECURITY.md](SECURITY.md) — es una decisión consciente para app de un solo usuario, no un descuido). `vj_laundry_cleaning_records` ya existe en Supabase (tabla creada y verificada) aunque el código que la usa todavía no está en `main` — ver nota de "no desplegado" en su sección.
 
 ---
 
@@ -132,6 +132,26 @@ Migración: `hoto_migration.sql` + `hoto_migration_v2.sql`. Detalle de uso en [m
 id, hoto_id (FK, cascade), section (`defect`\|`comment`\|`offload`), position, content, source (default `manual`), created_at.
 
 Storage: bucket `hoto-templates` (contiene `HOTO_official_v1.pdf`, la plantilla oficial en blanco).
+
+---
+
+## VistaJet — Laundry & Cleaning Form
+
+**No desplegado** — implementado y verificado en la rama `feature/vj-landing-cleaning` (ambos repos), sin merge a `main` todavía. Migración: `laundry_cleaning_migration_v1.sql`. Detalle de uso en [modules/VISTAJET_LAUNDRY_CLEANING.md](modules/VISTAJET_LAUNDRY_CLEANING.md).
+
+### `vj_laundry_cleaning_records`
+| Columna | Tipo | Notas |
+|---|---|---|
+| id | uuid PK | |
+| tail_number, icao, service_date | text | cabecera, texto libre tal cual va al PDF |
+| ch_name, ch_contact_number, ch_email_address, expected_departure_date | text | bloque CH de la cabecera |
+| items | jsonb | default `{}` — `{item_id: {given, received}}` para los 72 ítems normales; `{item_id: {given, note}}` (sin `received`) para los 6 ítems `*_other`, uno por sección — catálogo completo de `item_id` en `fieldMap.js`/`main.js` (contrato cross-repo), no duplicado aquí |
+| additional_comments | text | |
+| status | text | default `active` |
+| source_template | text | default `Laundry_Cleaning_Form_official_v1.pdf` |
+| created_at, updated_at | timestamptz | |
+
+Storage: bucket `laundry-cleaning-templates` (contiene `Laundry_Cleaning_Form_official_v1.pdf`, la plantilla oficial en blanco).
 
 ---
 

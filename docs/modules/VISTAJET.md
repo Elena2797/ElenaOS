@@ -1,6 +1,6 @@
 Estado: implementado (mapa general — detalle en cada sub-módulo)
-Última verificación: 2026-07-10
-Verificado en: life-os-app/src/main.js (router de vistas, vjView)
+Última verificación: 2026-07-13
+Verificado en: life-os-app/src/main.js (router de vistas, vjView) — nota: fila de Laundry & Cleaning Form refleja el estado de la rama feature/vj-landing-cleaning, no de main
 Fuente de verdad de datos: DATA_MODEL.md § vj_state, vj_tasks
 
 # modules/VISTAJET.md — Mapa del dominio VistaJet
@@ -13,7 +13,7 @@ VistaJet es, con diferencia, el dominio más maduro de LIFEOS: es el único con 
 |---|---|---|
 | [VISTAJET_INVENTORY.md](VISTAJET_INVENTORY.md) | Sesiones de inventario del avión, parser de chat, export Excel/UPLIFT | implementado |
 | [VISTAJET_HOTO.md](VISTAJET_HOTO.md) | Handover/Takeover vivo, export PDF oficial | implementado, con gaps documentados |
-| [VISTAJET_LAUNDRY.md](VISTAJET_LAUNDRY.md) | Checklist de lavandería | implementado mínimo |
+| [VISTAJET_LAUNDRY_CLEANING.md](VISTAJET_LAUNDRY_CLEANING.md) | Laundry & Cleaning Form (lavandería, dishwashing, bed linen, dry cleaning, cristalería), export PDF oficial | implementado y verificado en worktrees aislados — sin merge a main, no desplegado |
 | [VISTAJET_FRESH.md](VISTAJET_FRESH.md) | Plan de provisiones frescas | implementado mínimo |
 | [AIRCRAFT_READINESS.md](AIRCRAFT_READINESS.md) | Evaluación de "¿puedo entregar el avión ya?" | implementado |
 
