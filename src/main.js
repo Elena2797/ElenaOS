@@ -5,6 +5,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import * as isabelSvc from './services/isabel.js';
 import * as invSvc from './services/inventory.js';
 import * as hotoSvc from './services/hoto.js';
+import * as llcSvc from './services/laundryCleaning.js';
 import * as readiSvc from './services/readiness.js';
 // Definiciones del dominio HOTO: fuente única en src/hoto/model.js.
 // Se importan con los nombres VJ_* históricos para no tocar sus usos.
@@ -18,16 +19,109 @@ import {
 const PIN = '1965';
 // HOTO_SECTIONS, CABIN_CARE_LABELS, SHOPPING_ITEMS y MAG_STATUS viven ahora en
 // src/hoto/model.js (fuente única del dominio HOTO). Se importan arriba con alias.
-const VJ_LAUNDRY_ITEMS=[
-  {id:'pillowcases',name:'Pillowcases'},
-  {id:'blankets',name:'Blankets'},
-  {id:'duvets',name:'Duvets'},
-  {id:'towels',name:'Towels'},
-  {id:'tablecloths',name:'Tablecloths'},
-  {id:'napkins',name:'Napkins'},
-  {id:'seat_covers',name:'Seat covers'},
-  {id:'other',name:'Other items'},
+
+// Catálogo de ítems del PDF oficial "Laundry & Cleaning Form - All fleet 2023".
+// CONTRATO CON EL SERVIDOR (acoplamiento cross-repo): cada item.id DEBE coincidir
+// exactamente con la clave usada en isabel-api/src/laundryCleaning/fieldMap.js
+// (ALL_ITEMS[*].id) — es esa clave la que decide en qué casilla del PDF cae el
+// dato. Si añades/renombras un id aquí, hazlo también allí. El orden importa solo
+// para el render de la app; el orden real del PDF vive en el fieldMap del servidor.
+// item.other === true ⇒ fila "Other:" del PDF: una sola celda de texto libre
+// (nombre + cantidad combinados al exportar), sin columna "received" separada —
+// confirmado empíricamente contra el PDF, no es una limitación de la app.
+const VJ_LLC_SECTIONS=[
+  {id:'laundry',label:'Laundry',items:[
+    {id:'laundry_coasters',label:'Coasters'},
+    {id:'laundry_napkins',label:'Napkins'},
+    {id:'laundry_tablecloth_xs',label:'Tablecloth XS'},
+    {id:'laundry_tablecloth_s',label:'Tablecloth S'},
+    {id:'laundry_tablecloth_m',label:'Tablecloth M'},
+    {id:'laundry_tablecloth_l',label:'Tablecloth L'},
+    {id:'laundry_tablecloth_xl',label:'Tablecloth XL'},
+    {id:'laundry_duvet_cover_single',label:'Duvet Cover Single'},
+    {id:'laundry_duvet_cover_double',label:'Duvet Cover Double'},
+    {id:'laundry_fitted_sheet_single',label:'Fitted Sheet Single'},
+    {id:'laundry_fitted_sheet_double',label:'Fitted Sheet Double'},
+    {id:'laundry_pillowcase_flanges',label:'Pillowcase Flanges'},
+    {id:'laundry_pillowcase_no_flanges',label:'Pillowcase No Flanges'},
+    {id:'laundry_crepe_towel',label:'Crepe Towel'},
+    {id:'laundry_terry_towel',label:'Terry Towel'},
+    {id:'laundry_tea_towel',label:'Tea Towel'},
+    {id:'laundry_microfiber_cloth',label:'Microfiber Cloth'},
+    {id:'laundry_vj_laundry_bag',label:'VJ Laundry Bag'},
+    {id:'laundry_ch_apron',label:'CH Apron'},
+    {id:'laundry_other',label:'Other',other:true},
+  ]},
+  {id:'dish1',label:'Cleaning/Dishwashing',items:[
+    {id:'dish1_dinner_plate',label:'Dinner Plate'},
+    {id:'dish1_dessert_plate',label:'Dessert Plate'},
+    {id:'dish1_bread_plate',label:'Bread Plate'},
+    {id:'dish1_salad_bowl',label:'Salad Bowl'},
+    {id:'dish1_soup_bowl',label:'Soup Bowl'},
+    {id:'dish1_coffee_cup',label:'Coffee Cup'},
+    {id:'dish1_coffee_saucer',label:'Coffee Saucer'},
+    {id:'dish1_espresso_cup',label:'Espresso Cup'},
+    {id:'dish1_espresso_saucer',label:'Espresso Saucer'},
+    {id:'dish1_coffee_mug',label:'Coffee Mug'},
+    {id:'dish1_teapot',label:'Teapot'},
+    {id:'dish1_lsa_dibbern_bowl',label:'LSA/ Dibbern Bowl'},
+    {id:'dish1_chinese_bowl',label:'Chinese Bowl'},
+    {id:'dish1_wedgewood_bowl',label:'Wedgewood Bowl'},
+    {id:'dish1_porcelain_milk_jug',label:'Porcelain Milk Jug'},
+    {id:'dish1_silicone_jug',label:'Silicone Jug'},
+    {id:'dish1_pyrex_microwave_jug',label:'Pyrex Microwave Jug'},
+    {id:'dish1_microwave_plate',label:'Microwave Plate'},
+    {id:'dish1_plastic_tray',label:'Plastic Tray'},
+    {id:'dish1_plastic_drawer',label:'Plastic Drawer'},
+  ]},
+  {id:'dish2',label:'Cleaning/Dishwashing',items:[
+    {id:'dish2_menu_fork',label:'Menu Fork'},
+    {id:'dish2_menu_knife',label:'Menu Knife'},
+    {id:'dish2_menu_spoon',label:'Menu Spoon'},
+    {id:'dish2_dessert_fork',label:'Dessert Fork'},
+    {id:'dish2_dessert_knife',label:'Dessert Knife'},
+    {id:'dish2_dessert_spoon',label:'Dessert Spoon'},
+    {id:'dish2_espresso_spoon',label:'Espresso Spoon'},
+    {id:'dish2_coffee_spoon',label:'Coffee Spoon'},
+    {id:'dish2_tablespoon',label:'Tablespoon'},
+    {id:'dish2_fish_fork',label:'Fish Fork'},
+    {id:'dish2_fish_knife',label:'Fish Knife'},
+    {id:'dish2_steak_knife',label:'Steak Knife'},
+    {id:'dish2_cheese_knife',label:'Cheese Knife'},
+    {id:'dish2_metal_food_ring',label:'Metal Food Ring'},
+    {id:'dish2_vegetable_knife',label:'Vegetable Knife'},
+    {id:'dish2_cake_server',label:'Cake Server'},
+    {id:'dish2_chinese_spoon',label:'Chinese Spoon'},
+    {id:'dish2_chopping_board',label:'Chopping Board'},
+    {id:'dish2_atlas_box',label:'Atlas Box'},
+    {id:'dish2_other',label:'Other',other:true},
+  ]},
+  {id:'bedlinen',label:'Global 7500 Bed Linen',items:[
+    {id:'bedlinen_g7a_green',label:'Fitted Sheet G7A Green'},
+    {id:'bedlinen_g7d_yellow',label:'Fitted Sheet G7D Yellow'},
+    {id:'bedlinen_g7c_brown',label:'Fitted Sheet G7C Brown'},
+    {id:'bedlinen_flat_sheet_grey',label:'Flat Sheet (Grey)'},
+    {id:'bedlinen_other',label:'Other',other:true},
+  ]},
+  {id:'dry',label:'Dry Cleaning',items:[
+    {id:'dry_blanket_alpaca',label:'Blanket Alpaca'},
+    {id:'dry_pillowcase_alpaca',label:'Pillowcase Alpaca'},
+    {id:'dry_mattresses',label:'Mattresses'},
+    {id:'dry_pillows',label:'Pillows'},
+    {id:'dry_single_duvet',label:'Single Duvet'},
+    {id:'dry_double_duvet',label:'Double Duvet'},
+    {id:'dry_topper',label:'Topper'},
+    {id:'dry_other',label:'Other',other:true},
+  ]},
+  {id:'glass',label:'Glasses (Aircrafts with no galley sink only)',items:[
+    {id:'glass_champagne_flute',label:'Champagne Flute'},
+    {id:'glass_wine_glass',label:'Wine Glass'},
+    {id:'glass_tumbler',label:'Tumbler'},
+    {id:'glass_shot_glass',label:'Shot Glass'},
+    {id:'glass_other',label:'Other',other:true},
+  ]},
 ];
+const VJ_LLC_ALL_ITEMS=VJ_LLC_SECTIONS.flatMap(s=>s.items);
 let pinVal = '';
 
 function showPin() {
@@ -70,13 +164,14 @@ function pinPress(v) {
   }
 }
 
-let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], pendingImage:null, transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', vjLaundryTab:'hoy', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null };
+let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], pendingImage:null, transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null };
 
 async function initApp() {
   db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   dbSvc.setClient(db);
   invSvc.setClient(db);
   hotoSvc.setClient(db);
+  llcSvc.setClient(db);
   isabelSvc.setUrlGetter(() => S.metrics.find(m => m.key === 'agent_url')?.value || '');
   const now = new Date();
   document.getElementById('td').textContent = now.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
@@ -110,7 +205,7 @@ function render() {
   });
   const mp=document.getElementById('mp');
   mp.textContent=S.mode; mp.className='mode-pill '+(S.mode==='ON'?'m-on':'m-off');
-  const views={home:homeView,areas:areasView,area:areaView,global:globalView,project:projectView,avanzar:avanzarView,resultado_ia:resultadoIAView,dashboard:dashboardView,vj_hoto:vjHotoView,vj_inventario:vjInventarioView,vj_laundry:vjLaundryView,vj_fresh:vjFreshView,vj_status:vjStatusView};
+  const views={home:homeView,areas:areasView,area:areaView,global:globalView,project:projectView,avanzar:avanzarView,resultado_ia:resultadoIAView,dashboard:dashboardView,vj_hoto:vjHotoView,vj_inventario:vjInventarioView,vj_laundry_cleaning:vjLandingCleaningView,vj_fresh:vjFreshView,vj_status:vjStatusView};
   document.getElementById('main').innerHTML=(views[S.view]||homeView)();
 }
 
@@ -664,7 +759,7 @@ function areaView() {
     }
 
     const hotoTasksExist=pendTasks.some(t=>/hoto|hand.?over|defect/i.test(t.title));
-    const primaryCTA=hotoTasksExist?{label:'Ir al HOTO',view:'vj_hoto'}:status==='rotacion'?{label:'Ver Laundry Form',view:'vj_laundry'}:null;
+    const primaryCTA=hotoTasksExist?{label:'Ir al HOTO',view:'vj_hoto'}:status==='rotacion'?{label:'Ver Laundry & Cleaning Form',view:'vj_laundry_cleaning'}:null;
 
     // Fuente real = Supabase (si el HOTO ya se cargó); localStorage como fallback pre-migración.
     const hoToChecks=S.hotoRec?.daily_duties||JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
@@ -674,10 +769,14 @@ function areaView() {
     const hotoTasks=pendTasks.filter(t=>/hoto|hand.?over|defect/i.test(t.title));
 
     const todayStr=now.toISOString().slice(0,10);
-    const laundryDate=localStorage.getItem('vj_laundry_date');
-    const laundryItems=JSON.parse(localStorage.getItem('vj_laundry_items')||'{}');
-    const laundryToday=laundryDate===todayStr;
-    const laundryTotal=laundryToday?Object.values(laundryItems).reduce((a,b)=>a+b,0):0;
+    // Fuente real = Supabase (S.llcRec, cargado la primera vez que se visita la vista).
+    const llcItemsState=S.llcRec?.items||{};
+    const llcFilledCount=VJ_LLC_ALL_ITEMS.filter(it=>{
+      const e=llcItemsState[it.id];
+      if(!e) return false;
+      return it.other?!!(e.note||e.given!=null&&e.given!==''):(e.given!=null&&e.given!=='')||(e.received!=null&&e.received!=='');
+    }).length;
+    const llcTotal=VJ_LLC_ALL_ITEMS.length;
 
     const inventTasks=pendTasks.filter(t=>/inventar|catering|amenities|uplift/i.test(t.title));
     const elearningTasks=pendTasks.filter(t=>/elearning|e.?learning/i.test(t.title));
@@ -720,10 +819,10 @@ function areaView() {
     const inventSB=inventTasks.length>0?'#FAEEDA':'#E1F5EE';
     const inventSummary=inventTasks.length>0?inventTasks.length+' ítem'+(inventTasks.length>1?'s':'')+' pendiente'+(inventTasks.length>1?'s':''):'Sin novedades';
 
-    const laundrySL=!laundryToday?(status==='rotacion'?'Hoy pendiente':'No activo'):(laundryTotal>0?laundryTotal+' ítems':'En blanco');
-    const laundrySC=!laundryToday&&status==='rotacion'?'#854F0B':!laundryToday?'#9CA3AF':'#185FA5';
-    const laundrySB=!laundryToday&&status==='rotacion'?'#FAEEDA':!laundryToday?'#F5F5F5':'#EEF4FD';
-    const laundrySummary=laundryToday&&laundryTotal>0?'Registrado hoy: '+laundryTotal+' ítems':status==='rotacion'?'Se completa al final del día':'Disponible en rotación';
+    const llcSL=!S.llcRec?(status==='rotacion'?'Hoy pendiente':'No activo'):(llcFilledCount>0?llcFilledCount+'/'+llcTotal:'En blanco');
+    const llcSC=!S.llcRec&&status==='rotacion'?'#854F0B':!S.llcRec?'#9CA3AF':'#185FA5';
+    const llcSB=!S.llcRec&&status==='rotacion'?'#FAEEDA':!S.llcRec?'#F5F5F5':'#EEF4FD';
+    const llcSummary=S.llcRec&&llcFilledCount>0?'Registrado: '+llcFilledCount+' de '+llcTotal+' ítems':status==='rotacion'?'Se completa durante la rotación':'Disponible en rotación';
 
     const freshSL=status==='rotacion'?'Recomendado':'No activo';
     const freshSC=status==='rotacion'?'#185FA5':'#9CA3AF';
@@ -811,7 +910,7 @@ function areaView() {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
       ${toolCard('📋','HOTO',hotoSL,hotoSC,hotoSB,hotoSummary,'vj_hoto')}
       ${toolCard('📦','Inventario',inventSL,inventSC,inventSB,inventSummary,'vj_inventario')}
-      ${toolCard('🧺','Laundry Form',laundrySL,laundrySC,laundrySB,laundrySummary,'vj_laundry')}
+      ${toolCard('🧺','Laundry & Cleaning Form',llcSL,llcSC,llcSB,llcSummary,'vj_laundry_cleaning')}
       ${toolCard('🥗','Fresh Items Plan',freshSL,freshSC,freshSB,'Basado en sectores y pasajeros','vj_fresh')}
     </div>
 
@@ -1681,16 +1780,56 @@ async function resetHotoChecks(){
   }catch(e){ alert('No se pudo reiniciar: '+e.message); }
 }
 
-function updateLaundryItem(itemId,delta){
-  const today=new Date().toISOString().slice(0,10);
-  localStorage.setItem('vj_laundry_date',today);
-  const items=JSON.parse(localStorage.getItem('vj_laundry_items')||'{}');
-  items[itemId]=Math.max(0,(items[itemId]||0)+delta);
-  localStorage.setItem('vj_laundry_items',JSON.stringify(items));
+// ═══ Laundry & Cleaning Form — módulo vivo ═══════════════════════════════════
+function llcBack(){ S._llcLoaded=false; S.llcErr=null; go('area',S.areaId); }
+
+async function llcCreate(){
+  const tail=(document.getElementById('llc-new-tail')?.value||'').trim().toUpperCase();
+  const icao=(document.getElementById('llc-new-icao')?.value||'').trim().toUpperCase();
+  if(!tail){ alert('Introduce la matrícula.'); return; }
+  try{
+    S.llcRec=await llcSvc.createLaundryCleaning({tail_number:tail,icao});
+    render();
+  }catch(e){ alert('No se pudo crear el formulario: '+e.message); }
+}
+
+// No-optimista: guarda en Supabase PRIMERO; la UI solo refleja el valor tras éxito.
+// Si falla, revierte (el estado no cambió) y muestra el error. Mismo patrón que hotoField.
+async function llcField(field,value){
+  if(!S.llcRec) return;
+  const val=value===''?null:value;
+  try{
+    await llcSvc.updateLaundryCleaning(S.llcRec.id,{[field]:val});
+    S.llcRec[field]=val;
+  }catch(e){
+    alert('No se pudo guardar: '+e.message);
+    render();   // el input vuelve al valor previo (S.llcRec[field] no cambió)
+  }
+}
+
+// Ítems de las 6 tablas: se guardan en el único blob `items` (ver DATA_MODEL).
+// No-optimista igual que hotoCareSave/hotoShopSet: reescribe el blob entero,
+// la UI solo lo asume tras confirmación de Supabase.
+async function llcItemField(itemId,key,value){
+  if(!S.llcRec) return;
+  const items={...(S.llcRec.items||{})};
+  const current=items[itemId]||{};
+  const val=key==='note'?(value===''?null:value):(value===''?null:Number(value));
+  items[itemId]={...current,[key]:val};
+  try{
+    await llcSvc.updateLaundryCleaning(S.llcRec.id,{items});
+    S.llcRec.items=items;      // estado solo tras éxito
+  }catch(e){ alert('No se pudo guardar: '+e.message); }
   render();
 }
 
-function resetLaundry(){localStorage.removeItem('vj_laundry_items');localStorage.removeItem('vj_laundry_date');render();}
+function llcExport(){
+  if(!S.llcRec) return;
+  // Navegación directa (no fetch+blob): en iOS/PWA los blobs de descarga fallan,
+  // pero abrir la URL muestra el PDF en el visor nativo con compartir/guardar.
+  const url=`${ISABEL_API}/v1/laundry-cleaning/${S.llcRec.id}/export?inline=1&api_key=${encodeURIComponent(ISABEL_KEY)}`;
+  window.open(url,'_blank');
+}
 
 function vjHotoView(){
   const head=`<div class="ph"><button class="back" onclick="hotoBack()"><i class="ti ti-arrow-left"></i></button><h2>HOTO</h2></div>`;
@@ -2044,47 +2183,108 @@ function vjInventarioView(){
   </div>`;
 }
 
-function vjLaundryView(){
-  const today=new Date().toISOString().slice(0,10);
-  const laundryDate=localStorage.getItem('vj_laundry_date');
-  const isToday=laundryDate===today;
-  const items=isToday?JSON.parse(localStorage.getItem('vj_laundry_items')||'{}'):{};
-  const total=Object.values(items).reduce((a,b)=>a+b,0);
-  const tab=S.vjLaundryTab||'hoy';
-  const tabBar=`<div style="display:flex;gap:2px;margin-bottom:14px;background:var(--surface);border-radius:10px;padding:3px;border:0.5px solid var(--border)">${['hoy','historial'].map(t=>`<button onclick="setVjTab('vjLaundryTab','${t}')" style="flex:1;padding:8px 2px;border:none;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;background:${tab===t?'var(--text)':'transparent'};color:${tab===t?'#fff':'var(--t2)'}">${t.charAt(0).toUpperCase()+t.slice(1)}</button>`).join('')}</div>`;
-  const hoy=`
-    <div style="background:var(--surface);border-radius:12px;border:0.5px solid var(--border);overflow:hidden;margin-bottom:12px">
-      <div style="padding:14px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-        <div>
-          <div style="font-size:13px;font-weight:600;color:var(--text)">Laundry Form · Hoy</div>
-          <div style="font-size:11px;color:var(--t2);margin-top:2px">${total>0?total+' ítem'+(total>1?'s':'')+' registrado'+(total>1?'s':''):'Aún no registrado'}</div>
-        </div>
-        ${total>0?`<button onclick="resetLaundry()" style="border:none;background:none;color:var(--t3);font-size:11px;cursor:pointer;text-decoration:underline">Reiniciar</button>`:''}
-      </div>
-      ${VJ_LAUNDRY_ITEMS.map((item,i,arr)=>{
-        const count=items[item.id]||0;
-        return `<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;${i<arr.length-1?'border-bottom:0.5px solid var(--border)':''}">
-          <span style="flex:1;font-size:13px;color:var(--text)">${item.name}</span>
-          <div style="display:flex;align-items:center">
-            <button onclick="updateLaundryItem('${item.id}',-1)" style="width:28px;height:28px;border:1px solid var(--border);border-radius:8px 0 0 8px;background:var(--bg);cursor:pointer;font-size:16px;color:var(--t2);display:flex;align-items:center;justify-content:center;padding:0">−</button>
-            <div style="width:36px;height:28px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:${count>0?'var(--text)':'var(--t3)'};background:var(--surface)">${count}</div>
-            <button onclick="updateLaundryItem('${item.id}',1)" style="width:28px;height:28px;border:1px solid var(--border);border-radius:0 8px 8px 0;background:var(--bg);cursor:pointer;font-size:16px;color:var(--t2);display:flex;align-items:center;justify-content:center;padding:0">+</button>
-          </div>
-        </div>`;
-      }).join('')}
-      <div style="padding:12px 14px;border-top:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:13px;font-weight:600;color:var(--text)">TOTAL</span>
-        <span style="font-size:16px;font-weight:700;color:var(--text)">${total}</span>
-      </div>
-    </div>
-    <button style="width:100%;padding:14px;border:none;background:${total>0?'var(--text)':'var(--border)'};color:${total>0?'#fff':'var(--t3)'};border-radius:12px;font-size:14px;font-weight:600;cursor:${total>0?'pointer':'default'}">${total>0?'Ver y enviar Laundry Form →':'Registra ítems para continuar'}</button>`;
-  const historial=`
-    <div style="background:var(--surface);border-radius:12px;padding:24px 16px;text-align:center;border:0.5px solid var(--border)">
-      <div style="font-size:32px;margin-bottom:12px">🧺</div>
-      <div style="font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px">Historial de Laundry Forms</div>
-      <div style="font-size:12px;color:var(--t2);line-height:1.6">El historial de formularios enviados estará disponible próximamente.</div>
+// ── Filas de las 6 tablas de ítems ───────────────────────────────────────────
+function llcItemRowHtml(item,entry,isLast){
+  const esc=(s)=>String(s??'').replace(/"/g,'&quot;');
+  const border=isLast?'':'border-bottom:0.5px solid var(--border);';
+  const numStyle=`width:60px;box-sizing:border-box;padding:7px 4px;border:1px solid var(--border);border-radius:7px;font-size:12px;background:var(--bg);color:var(--text);text-align:center`;
+  if(item.other){
+    // Fila "Other:" del PDF: un único campo de texto libre (sin Received) —
+    // en la app se piden nombre y cantidad por separado y se combinan al exportar.
+    return `<div style="display:flex;align-items:center;gap:8px;padding:9px 0;${border}">
+      <span style="width:56px;flex-shrink:0;font-size:12px;color:var(--t2)">${item.label}</span>
+      <input value="${esc(entry.note)}" placeholder="Describe el ítem" onchange="llcItemField('${item.id}','note',this.value)" style="flex:1;box-sizing:border-box;padding:7px 9px;border:1px solid var(--border);border-radius:7px;font-size:12px;background:var(--bg);color:var(--text)">
+      <input type="number" min="0" inputmode="numeric" value="${entry.given??''}" placeholder="Qty" onchange="llcItemField('${item.id}','given',this.value)" style="${numStyle}">
     </div>`;
-  return `<div class="ph"><button class="back" onclick="go('area','${S.areaId}')"><i class="ti ti-arrow-left"></i></button><h2>Laundry Form</h2></div>${tabBar}${tab==='hoy'?hoy:historial}`;
+  }
+  return `<div style="display:flex;align-items:center;gap:8px;padding:9px 0;${border}">
+    <span style="flex:1;font-size:12px;color:var(--text)">${item.label}</span>
+    <input type="number" min="0" inputmode="numeric" value="${entry.given??''}" placeholder="Given" onchange="llcItemField('${item.id}','given',this.value)" style="${numStyle}">
+    <input type="number" min="0" inputmode="numeric" value="${entry.received??''}" placeholder="Recv" onchange="llcItemField('${item.id}','received',this.value)" style="${numStyle}">
+  </div>`;
+}
+
+function llcSectionHtml(section){
+  const items=(S.llcRec&&S.llcRec.items)||{};
+  const filled=section.items.filter(it=>{
+    const e=items[it.id];
+    if(!e) return false;
+    return it.other?!!(e.note||(e.given!=null&&e.given!=='')):(e.given!=null&&e.given!=='')||(e.received!=null&&e.received!=='');
+  }).length;
+  return `<div style="margin-bottom:14px">
+    <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:6px">${section.label} · ${filled}/${section.items.length}</div>
+    <div style="background:var(--surface);border-radius:12px;padding:2px 14px;border:0.5px solid var(--border)">
+      ${section.items.map((it,i,arr)=>llcItemRowHtml(it,items[it.id]||{},i===arr.length-1)).join('')}
+    </div>
+  </div>`;
+}
+
+// ── Vista principal: editor vivo + exportación al PDF oficial ───────────────
+function vjLandingCleaningView(){
+  const head=`<div class="ph"><button class="back" onclick="llcBack()"><i class="ti ti-arrow-left"></i></button><h2>Laundry & Cleaning Form</h2></div>`;
+
+  // ── Carga asíncrona del registro activo ──────────────────────────────────
+  if(!S._llcLoaded){
+    S._llcLoaded=true;
+    (async()=>{
+      try{ S.llcRec=await llcSvc.loadActiveLaundryCleaning(); S.llcErr=null; }
+      catch(e){ console.error('llc load',e); S.llcErr=e.message; }
+      render();
+    })();
+    return `${head}<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--t3);font-size:13px">Cargando…</div>`;
+  }
+
+  if(S.llcErr){
+    return `${head}<div style="background:var(--surface);border-radius:12px;padding:20px;border:0.5px solid var(--border);font-size:13px;color:var(--t2);line-height:1.6">No se pudo cargar el formulario.<br><span style="color:var(--t3);font-size:12px">${S.llcErr}</span><br><br>Si la tabla aún no existe, ejecuta la migración <code>laundry_cleaning_migration_v1.sql</code> en Supabase.</div>`;
+  }
+
+  const rec=S.llcRec;
+  const fieldStyle=`width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg);color:var(--text)`;
+  const v=(x)=>x==null?'':String(x).replace(/"/g,'&quot;');
+
+  // Sin registro activo → crear uno nuevo
+  if(!rec){
+    return `${head}
+    <div style="background:var(--surface);border-radius:12px;padding:20px;border:0.5px solid var(--border)">
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">Nuevo Laundry & Cleaning Form</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px">No hay ningún formulario activo. Empieza uno para esta rotación; se irá construyendo solo mientras trabajas. El día de la entrega solo exportas el PDF oficial.</div>
+      <label style="font-size:11px;font-weight:600;color:var(--t2)">Matrícula</label>
+      <input id="llc-new-tail" placeholder="9H-JHK" style="${fieldStyle};margin:4px 0 10px;text-transform:uppercase">
+      <label style="font-size:11px;font-weight:600;color:var(--t2)">ICAO</label>
+      <input id="llc-new-icao" placeholder="LPFR" style="${fieldStyle};margin:4px 0 16px;text-transform:uppercase">
+      <button onclick="llcCreate()" style="width:100%;padding:13px;border:none;background:var(--text);color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Crear formulario</button>
+    </div>`;
+  }
+
+  return `${head}
+  <div style="background:var(--surface);border-radius:12px;padding:16px;border:0.5px solid var(--border);margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label style="font-size:10px;font-weight:600;color:var(--t3)">AIRCRAFT REGISTRATION</label>
+        <input value="${v(rec.tail_number)}" onchange="llcField('tail_number',this.value)" style="${fieldStyle};margin-top:4px;text-transform:uppercase"></div>
+      <div><label style="font-size:10px;font-weight:600;color:var(--t3)">ICAO</label>
+        <input value="${v(rec.icao)}" onchange="llcField('icao',this.value)" style="${fieldStyle};margin-top:4px;text-transform:uppercase"></div>
+      <div><label style="font-size:10px;font-weight:600;color:var(--t3)">DATE</label>
+        <input value="${v(rec.service_date)}" onchange="llcField('service_date',this.value)" placeholder="25-May-26" style="${fieldStyle};margin-top:4px"></div>
+      <div><label style="font-size:10px;font-weight:600;color:var(--t3)">EXPECTED DATE OF DEPARTURE</label>
+        <input value="${v(rec.expected_departure_date)}" onchange="llcField('expected_departure_date',this.value)" placeholder="28-May-26" style="${fieldStyle};margin-top:4px"></div>
+      <div><label style="font-size:10px;font-weight:600;color:var(--t3)">CH NAME</label>
+        <input value="${v(rec.ch_name)}" onchange="llcField('ch_name',this.value)" style="${fieldStyle};margin-top:4px"></div>
+      <div><label style="font-size:10px;font-weight:600;color:var(--t3)">CH CONTACT NUMBER</label>
+        <input value="${v(rec.ch_contact_number)}" onchange="llcField('ch_contact_number',this.value)" style="${fieldStyle};margin-top:4px"></div>
+      <div style="grid-column:1 / -1"><label style="font-size:10px;font-weight:600;color:var(--t3)">CH EMAIL ADDRESS</label>
+        <input value="${v(rec.ch_email_address)}" onchange="llcField('ch_email_address',this.value)" style="${fieldStyle};margin-top:4px"></div>
+    </div>
+  </div>
+
+  ${VJ_LLC_SECTIONS.map(s=>llcSectionHtml(s)).join('')}
+
+  <div style="margin-bottom:14px">
+    <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:6px">Additional Comments</div>
+    <textarea onchange="llcField('additional_comments',this.value)" rows="3" style="${fieldStyle};resize:vertical;font-family:inherit">${v(rec.additional_comments)}</textarea>
+  </div>
+
+  <button onclick="llcExport()" style="width:100%;margin-top:4px;padding:15px;border:none;background:#0F6E56;color:#fff;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ti ti-file-download"></i> Exportar Laundry & Cleaning PDF oficial</button>
+  <div style="text-align:center;font-size:11px;color:var(--t3);margin-top:8px;line-height:1.5">Genera el PDF oficial de VistaJet con estos datos.<br>El PDF nunca se edita a mano: siempre se exporta desde aquí.</div>`;
 }
 
 function vjFreshView(){
@@ -3459,13 +3659,14 @@ Object.assign(window, {
   openEventoForm, saveEvento,
   openProjectMenu, pauseProject, resumeProject,
   selectProposal, empezarPropuesta,
-  setVjTab, toggleHotoCheck, resetHotoChecks, updateLaundryItem, resetLaundry,
+  setVjTab, toggleHotoCheck, resetHotoChecks,
   invBack, invPreviewFile, invCreateSession, invSendMessage, invConfirm, invSetSearch, invCloseSession, invExport,
   hotoBack, hotoCreate, hotoField, hotoAddItem, hotoDelItem, hotoExport,
   hotoCareToggle, hotoCareToday, hotoCareUnknown, hotoCareDate, hotoCareNote,
   hotoShopToggle, hotoShopSet, hotoResetSection,
   hotoMagToggle, hotoMagAdd, hotoMagSet, hotoMagDel, hotoMagDropLegacy,
   readiRefresh, readiToggleDetail,
+  llcBack, llcCreate, llcField, llcItemField, llcExport,
 });
 
 window.addEventListener('load', showPin);
