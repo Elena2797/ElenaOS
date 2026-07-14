@@ -21,4 +21,4 @@ LIFEOS en producción y en uso real diario. VistaJet (Inventario + HOTO + Aircra
 Ninguno técnico. Un pendiente de confirmación por la usuaria: la migración del checklist Daily Duties de HOTO a Supabase en su móvil (detalle en `modules/VISTAJET_HOTO.md`).
 
 ## Siguiente objetivo
-Ninguno asignado automáticamente. La investigación de JETMI queda en pausa deliberada tras la ingestión de los tres artefactos — el siguiente bloque (continuar Fase 1 del Mapa Maestro, o abrir la Fase 0 de fundamentos legales) es una decisión pendiente de Estefanía, no una inferencia a tomar sola. Ver `research/JETMI/LOG.md` § 6 y `NEXT_SESSION.md` para el handoff exacto.
+Ninguno iniciado automáticamente. La investigación de JETMI queda en pausa deliberada tras la ingestión de los tres artefactos — el próximo bloque **ya está decidido** (Fase 1, dominio 1.2 Supply), pero no se ha abierto todavía. Ver `research/JETMI/LOG.md` § 6 y `NEXT_SESSION.md` para el handoff exacto.

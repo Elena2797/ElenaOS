@@ -59,6 +59,34 @@ FUENTE → extracción → clasificación → verificación → conocimiento con
 
 **Ninguna afirmación de `sources/` se copia automáticamente a `KNOWLEDGE.md`.** El paso de fuente a conocimiento consolidado es un acto deliberado, hecho por Estefanía o explícitamente confirmado por ella — nunca una inferencia silenciosa de Claude Code al leer el artefacto.
 
+## Cadena completa: de la fuente externa al código
+
+El pipeline de ingestión de arriba cubre solo el tramo fuente→conocimiento. La cadena completa, de principio a fin, es:
+
+```
+FUENTE EXTERNA → RESEARCH/SOURCES → HIPÓTESIS o CONOCIMIENTO CONSOLIDADO → DECISIÓN → DEFINICIÓN DE PRODUCTO/PRD → IMPLEMENTACIÓN → ESTADO VERIFICADO EN /docs
+```
+
+| Etapa | Qué es | Dónde vive |
+|---|---|---|
+| Fuente externa | El documento o investigación original (informe, entrevista, artículo, investigación encargada a otra herramienta) | Fuera de `/docs` — no versionado como tal, solo su conversión |
+| Research/sources | Conversión fiel a Markdown, sin editorializar — es evidencia, no verdad | `research/<DOMINIO>/sources/*.md` |
+| Hipótesis o conocimiento consolidado | Lo extraído se clasifica: si no ha superado verificación, es hipótesis; si sí, es conocimiento consolidado | `research/<DOMINIO>/HYPOTHESES.md` / `KNOWLEDGE.md` |
+| Decisión | Cuando el conocimiento es suficiente, se toma (o se registra) una decisión de negocio concreta | `DECISIONS.md`, con prefijo `<DOMINIO>-Dn` |
+| Definición de producto/PRD | La decisión se traduce en requisitos de producto — visión, vocabulario del dominio, alcance | Documentos de visión de la raíz del proyecto (p. ej. `JETMI_PRD_Semilla.md`) |
+| Implementación | El código real que construye lo definido en el PRD | Repositorios (`life-os-app/src`, `isabel-api`, etc.) |
+| Estado verificado en `/docs` | Lo que de verdad existe en código, verificado empíricamente — nunca lo que "debería" existir según el PRD | `modules/<DOMINIO>.md` |
+
+Ninguna etapa se salta hacia adelante sin pasar por la anterior: una fuente no se convierte en decisión sin pasar por conocimiento consolidado; una decisión no se convierte en código sin pasar por una definición de producto suficiente.
+
+## Separación de responsabilidades de trabajo
+
+- **La investigación externa produce evidencia.** No decide, no diseña, no propone arquitectura de producto — su output es `sources/`, y como mucho observaciones explícitamente marcadas como tales (ver p. ej. `investigacion-1-1-trabajo-real-broker.md` § I, "solo observaciones, no diseño").
+- **El espacio de producto/estrategia** (la conversación donde se revisa la investigación, se interpreta, se clasifica en `HYPOTHESES.md`/`KNOWLEDGE.md`, y se toman o registran decisiones) no escribe código ni implementa — su output son decisiones (`DECISIONS.md`) y, cuando corresponde, ajustes a los documentos de visión de la raíz.
+- **Claude Code investiga el repositorio real** (código, datos, `/docs`) e implementa — pero solo cuando existe definición de producto suficiente (una decisión registrada y, si aplica, un PRD que la recoja). Claude Code no infiere requisitos de producto directamente de `sources/` ni de `HYPOTHESES.md` — eso sería saltarse las etapas de decisión y definición de producto.
+
+Esta separación es sobre **roles de trabajo**, no sobre herramientas concretas — hoy la investigación externa se produce con una herramienta de investigación dedicada y la implementación con Claude Code, pero esos nombres son la forma de trabajo actual, no una dependencia arquitectónica de LIFEOS. Si cambia la herramienta, la cadena de etapas de arriba se mantiene igual.
+
 ## Procedencia dentro de `sources/`
 
 Un artefacto puede ser investigación secundaria (sintetiza o interpreta fuentes primarias, no es él mismo la fuente original). Cuando esto ocurra, el archivo convertido debe:

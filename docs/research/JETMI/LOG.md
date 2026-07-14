@@ -11,7 +11,7 @@ Este documento responde cinco preguntas. No es una lista de archivos — es el m
 
 ## 1. Qué estamos investigando ahora mismo
 
-Fase 1 del Mapa Maestro de Investigación (conocimiento de industria): completado el dominio 1.1 (qué hace un broker día a día). Pendientes dentro de la misma fase: 1.2 (supply — operadores y aeronaves), 1.3 (demanda — clientes), 1.4 (ciclo operativo end-to-end). La Fase 0 (fundamentos legales y de negocio, bloqueante) no se ha iniciado — sigue en NO INVESTIGADO completo.
+Fase 1 del Mapa Maestro de Investigación (conocimiento de industria): completado el dominio 1.1 (qué hace un broker día a día). **Próximo bloque decidido: dominio 1.2 (Supply — operadores y aeronaves)** — todavía no iniciado, ver § 6. Los dominios 1.3 (demanda — clientes) y 1.4 (ciclo operativo end-to-end) quedan después de 1.2, sin decidir su orden relativo todavía. La Fase 0 (fundamentos legales y de negocio, bloqueante para operar) sigue sin iniciarse — NO INVESTIGADO completo — pero no es el siguiente bloque inmediato.
 
 ## 2. Artefactos existentes
 
@@ -74,4 +74,8 @@ Ver `HYPOTHESES.md` para el detalle completo, con estado y artefacto de origen d
 
 ## 6. Próximo bloque de investigación
 
-Según el orden recomendado por el propio Mapa Maestro (Parte 5): completar la Fase 1 (dominios 1.2 supply, 1.3 demanda, 1.4 ciclo operativo end-to-end) manteniendo el estilo ya usado en la Investigación 1.1, o alternativamente abrir la Fase 0 (fundamentos legales) si se decide priorizar lo bloqueante sobre lo de alta prioridad no bloqueante. Ninguna de las dos rutas se ha decidido todavía — es una decisión pendiente de Estefanía, no una inferencia que corresponda hacer aquí.
+**Decisión tomada (2026-07-14):** el siguiente bloque de investigación es **Fase 1, dominio 1.2 — Supply (operadores y aeronaves)**, manteniendo el estilo ya usado en la Investigación 1.1 (fuentes secundarias + ofertas de empleo/documentación técnica, con las mismas etiquetas epistemológicas). Todavía **no se ha iniciado** — queda como próximo paso, no como trabajo en curso.
+
+Orden previsto a partir de aquí: **1.1 Qué hace un broker (✅ completado) → 1.2 Supply (siguiente) → decidir el bloque posterior según los hallazgos y la cobertura actualizada de esa investigación.** No se da por decidido de antemano que 1.3 (demanda) o 1.4 (ciclo operativo) sean el paso inmediatamente posterior a 1.2 — se revisa tras completar 1.2, no antes.
+
+La **Fase 0** (constitución legal, modelo jurídico, regulación por jurisdicción) sigue **pendiente y bloqueante para operar el primer vuelo real** (ver Mapa Maestro, Parte 3), pero no es el siguiente bloque de investigación inmediato — queda registrada como pendiente crítica, a abrir cuando se decida priorizarla sobre el resto de la Fase 1.
