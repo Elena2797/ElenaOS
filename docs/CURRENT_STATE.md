@@ -1,6 +1,6 @@
 Estado: este documento ES el estado — se reescribe en cada "Cerrar sesión de desarrollo" si algo cambió globalmente
 Última verificación: 2026-07-14
-Verificado en: commit 258d2f5 (docs/research/ + JETMI-D1 + ingestión de 3 artefactos, ver CHANGELOG.md)
+Verificado en: commit 4a80e9d (auditoría de persistencia + cierre de contexto durable, ver CHANGELOG.md)
 Fuente de verdad de datos: ninguna (agrega, no duplica DATA_MODEL)
 
 # CURRENT_STATE.md — Fotografía del proyecto, ahora
@@ -15,7 +15,7 @@ LIFEOS en producción y en uso real diario. VistaJet (Inventario + HOTO + Aircra
 - `life-os-app` → Vercel, commit `f7d4f86` (checklist persistente en Supabase + guardado no-optimista en HOTO).
 
 ## Último commit importante
-`258d2f5` en `life-os-app` — creación de `docs/research/` + `DECISIONS.md` JETMI-D1 + ingestión de los tres primeros artefactos de investigación de JETMI (Manual Cap. 1, Mapa Maestro, Investigación 1.1). Ver `CHANGELOG.md`.
+`4a80e9d` en `life-os-app` — auditoría de persistencia de la investigación de JETMI y cierre de cuatro huecos de contexto durable (relación con Isabel, restricción "una persona + IA", cadena completa del pipeline, próximo bloque de investigación fijado). Precedido por `258d2f5` (creación de `docs/research/` + JETMI-D1 + ingestión de los tres artefactos). Ver `CHANGELOG.md`.
 
 ## Bloqueos actuales
 Ninguno técnico. Un pendiente de confirmación por la usuaria: la migración del checklist Daily Duties de HOTO a Supabase en su móvil (detalle en `modules/VISTAJET_HOTO.md`).
