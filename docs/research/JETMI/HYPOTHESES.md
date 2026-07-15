@@ -1,6 +1,6 @@
 Estado: conocimiento vigente — vivo, se añade y se resuelve (nunca se borra una hipótesis resuelta, se marca como tal)
-Última verificación: 2026-07-15
-Verificado en: ingestión de Investigación 1.2 (Supply), 1.2B (Challenge regional) y 1.2C (Empty legs wedge)
+Última verificación: 2026-07-16
+Verificado en: ingestión de Investigación 1.3 (Demanda) y 1.3B (Demanda regional, competencia y white space)
 Fuente de verdad de datos: ninguna
 
 # research/JETMI/HYPOTHESES.md — Hipótesis, interpretaciones y preguntas abiertas
@@ -107,6 +107,29 @@ Todas requieren, según la propia fuente, entrevista directa a un broker en acti
 
 **Fuente:** `sources/investigacion-1-2c-empty-legs-wedge.md` § M.
 
+## Preguntas abiertas de Demanda (Investigación 1.3, sección M)
+
+1. **[crítica]** ¿Existe algún caso documentado, contado por el propio cliente (no por el broker), de qué le hizo confiar en un broker nuevo por primera vez? — laguna central de toda la investigación de Demanda: casi toda la evidencia reunida sobre confianza es, en sí misma, marketing de confianza (brokers describiendo qué buscar en un broker), no testimonio neutral.
+2. ¿Cuál es la tasa real de conversión de comprador de empty leg a cliente de charter completo, si es que existe alguna? — ninguna fuente la aporta, pese a que varias plataformas publicitan el acceso a empty legs a sus advisors.
+3. ¿Qué papel real juega el broker individual frente a la marca de la empresa en la retención del cliente a largo plazo?
+4. ¿Cómo funciona en la práctica un acuerdo de partnership con un luxury travel advisor — modelo "flight factory" o modelo de relación protegida — y cuál predomina?
+5. ¿Existen datos de demanda específicos (no solo de oferta) para Portugal, México, y el resto de LATAM más allá de Brasil?
+6. ¿Qué tiempo de respuesta concreto, en minutos u horas, marca la diferencia entre ganar o perder una solicitud urgente?
+7. ¿Qué proporción de la demanda de charter en España es corporativa frente a ocio, y cómo varía estacionalmente?
+
+**Fuente:** `sources/investigacion-1-3-demanda.md` § M.
+
+## Preguntas abiertas del challenge regional de Demanda (Investigación 1.3B, sección Q)
+
+1. **[crítica]** ¿Existe realmente demanda de charter privado en los corredores España/Portugal↔LATAM hispanohablante, y de qué volumen? — la apuesta más interesante y menos validada de toda la tanda de Demanda.
+2. ¿Cuál es la cifra real y verificada (fuente regulatoria primaria — AFAC, no comercial) de flota ejecutiva en México? — las fuentes encontradas discrepan entre 800, 2.000 y 7.700 aeronaves, probablemente midiendo universos distintos sin aclararlo.
+3. ¿Cubre Flapper realmente todos los segmentos de cliente en los países donde opera, o deja huecos específicos (p. ej., clientes que prefieren relación personal sobre app)?
+4. ¿Existen programas de afiliados con luxury travel advisors en español/portugués equivalentes a los anglosajones ya documentados (Jet Luxe, Villiers, Bespoke Air Group, LatitudeGo)?
+5. ¿Qué papel juega realmente Argentina, Chile y Panamá — sigue completamente sin investigar con la profundidad de México/Brasil/Colombia/Perú?
+6. ¿Existen quejas/patrones de fraude documentados específicamente en español/portugués que revelen fricciones no capturadas en esta ronda? — búsqueda dedicada explícitamente no realizada, marcada como uno de los huecos más importantes del documento.
+
+**Fuente:** `sources/investigacion-1-3b-demanda-regional-white-space.md` § Q.
+
 ## Degradaciones epistemológicas introducidas por la Investigación 1.2B sobre la Investigación 1.2
 
 La Investigación 1.2B audita explícitamente cada afirmación de 1.2 y propone un nuevo estado epistemológico para varias de ellas (tabla completa en `sources/investigacion-1-2b-challenge-regional-supply.md` § O). No se ha editado 1.2 para reflejarlo — el estado más reciente vive aquí:
@@ -122,6 +145,28 @@ La Investigación 1.2B audita explícitamente cada afirmación de 1.2 y propone 
 | Vetting y fraude (ARGUS/Wyvern/IS-BAO, wet-lease) | Hecho verificado | Se mantiene el mecanismo; **se añade** el caso de sanciones de Avinode (2026) como ampliación relevante, no como contradicción |
 
 **Regla aplicada en esta ingestión, por instrucción explícita:** cuando 1.2B degrada el nivel de confianza de una afirmación de 1.2, la versión más reciente (degradada) es la que debe citarse en cualquier trabajo futuro — no la versión original de 1.2, aunque el documento fuente de 1.2 no se ha editado retrospectivamente.
+
+## Degradaciones epistemológicas introducidas por la Investigación 1.3B sobre la Investigación 1.3
+
+La Investigación 1.3B audita explícitamente cada conclusión de 1.3 con búsquedas dedicadas en español y portugués (tabla completa en `sources/investigacion-1-3b-demanda-regional-white-space.md` § A). No se ha editado 1.3 para reflejarlo — el estado más reciente vive aquí. Se detalla con especial cuidado la degradación de las cuatro formulaciones señaladas explícitamente en el encargo de ingestión:
+
+**A — "El mercado se mueve mayoritariamente por referrals, relaciones y reputación"**: se mantiene como mecanismo robusto — reforzado, no debilitado, por evidencia local de México, Brasil, Colombia y Perú (contacto directo, WhatsApp, relación empresa-cliente). Pero **no debe tratarse como ley universal del mercado global**: el peso relativo de referrals frente a otros canales no está cuantificado en ninguna región, varía previsiblemente por mercado, y en LATAM existe un canal adicional de descubrimiento no anticipado por 1.3 — plataformas digitales pan-regionales (ver Flapper, más abajo). Estado: `ROBUSTA PERO REGIONAL`.
+
+**B — "Un broker tarda 3-5 años en conseguir ingresos consistentes"**: **degradada de HECHO VERIFICADO a SESGADA HACIA MERCADOS ANGLOSAJONES**. Las tres fuentes que la sostenían (IABI, BlackJet/Altitude Blog, FlyUSA) son fuentes de formación de brokers en inglés, orientadas al mercado de EE.UU., con interés comercial en vender cursos/formación. Ninguna evidencia de 1.3B, en ningún idioma, confirma o refuta este plazo para España, Portugal o LATAM. **No debe conservarse como benchmark universal** para planificar el horizonte de tiempo de JETMI.
+
+**C — "Luxury travel advisors son una vía especialmente fuerte de entrada"**: se mantiene como **hipótesis plausible**, no se degrada a inválida — la infraestructura de afiliados (Jet Luxe, Villiers, Bespoke Air Group, LatitudeGo) es real y está documentada con estructuras de comisión concretas. Pero **toda esa evidencia procede del ecosistema angloparlante**; no se ha encontrado, en español o portugués, ningún programa equivalente, lo cual (ausencia de evidencia en dos idiomas de búsqueda dedicada) es en sí mismo un dato, no una confirmación de que no exista. **No debe elevarse a estrategia recomendada para JETMI** — sigue siendo una vía de acceso plausible entre varias, sin validación regional.
+
+**D — "Las relaciones personales previas son la vía dominante para conseguir los primeros clientes"**: se **rebaja de "dominante" a "vía frecuente e importante, sin evidencia suficiente para cuantificarla como dominante"**. La evidencia (tanto 1.3 como 1.3B) confirma de forma consistente que es una práctica citada con frecuencia por brokers describiendo su propio arranque, y que el mecanismo de confianza por relación se sostiene como robusto y probablemente global — pero ninguna fuente aporta una cifra o proporción que permita decir que es la vía dominante frente a las demás (partnerships, eventos, contenido), solo que aparece con más frecuencia en los relatos disponibles.
+
+**Tratamiento de Flapper (cautela crítica):** la Investigación 1.3B identifica a Flapper como un actor digital relevante, con presencia confirmada en Brasil, México, Colombia y Perú, ~30.000 clientes, certificación ARGUS® propia (la primera de la región), y acceso a más de 5.000 aeronaves vía alianzas. Esto permite afirmar que **existe competencia digital panregional relevante** y que **LATAM no puede tratarse como un mercado vacío o "no digitalizado"**. No se eleva a hecho la formulación "Flapper ha resuelto el problema de descubrimiento online en LATAM" — la existencia, expansión y visibilidad de Flapper no demuestra cuota de mercado dominante, cobertura completa, satisfacción de todos los segmentos, resolución general del descubrimiento, ausencia de white space, ni comportamiento real de todos los compradores. **Formulación epistemológica vigente**: Flapper confirma la existencia de competencia digital panregional relevante, pero no existe evidencia suficiente para concluir que el descubrimiento online esté resuelto en LATAM ni para identificar con precisión qué segmentos quedan desatendidos.
+
+**Tratamiento de México y Brasil**: ambos mercados se clasifican como **"NO SON WHITE SPACES OBVIOS"** — tienen líderes históricos fuertes (Aerolíneas Ejecutivas, Líder Aviação) y la presencia ya consolidada de Flapper. Esto **no equivale** a "MERCADOS NO ATRACTIVOS" o "DESCARTADOS": la ausencia de un hueco evidente en las capas más visibles del mercado no demuestra ausencia de segmentos desatendidos, corredores concretos, canales específicos, oportunidades B2B/B2B2C, fricciones cross-border, ni de un wedge futuro más estrecho que el país entero.
+
+**Tratamiento de Perú**: el mercado se mantiene **explícitamente ambiguo** — una fuente periodística no comercial lo describe como "sin tendencia definida en el mercado", lo que es tan compatible con oportunidad de bajo compromiso como con mercado poco atractivo; no hay forma de distinguir ambas lecturas con la evidencia actual. La familiaridad cultural/personal de la fundadora con Perú **no se trata como ventaja comercial demostrada** — se distingue explícitamente de acceso comercial real, tamaño de mercado, demanda real, competencia y posibilidad operativa, ninguna de las cuales ha sido confirmada por esa circunstancia personal.
+
+**Tratamiento de Europa↔LATAM**: no se registra como mercado homogéneo. Es una hipótesis amplia que necesita descomposición en corredores concretos (España↔México, España↔Colombia, España↔Perú, España↔Argentina, Portugal↔Brasil, entre otros), cada uno con compradores, economics, supply, frecuencia, intermediarios y barreras potencialmente distintos — ninguno de ellos investigado individualmente todavía. La posible ventaja lingüística/cultural cross-border sigue siendo una hipótesis plausible por lógica de negocio, no validada con ningún dato de demanda real.
+
+**Regla aplicada, consistente con la ya usada para Supply/1.2B:** cuando 1.3B degrada el nivel de confianza de una afirmación de 1.3, la versión más reciente (degradada) es la que debe citarse en cualquier trabajo futuro — no la versión original de 1.3, aunque el documento fuente de 1.3 no se ha editado retrospectivamente.
 
 ## Aspectos no verificados del Manual a vigilar (no contradicciones, solo evidencia débil)
 
@@ -145,7 +190,39 @@ La Investigación 1.2C introduce formalmente un conjunto de cuestiones sobre la 
 
 **H10-B — Dependencia legal/laboral pendiente (sigue sin resolver):** todavía debe investigarse cómo puede participar legítimamente la fundadora en la creación, propiedad, administración, dirección, actividad operativa, actividad comercial y visibilidad pública de JETMI mientras continúa empleada por VistaJet — incluyendo cláusulas de exclusividad/non-compete, conflicto de interés, deber de lealtad y confidencialidad de su contrato laboral actual, y el régimen de KYC/AML/sanciones aplicable. Entre las hipótesis futuras que se han considerado, sin que nada esté decidido, están: una posible estructura societaria en Portugal, y una posible participación societaria o administrativa de la madre de la fundadora, entre otras estructuras legales que puedan estudiarse posteriormente. **Ninguna de estas hipótesis se valida, recomienda ni diseña aquí** — en particular, no debe asumirse que poner una empresa a nombre de otra persona resuelve, por sí solo, ninguna restricción contractual o jurídica, y no se contempla ninguna estructura destinada a ocultar quién gestiona o controla realmente la actividad. La estructura jurídica deberá investigarse en la futura Fase 0, usando el contrato laboral real, la jurisdicción laboral aplicable, derecho societario, fiscalidad, beneficial ownership, conflicto de interés, y los deberes de confidencialidad/no competencia que resulten aplicables — no se abre esa investigación jurídica en esta ingestión. **Estado:** `[DEPENDENCIA LEGAL/LABORAL PENDIENTE]` en todas sus variantes. **Qué la resolvería:** revisión legal específica del contrato laboral y del marco de conflicto de interés — fuente primaria (abogado laboral), no investigación web. **Fuente:** `sources/investigacion-1-2c-empty-legs-wedge.md` § L.
 
+## Hipótesis de la tanda de Demanda (Investigación 1.3 / 1.3B)
+
+### H11 — El mercado se mueve por referido/relación, pero el peso relativo por región no está cuantificado
+Robusta y probablemente global como mecanismo (ver degradación A más arriba), pero con un matiz regional relevante: en LATAM existe un canal adicional de descubrimiento (plataformas digitales pan-regionales, ver H14/Flapper) que la Investigación 1.3, centrada en fuentes anglosajonas, no había identificado. **Estado:** abierta — no se cuantifica el peso relativo de cada canal en ninguna región. **Fuente:** `sources/investigacion-1-3-demanda.md` § A, D; `sources/investigacion-1-3b-demanda-regional-white-space.md` § A.
+
+### H12 — El tiempo real hasta ingresos consistentes (3-5 años) es una cifra de EE.UU., no un benchmark universal
+Ver degradación B más arriba. **Estado:** abierta, sin evidencia regional para España/Portugal/LATAM. **Fuente:** `sources/investigacion-1-3-demanda.md` § D; `sources/investigacion-1-3b-demanda-regional-white-space.md` § A.
+
+### H13 — Luxury travel advisors como canal: infraestructura real, pero angloparlante y sin validación regional
+Ver degradación C más arriba. **Estado:** abierta — plausible como vía de acceso, no confirmada fuera del ecosistema anglosajón. **Qué la resolvería:** contacto directo (público, no vinculado a VistaJet) con estos programas para entender su cobertura real en español/portugués. **Fuente:** `sources/investigacion-1-3-demanda.md` § D, H; `sources/investigacion-1-3b-demanda-regional-white-space.md` § A, I, O(2).
+
+### H14 — Flapper y los gaps que deja (no resueltos por su existencia)
+Ver "Tratamiento de Flapper" más arriba. **Estado:** abierta — Flapper confirma competencia digital panregional real en 4 países LATAM, pero no hay evidencia de qué segmentos (si alguno) deja desatendidos. **Qué la resolvería:** pregunta Q3 de 1.3B. **Fuente:** `sources/investigacion-1-3b-demanda-regional-white-space.md` § D, K.
+
+### H15 — México y Brasil: mercados grandes con competencia fuerte, no white spaces obvios, pero no descartados
+Ver "Tratamiento de México y Brasil" más arriba. **Estado:** abierta — la ausencia de hueco evidente en las capas visibles del mercado no excluye segmentos, corredores o canales específicos todavía no investigados. **Fuente:** `sources/investigacion-1-3b-demanda-regional-white-space.md` § C, D, N, P.
+
+### H16 — Perú: mercado ambiguo, sin señal clara de oportunidad ni de descarte
+Ver "Tratamiento de Perú" más arriba. **Estado:** abierta, explícitamente sin resolver. **Fuente:** `sources/investigacion-1-3b-demanda-regional-white-space.md` § F, N, S.
+
+### H17 — Europa↔LATAM como conjunto de corredores, no como mercado homogéneo
+Ver "Tratamiento de Europa↔LATAM" más arriba. **Estado:** abierta — descompuesta explícitamente en corredores individuales (España↔México, España↔Colombia, España↔Perú, España↔Argentina, Portugal↔Brasil), ninguno investigado todavía. Es, según 1.3B, "la apuesta más interesante y menos validada" de toda la tanda de Demanda. **Fuente:** `sources/investigacion-1-3b-demanda-regional-white-space.md` § H, O(1).
+
+### H18 — El wedge de JETMI, si existe, podría no ser geográfico sino una combinación más estrecha
+A partir del patrón repetido en 1.3B (segmento deportivo/entretenimiento en países medianos, nicho B2B corporativo no cubierto por Flapper/grandes locales, especialización en logística de eventos regionales, colaboración con operadores locales sin canal internacional propio): la evidencia sugiere que, si existe un wedge viable, es más probable que resulte de una **combinación de segmento + canal + problema específico + corredor + modelo operativo** que de la elección de un solo país o región entera. **Estado:** hipótesis abierta, no validada, explícitamente no elevada a decisión de mercado/ICP/go-to-market. **Fuente:** `sources/investigacion-1-3b-demanda-regional-white-space.md` § N, O.
+
+### H19 — Empty legs, lado de demanda: desconexión de segmento, no superposición
+El comprador típico de empty leg (flexibilidad de ruta/horario, tolerancia a cancelación) es estructuralmente distinto del comprador de charter completo (control y certeza) — sin evidencia de conversión entre ambos segmentos en ninguna dirección. Refuerza, no reduce, el escepticismo ya registrado en C3/H8/H9 sobre empty legs como wedge. **Estado:** abierta, consistente con la tensión ya registrada en C3. **Fuente:** `sources/investigacion-1-3-demanda.md` § I.
+
+### H20 — "Price shopping" penaliza al propio cliente y es más agudo en empty legs
+Enviar la misma solicitud a varios brokers simultáneamente es interpretado por los operadores como señal de urgencia, lo que sube el precio o retira la disponibilidad — mecanismo descrito por una única fuente comercial (L'VOYAGE) con interés en desalentar esa práctica, sin confirmación en español/portugués. Añade una razón adicional, del lado de la demanda, para el escepticismo sobre empty legs como wedge. **Estado:** abierta, robusta pero regional en su verificación explícita. **Fuente:** `sources/investigacion-1-3-demanda.md` § C, I; `sources/investigacion-1-3b-demanda-regional-white-space.md` § A.
+
 ## Preguntas pendientes sin artefacto que las responda todavía
 
 - ¿Qué matices introduciría un futuro Capítulo 2 del Manual ("Qué es realmente un broker") sobre lo ya cubierto por la Investigación 1.1? Son, en teoría, el mismo dominio (1.1 del Mapa Maestro) — si se escribe el Capítulo 2 narrativo, debe verificarse que no duplique sino que complemente lo ya ingerido aquí.
-- Todas las preguntas de demanda que motivan la apertura del dominio 1.3 (ver `LOG.md` § 6) — no se listan aquí de forma exhaustiva porque pertenecen a una investigación todavía no iniciada, no a la ya ingerida.
+- Todas las preguntas del dominio 1.4 (Ciclo operativo end-to-end) que motivan su apertura (ver `LOG.md` § 6) — no se listan aquí de forma exhaustiva porque pertenecen a una investigación todavía no iniciada, no a la ya ingerida.
