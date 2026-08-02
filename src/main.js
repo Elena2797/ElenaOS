@@ -164,7 +164,7 @@ function pinPress(v) {
   }
 }
 
-let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], pendingImage:null, transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null };
+let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], pendingImage:null, transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'} };
 
 async function initApp() {
   db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -177,6 +177,23 @@ async function initApp() {
   document.getElementById('td').textContent = now.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
   await reload();
   render();
+  loadIsabelNow(); // no bloquea el resto de la app — tarjeta aditiva/beta, se resuelve aparte
+}
+
+// ────── Isabel · Ahora (fase 2, aditiva/beta) — consume GET /v1/now ───────────
+async function loadIsabelNow() {
+  S.isabelNow = { status: 'loading' };
+  try {
+    const res = await fetch(`${ISABEL_API}/v1/now`, { headers: { 'x-api-key': ISABEL_KEY } });
+    if (!res.ok) throw new Error(`Isabel Core ${res.status}`);
+    const data = await res.json();
+    S.isabelNow = data;
+  } catch (e) {
+    // /v1/now caído por completo (red, 500, etc.) — Home sigue funcionando con
+    // normalidad, la tarjeta simplemente no se muestra (ver isabelNowCard()).
+    S.isabelNow = { status: 'unreachable', error: e.message };
+  }
+  if (S.view === 'home') render();
 }
 
 async function reload() {
@@ -406,6 +423,81 @@ function projectVisualCard(p) {
   </div>`;
 }
 
+// ────── Isabel · Ahora (fase 2, aditiva/beta) — render de GET /v1/now ─────────
+// Convive con la tarjeta estática "Isabel habla primero" durante validación.
+// No reemplaza nada existente. Ver docs/DECISIONS.md D9.
+
+function isabelAttentionStyle(mode) {
+  switch (mode) {
+    case 'urgent': return { bg: 'var(--urgent-bg)', fg: 'var(--urgent)', label: 'Urgente' };
+    case 'reentry': return { bg: 'var(--info-bg)', fg: 'var(--info)', label: 'Retomar' };
+    case 'maintain': return { bg: 'var(--warn-bg)', fg: 'var(--warn)', label: 'Vigilar' };
+    case 'clear': return { bg: 'var(--ok-bg)', fg: 'var(--ok)', label: 'Despejado' };
+    default: return { bg: 'var(--surface)', fg: 'var(--t2)', label: '—' };
+  }
+}
+
+function isabelEvidenceLabel(e) {
+  const plural = (n, s, p) => `${n} ${n === 1 ? s : p}`;
+  switch (e.signal) {
+    case 'task_overdue': return `${e.domain}: ${plural(e.value, 'tarea vencida', 'tareas vencidas')}`;
+    case 'due_today': return `${e.domain}: ${plural(e.value, 'tarea vence hoy', 'tareas vencen hoy')}`;
+    case 'due_soon': return `${e.domain}: ${plural(e.value, 'tarea vence pronto', 'tareas vencen pronto')}`;
+    case 'open_decision_age': return `${e.domain}: decisión abierta hace ${e.value} días${e.detail ? ' — ' + e.detail : ''}`;
+    case 'waiting_overdue': return `${e.domain}: ${plural(e.value, 'espera vencida', 'esperas vencidas')}`;
+    case 'critical_alert': return `${e.domain}: ${plural(e.value, 'alerta crítica', 'alertas críticas')}`;
+    case 'stale_projects': return `${e.domain}: ${plural(e.count, 'proyecto parado', 'proyectos parados')} hace ${e.max_days} días`;
+    case 'pending_tasks_without_deadline': return `${e.domain}: ${plural(e.count, 'tarea sin fecha', 'tareas sin fecha')}`;
+    case 'rotation_active': return `${e.domain}: rotación activa · día ${e.value}`;
+    default: return `${e.domain}: ${e.signal}`;
+  }
+}
+
+function isabelNowCard() {
+  const iN = S.isabelNow;
+  if (!iN) return '';
+
+  const header = `<div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:8px">ISABEL · AHORA <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--t3)">· beta</span></div>`;
+
+  if (iN.status === 'loading') {
+    return `<div class="brief-card" style="margin-bottom:10px">${header}<div style="font-size:13px;color:var(--t2)">Revisando tus dominios…</div></div>`;
+  }
+
+  if (iN.status === 'unreachable') {
+    // /v1/now caído por completo — Home sigue funcionando con normalidad;
+    // se avisa igualmente, sin alarma, en vez de ocultarlo en silencio (ver DECISIONS.md D8).
+    return `<div class="brief-card" style="margin-bottom:10px;opacity:.65">${header}<div style="font-size:12px;color:var(--t3)">No disponible ahora mismo — el resto de Life OS funciona con normalidad.</div></div>`;
+  }
+
+  if (iN.status === 'no_signal') {
+    return `<div class="brief-card" style="margin-bottom:10px;background:var(--ok-bg);border-color:transparent">${header}<div style="font-size:14px;font-weight:600;color:var(--ok)">✓ Nada requiere tu atención ahora.</div></div>`;
+  }
+
+  if (iN.status === 'data_unavailable') {
+    return `<div class="brief-card" style="margin-bottom:10px">${header}<div style="font-size:13px;color:var(--t2)">⚠ Evaluación parcial — ${(iN.unavailable_sources || []).join(', ') || 'una fuente'} no respondió. No se puede confirmar que no haya algo urgente.</div></div>`;
+  }
+
+  // status 'ok' o 'llm_error' — la capa determinista (attention_mode/evidence/can_ignore)
+  // siempre está presente en ambos casos; solo falta headline/recommendation si el LLM falló.
+  const style = isabelAttentionStyle(iN.attention_mode);
+  const top3 = (iN.evidence || []).filter(e => e.signal !== 'no_signal').slice(0, 3);
+  const canIgnoreCount = (iN.can_ignore || []).length;
+  const domainArea = iN.priority_domain ? S.areas.find(a => a.name === iN.priority_domain) : null;
+
+  return `<div class="brief-card" style="margin-bottom:10px;border-left:3px solid ${style.fg}">
+    ${header}
+    ${iN.attention_mode_reliable === false ? `<div style="font-size:11px;color:var(--warn);background:var(--warn-bg);border-radius:8px;padding:6px 8px;margin-bottom:8px">⚠ Evaluación parcial — algunas fuentes no respondieron; puede haber señales que Isabel no vio.</div>` : ''}
+    <div style="display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${style.fg};background:${style.bg};border-radius:999px;padding:3px 9px;margin-bottom:8px">${style.label}</div>
+    ${iN.status === 'llm_error'
+      ? `<div style="font-size:13px;color:var(--t2);margin-bottom:8px">Isabel no pudo redactar una recomendación ahora mismo, pero esto es lo que se detectó:</div>`
+      : `<div style="font-size:15px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:6px">${iN.headline || ''}</div>
+         ${iN.recommendation ? `<div style="font-size:13px;color:var(--t2);line-height:1.5;margin-bottom:8px">${iN.recommendation}</div>` : ''}`}
+    ${top3.length ? `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">${top3.map(e => `<div style="font-size:11px;color:var(--t3)">· ${isabelEvidenceLabel(e)}</div>`).join('')}</div>` : ''}
+    ${canIgnoreCount ? `<div style="font-size:11px;color:var(--t3);margin-bottom:${domainArea ? '10px' : '0'}">${canIgnoreCount} dominio${canIgnoreCount !== 1 ? 's' : ''} sin nada pendiente ahora — puedes dejarlo${canIgnoreCount !== 1 ? 's' : ''} para después.</div>` : ''}
+    ${domainArea ? `<button onclick="go('area','${domainArea.id}')" style="background:${style.fg};color:#fff;border:none;border-radius:999px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer">Ir a ${iN.priority_domain} →</button>` : ''}
+  </div>`;
+}
+
 function homeView() {
   const now = Date.now();
   const hour = new Date().getHours();
@@ -472,6 +564,8 @@ function homeView() {
       <div style="font-size:15px;color:var(--text);line-height:1.7">${briefing}</div>
       <button onclick="openChat()" style="background:none;border:none;padding:6px 0 0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer;display:block;margin-top:4px">Hablar con Isabel →</button>
     </div>
+
+    ${isabelNowCard()}
 
     <!-- ¿Qué merece mi atención ahora? -->
     <div style="background:var(--surface);border-radius:14px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)">
