@@ -1,5 +1,5 @@
 Estado: conocimiento vigente — se añade, nunca se reescribe
-Última verificación: 2026-07-10
+Última verificación: 2026-08-02
 Verificado en: reconstrucción a partir del historial de esta sesión de desarrollo
 Fuente de verdad de datos: ninguna
 
@@ -65,3 +65,10 @@ Formato: decisión · fecha · contexto · alternativa descartada · razón · e
 **Razón:** decisión de negocio explícita de Estefanía — JETMI existe para construir y operar un broker de aviación privada propio, no para intermediar entre operadores y otros brokers ni para quedarse en la capa de descubrimiento/marketing.
 **Estado:** vigente. `jetmi.md` (raíz) queda marcado como superseded en su propia cabecera, sin borrar ni reescribir su contenido — ver `archive/deprecated-decisions.md`. `JETMI_PRD_Semilla.md` no se modifica en esta decisión; su lenguaje en la línea 22 ("empresa de descubrimiento, comercialización y gestión de oportunidades") antecede a esta decisión y queda anotado como nota pendiente en `research/JETMI/HYPOTHESES.md`, no como acción tomada.
 **Nota de estado real:** a fecha de esta decisión, JETMI está en fase de definición, investigación y diseño. No existe todavía ninguna sociedad JETMI LDA constituida en Portugal ni en ninguna otra jurisdicción — ver `modules/JETMI.md`.
+
+### D8 — Un fallo de carga inicial se muestra explícitamente (banner + Reintentar), nunca se interpreta en silencio como "no hay datos"
+**Fecha:** 2026-08-02
+**Contexto:** la usuaria reportó Dominios vacío con la píldora de modo en "OFF". Auditoría de código demostró que `reload()` coercía cualquier fallo de red de `ctx`/`areas` a `[]`/valor por defecto sin ningún aviso — indistinguible de "no hay dominios" o de que ella hubiera puesto el modo en OFF. La causa real, investigada en la misma sesión, fue el proyecto de Supabase pausado (plan gratuito).
+**Alternativa descartada:** reintentar automáticamente en bucle sin avisar a la usuaria; o mostrar un mensaje de error genérico sin acción disponible, obligando a recargar toda la app.
+**Razón:** la usuaria necesita poder distinguir "esto está realmente vacío" de "esto no cargó" sin depender de este chat para diagnosticarlo, y necesita una acción inmediata (Reintentar) en vez de recargar toda la aplicación. Coherente con `PRINCIPLES.md` #2 ("nunca inventar información ausente" — aquí, nunca *interpretar* un vacío por fallo como un vacío real).
+**Estado:** vigente. Alcance mínimo deliberado: solo `ctx` (modo) y `areas` (Dominios) disparan el banner, por ser las dos fuentes que producían el síntoma reportado. Las otras 11 tablas de `loadAll()` siguen degradándose a listas vacías en silencio si fallan individualmente — ver `KNOWN_PROBLEMS.md`.

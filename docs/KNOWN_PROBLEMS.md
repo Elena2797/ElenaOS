@@ -1,11 +1,21 @@
 Estado: conocimiento vigente — lista viva, se actualiza con "Actualiza la documentación"
-Última verificación: 2026-07-10
-Verificado en: auditorías realizadas en esta sesión (HOTO, Inventario, arquitectura de Isabel)
-Fuente de verdad de datos: ninguna
+Última verificación: 2026-08-02
+Verificado en: auditorías realizadas en esta sesión (HOTO, Inventario, arquitectura de Isabel) + diagnóstico del incidente de Supabase pausado del 2026-08-02
 
 # KNOWN_PROBLEMS.md — Deuda técnica y grietas conocidas
 
 No confundir con bugs ya resueltos (→ [CHANGELOG.md](CHANGELOG.md)). Esto es lo que sigue abierto.
+
+## Disponibilidad de datos
+
+### Supabase (plan gratuito) puede pausar el proyecto por inactividad — se manifiesta como NXDOMAIN, no como un error HTTP normal
+Verificado el 2026-08-02: el proyecto `cllubptdwydifomlnxds` estuvo pausado, y el efecto no fue un 503 o un timeout — el hostname dejó de resolver en DNS por completo (NXDOMAIN, confirmado con un resolver DNS público). Cualquier chat futuro que diagnostique "Supabase no responde" debe comprobar DNS primero, no asumir problema de red del dispositivo o de CORS. Método documentado en [operations/SUPABASE.md](operations/SUPABASE.md). Antes del fix del 2026-08-02 (ver `DECISIONS.md` D8), esto era indistinguible en la UI de "no hay dominios" — ahora dispara un banner explícito con botón "Reintentar".
+
+### `loadAll()` solo trata `ctx`/`areas` como críticos — las otras 11 tablas se degradan a vacío en silencio
+`reload()` (`src/main.js`) dispara el banner de error solo si fallan `life_context` o `areas` — el resto (`tasks`, `waiting_for`, `decisions`, `metrics`, `operators`, `transactions`, `vj_state`, `vj_tasks`, `projects`, `eventos`, `alertas`) sigue coercionando `data:null` a `[]` sin avisar si fallan individualmente. Decisión consciente de alcance mínimo (esas dos son las que producían el síntoma reportado por la usuaria), no un descuido — pero significa que un fallo parcial en, por ejemplo, `alertas` seguiría siendo invisible.
+
+### "Gym" existe en la tabla `areas` pero nunca aparece en Dominios
+`visibleDomains()` (`src/main.js`) filtra por una lista fija de 6 nombres (`VistaJet, JETMI, Finanzas, Salud, Marca Personal, Vida Personal`) que no incluye "Gym", aunque la fila existe en Supabase (7 áreas en total, confirmado por consulta directa a la REST API el 2026-08-02). No se sabe si es intencional (¿Gym vive dentro de "Salud"?) o un olvido — detectado de paso durante el diagnóstico del bug de Dominios vacío, no investigado a fondo.
 
 ## Arquitectura
 
