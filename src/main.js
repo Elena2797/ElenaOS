@@ -164,7 +164,7 @@ function pinPress(v) {
   }
 }
 
-let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], pendingImage:null, transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null };
+let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], pendingImage:null, transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null };
 
 async function initApp() {
   db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -182,6 +182,16 @@ async function initApp() {
 async function reload() {
   try {
     const {ctx:c,areas:a,tasks:t,waiting:w,decisions:d,metrics:m,operators:op,transactions:tr,vjState:vjs,vjTasks:vjt,projects:pj,eventos:ev,alertas:al} = await dbSvc.loadAll();
+    // ctx (modo) y areas (dominios) son las dos fuentes que producen el síntoma "Dominios
+    // vacío / OFF fantasma" si fallan. Si cualquiera de las dos trae error, no se sobrescriben
+    // con datos vacíos — se conserva lo que hubiera antes y se marca el fallo explícitamente,
+    // en vez de dejar que un `[] por defecto` se interprete como "no hay dominios".
+    const coreError = c.error || a.error;
+    if (coreError) {
+      S.loadStatus = 'error';
+      S.loadError = coreError.message || 'No se pudo conectar con los datos.';
+      return;
+    }
     if(c.data&&c.data[0]) S.mode=c.data[0].mode;
     S.areas=a.data||[]; S.tasks=t.data||[]; S.wf=w.data||[]; S.dec=d.data||[];
     S.metrics=m.data||[]; S.operators=op.data||[]; S.transactions=tr.data||[];
@@ -193,7 +203,33 @@ async function reload() {
       const cat=x.key.slice(7);
       S.budgets[cat]=parseFloat(x.value)||0;
     });
-  } catch(e){ console.error(e); }
+    S.loadStatus = 'loaded';
+    S.loadError = null;
+  } catch(e){
+    console.error(e);
+    S.loadStatus = 'error';
+    S.loadError = e?.message || 'Error inesperado al cargar los datos.';
+  }
+}
+
+async function retryLoad() {
+  S.loadStatus = 'loading';
+  render();
+  await reload();
+  render();
+}
+
+function connectionBanner() {
+  if (S.loadStatus === 'error') {
+    return `<div class="conn-banner conn-banner-error">
+      <span>⚠ Sin conexión con los datos${S.loadError ? ' — '+S.loadError : ''}. Lo que ves puede no reflejar tu estado real.</span>
+      <button onclick="retryLoad()">Reintentar</button>
+    </div>`;
+  }
+  if (S.loadStatus === 'loading') {
+    return `<div class="conn-banner conn-banner-loading"><span>Conectando…</span></div>`;
+  }
+  return '';
 }
 
 function render() {
@@ -206,7 +242,7 @@ function render() {
   const mp=document.getElementById('mp');
   mp.textContent=S.mode; mp.className='mode-pill '+(S.mode==='ON'?'m-on':'m-off');
   const views={home:homeView,areas:areasView,area:areaView,global:globalView,project:projectView,avanzar:avanzarView,resultado_ia:resultadoIAView,dashboard:dashboardView,vj_hoto:vjHotoView,vj_inventario:vjInventarioView,vj_laundry_cleaning:vjLandingCleaningView,vj_fresh:vjFreshView,vj_status:vjStatusView};
-  document.getElementById('main').innerHTML=(views[S.view]||homeView)();
+  document.getElementById('main').innerHTML=connectionBanner()+(views[S.view]||homeView)();
 }
 
 function visibleDomains() {
@@ -3640,6 +3676,7 @@ async function invCloseSession() {
 Object.assign(window, {
   showPin, pinPress,
   go, toggleMode, openAdd, openChat, closeChat, sendMsg, handleFile,
+  retryLoad,
   done, closeModal,
   checkinSueno, checkinDolor, checkinVJ, completeCheckin,
   saveVjState, openVjState, saveVjStateForm,

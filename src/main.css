@@ -27,6 +27,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 /* Main */
 #main{flex:1;padding:14px 16px 100px;max-width:640px;margin:0 auto;width:100%}
 
+/* Estado de conexión de datos */
+.conn-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;border-radius:var(--r-sm);padding:10px 12px;margin-bottom:12px;font-size:13px}
+.conn-banner-error{background:var(--urgent-bg);color:var(--urgent)}
+.conn-banner-error button{border:1px solid var(--urgent);color:var(--urgent);background:none;border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0}
+.conn-banner-loading{background:var(--info-bg);color:var(--info)}
+
 /* Bottom nav */
 #nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:100}
 .nb{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 0 8px;border:none;background:none;color:var(--t3);font-size:10px;gap:3px;cursor:pointer;font-family:inherit}

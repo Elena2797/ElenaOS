@@ -10,23 +10,31 @@ export function setClient(client) {
 // ─── Carga inicial ────────────────────────────────────────────────────────────
 
 export async function loadAll() {
-  const [ctx, areas, tasks, waiting, decisions, metrics, operators, transactions, vjState, vjTasks, projects, eventos, alertas] =
-    await Promise.all([
-      _db.from('life_context').select('*').order('created_at', { ascending: false }).limit(1),
-      _db.from('areas').select('*').order('sort_order'),
-      _db.from('tasks').select('*,areas(name,color)').neq('status', 'done'),
-      _db.from('waiting_for').select('*,areas(name,color)').eq('status', 'active'),
-      _db.from('decisions').select('*,areas(name,color)').eq('status', 'open'),
-      _db.from('metrics').select('*'),
-      _db.from('operators').select('*').order('created_at'),
-      _db.from('transactions').select('*').gte('date', new Date().getFullYear() + '-01-01').order('date', { ascending: false }),
-      _db.from('vj_state').select('*').limit(1),
-      _db.from('vj_tasks').select('*').order('created_at'),
-      _db.from('projects').select('*').in('status', ['active', 'paused']).order('last_activity_at', { ascending: false }),
-      _db.from('eventos').select('*').order('created_at', { ascending: false }).limit(50),
-      _db.from('alertas').select('*').eq('status', 'active').order('created_at', { ascending: false }),
-    ]);
-  return { ctx, areas, tasks, waiting, decisions, metrics, operators, transactions, vjState, vjTasks, projects, eventos, alertas };
+  const keys = ['ctx', 'areas', 'tasks', 'waiting', 'decisions', 'metrics', 'operators', 'transactions', 'vjState', 'vjTasks', 'projects', 'eventos', 'alertas'];
+  // allSettled: un fallo de red en una query (rechazo real, no el {data:null,error} que ya
+  // devuelve supabase-js por defecto) no debe impedir que las otras 12 se apliquen.
+  const settled = await Promise.allSettled([
+    _db.from('life_context').select('*').order('created_at', { ascending: false }).limit(1),
+    _db.from('areas').select('*').order('sort_order'),
+    _db.from('tasks').select('*,areas(name,color)').neq('status', 'done'),
+    _db.from('waiting_for').select('*,areas(name,color)').eq('status', 'active'),
+    _db.from('decisions').select('*,areas(name,color)').eq('status', 'open'),
+    _db.from('metrics').select('*'),
+    _db.from('operators').select('*').order('created_at'),
+    _db.from('transactions').select('*').gte('date', new Date().getFullYear() + '-01-01').order('date', { ascending: false }),
+    _db.from('vj_state').select('*').limit(1),
+    _db.from('vj_tasks').select('*').order('created_at'),
+    _db.from('projects').select('*').in('status', ['active', 'paused']).order('last_activity_at', { ascending: false }),
+    _db.from('eventos').select('*').order('created_at', { ascending: false }).limit(50),
+    _db.from('alertas').select('*').eq('status', 'active').order('created_at', { ascending: false }),
+  ]);
+  const result = {};
+  settled.forEach((s, i) => {
+    result[keys[i]] = s.status === 'fulfilled'
+      ? s.value
+      : { data: null, error: { message: s.reason?.message || 'Fallo de red' } };
+  });
+  return result;
 }
 
 // ─── Modo ─────────────────────────────────────────────────────────────────────
