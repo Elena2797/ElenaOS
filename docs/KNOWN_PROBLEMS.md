@@ -1,6 +1,6 @@
 Estado: conocimiento vigente — lista viva, se actualiza con "Actualiza la documentación"
-Última verificación: 2026-08-02
-Verificado en: auditorías realizadas en esta sesión (HOTO, Inventario, arquitectura de Isabel) + diagnóstico del incidente de Supabase pausado del 2026-08-02
+Última verificación: 2026-08-03
+Verificado en: auditorías de sesiones anteriores (HOTO, Inventario, arquitectura de Isabel, incidente de Supabase pausado) + incidentes de infraestructura reales del 2026-08-03 (Isabel Core Fase 1/2, Railway, Vercel)
 
 # KNOWN_PROBLEMS.md — Deuda técnica y grietas conocidas
 
@@ -22,8 +22,8 @@ Verificado el 2026-08-02: el proyecto `cllubptdwydifomlnxds` estuvo pausado, y e
 ### Cuatro sistemas de "Isabel", solo uno en uso real
 Ver [core/ISABEL_CHANNELS.md](core/ISABEL_CHANNELS.md) para el detalle completo. Impacto: cualquier trabajo futuro sobre "el chat de Isabel" debe primero confirmar sobre cuál de los 4 canales se está trabajando — son código independiente, no una sola pieza con variantes.
 
-### `isabel-api/src/core/` (Isabel Core con routing a especialistas) existe pero no está montado
-`index.js` no importa `core/router.js`. Es código completo, probablemente funcional si se conectara, pero no forma parte del servidor que corre en producción. Impacto: cualquier chat que lea el código de `core/` sin verificar `index.js` asumirá que está activo.
+### `isabel-api/src/core/router.js` (Isabel Core con routing a especialistas) existe pero no está montado
+**Actualizado 2026-08-03: ya no aplica a todo `core/`.** `index.js` monta `core/now.js` (`GET /v1/now`, solo lectura, ver `core/ISABEL_NOW.md`), pero sigue sin importar `core/router.js` (`POST /chat`, `intentRouter`, `inventoryDelegate`, `generalHandler`). Es código completo, probablemente funcional si se conectara, pero no forma parte del servidor que corre en producción. Impacto: cualquier chat que lea el código de `core/` sin verificar `index.js` línea por línea asumirá que todo está activo, o que nada lo está — ninguna de las dos es cierta.
 
 ## Duplicación de datos
 
@@ -53,6 +53,17 @@ No incluye `VITE_ISABEL_API_URL` ni `VITE_ISABEL_KEY`, que sí se usan en produc
 
 ### Gmail OAuth existe como código, sin UI que lo dispare
 `life-os-app/api/gmail-auth.js` y `gmail-callback.js` son funciones serverless completas y funcionales en aislamiento, pero 0 referencias desde el frontend. No se sabe si el objetivo original sigue vigente.
+
+## Infraestructura / deploy
+
+### El service worker de la PWA puede servir un bundle viejo después de un deploy real y correcto
+Verificado dos veces el 2026-08-03: tras un deploy exitoso en Vercel (bundle nuevo confirmado por hash y por contenido), la app seguía mostrando comportamiento del bundle anterior hasta hacer `navigator.serviceWorker.getRegistrations()` → `unregister()` + `caches.keys()` → `caches.delete()`. Sin este paso, es indistinguible de "el deploy no llegó" o "el fix no funciona" — antes de diagnosticar un deploy que "no se nota", limpiar el service worker primero. En el iPhone: cerrar la app/pestaña por completo y reabrir, o borrar datos del sitio en Safari si persiste.
+
+### Railway puede tener una región inválida configurada que bloquea todos los deploys nuevos sin ningún error visible
+Encontrado el 2026-08-03 en `isabel-api`: la región estaba fijada en `sfo` (inválida), y el mensaje "Invalid region sfo is configured on this service and is blocking deployments" solo aparece en Settings → Scale — no en ningún otro sitio del dashboard, no como notificación, no como fallo de build. El servicio seguía "Online" sirviendo el último build bueno, así que parecía sano. Corregido a `us-west2`. Si un futuro deploy de `isabel-api` "no coge" el commit nuevo pase lo que pase, comprobar esto antes que nada. Ver `operations/RAILWAY.md`.
+
+### El webhook GitHub→Railway puede quedar obsoleto sin aviso, incluso con "Auto deploy" mostrando activado
+Encontrado el 2026-08-03: con la región ya corregida, Railway seguía sin recoger el commit más nuevo de `isabel-api` — ni "Redeploy" ni "Latest deploy" ni re-seleccionar la rama en el dropdown lo resolvían (todos reconstruían el mismo commit viejo). Solo un `Disconnect` + `Connect Repo` completo del Source forzó una resincronización real. Ver `operations/RAILWAY.md`.
 
 ## Seguridad
 Ver [SECURITY.md](SECURITY.md) — no se duplica aquí, pero cuenta como deuda técnica activa (PIN hardcodeado, API key con fallback expuesto en el bundle, RLS desactivado, token de GitHub en texto plano).

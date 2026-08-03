@@ -49,3 +49,7 @@ Función serverless de Vercel en `life-os-app/api/chat.js`. Construye su propio 
 Antes de tocar "el chat de Isabel", identifica primero **cuál de los 4** es el objetivo del cambio. Son bases de código independientes: arreglar un bug en `core/router.js` no afecta al bridge local que la usuaria usa hoy. Si el objetivo es que Isabel gane capacidades nuevas de forma que la usuaria las note, casi siempre el canal relevante es el **bridge local** (#1), no los otros tres.
 
 Ninguna decisión de consolidar, activar o eliminar alguno de estos canales se ha tomado — si se toma, debe registrarse en [DECISIONS.md](../DECISIONS.md).
+
+## Nota (2026-08-03): esto sigue siendo así, con un matiz
+
+Desde 2026-08-03 existe `GET /v1/now` (ver [ISABEL_NOW.md](ISABEL_NOW.md)), montado dentro de `isabel-api` — pero **no es un canal conversacional**, no es un quinto elemento de esta tabla. Es un endpoint de solo lectura que alimenta una tarjeta de Home ("ISABEL · AHORA"), sin chat, sin `POST /chat`, sin tocar ninguno de los 4 canales de arriba. El canal #2 (`POST /chat`, `intentRouter`, `inventoryDelegate`) sigue exactamente igual de desconectado que antes.
