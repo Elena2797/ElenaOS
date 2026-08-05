@@ -1,6 +1,6 @@
 Estado: conocimiento vigente — lista viva, se actualiza con "Actualiza la documentación"
-Última verificación: 2026-08-03
-Verificado en: auditorías de sesiones anteriores (HOTO, Inventario, arquitectura de Isabel, incidente de Supabase pausado) + incidentes de infraestructura reales del 2026-08-03 (Isabel Core Fase 1/2, Railway, Vercel)
+Última verificación: 2026-08-05
+Verificado en: auditorías de sesiones anteriores (HOTO, Inventario, arquitectura de Isabel, incidente de Supabase pausado) + incidentes de infraestructura reales del 2026-08-03 (Isabel Core Fase 1/2, Railway, Vercel) + spike de OpenClaw del 2026-08-05
 
 # KNOWN_PROBLEMS.md — Deuda técnica y grietas conocidas
 
@@ -24,6 +24,15 @@ Ver [core/ISABEL_CHANNELS.md](core/ISABEL_CHANNELS.md) para el detalle completo.
 
 ### `isabel-api/src/core/router.js` (Isabel Core con routing a especialistas) existe pero no está montado
 **Actualizado 2026-08-03: ya no aplica a todo `core/`.** `index.js` monta `core/now.js` (`GET /v1/now`, solo lectura, ver `core/ISABEL_NOW.md`), pero sigue sin importar `core/router.js` (`POST /chat`, `intentRouter`, `inventoryDelegate`, `generalHandler`). Es código completo, probablemente funcional si se conectara, pero no forma parte del servidor que corre en producción. Impacto: cualquier chat que lea el código de `core/` sin verificar `index.js` línea por línea asumirá que todo está activo, o que nada lo está — ninguna de las dos es cierta.
+
+### Cron de OpenClaw vía CLI está bloqueado por el scope `operator.admin`, incluso con token compartido
+Confirmado el 2026-08-05, perfil `dev` aislado: `agent cron add` (y comandos `cron` equivalentes) fallan con "scope upgrade pending approval" al autenticar por token compartido. La vía de bypass documentada para token compartido ("restaura scope completo") solo aplica a superficies HTTP concretas (`/tools/invoke`, endpoints compatibles con OpenAI), no al protocolo WS que usa la CLI para administrar cron. **Workaround confirmado que sí funciona:** administrar cron desde la Control UI (navegador), que se auto-aprueba vía loopback. Cualquier automatización futura con OpenClaw debe planificarse asumiendo Control UI como vía de administración de cron, no CLI. Ver `core/AUTOMATIONS.md`.
+
+### El turno de agente aislado disparado por un cron de OpenClaw no arranca — "isolated agent setup timed out before runner start"
+Encontrado el 2026-08-05, perfil `dev` aislado: un cron creado correctamente vía Control UI se disparó en el horario programado, pero el turno de agente que debía ejecutar nunca llegó a arrancar, con ese mensaje de timeout. No investigado — estaba fuera del objetivo acotado de esa fase de spike. Bloqueante para confiar en cron de OpenClaw en producción hasta que se entienda la causa. Ver `core/AUTOMATIONS.md`.
+
+### `isabel-api/src/mcp.js` no tiene autenticación
+Ver [SECURITY.md](SECURITY.md) riesgo #7 — no se duplica el detalle aquí. Cuenta como bloqueante concreto (no solo deuda genérica) para el plan de desplegar OpenClaw como runtime remoto.
 
 ## Duplicación de datos
 
@@ -66,4 +75,4 @@ Encontrado el 2026-08-03 en `isabel-api`: la región estaba fijada en `sfo` (inv
 Encontrado el 2026-08-03: con la región ya corregida, Railway seguía sin recoger el commit más nuevo de `isabel-api` — ni "Redeploy" ni "Latest deploy" ni re-seleccionar la rama en el dropdown lo resolvían (todos reconstruían el mismo commit viejo). Solo un `Disconnect` + `Connect Repo` completo del Source forzó una resincronización real. Ver `operations/RAILWAY.md`.
 
 ## Seguridad
-Ver [SECURITY.md](SECURITY.md) — no se duplica aquí, pero cuenta como deuda técnica activa (PIN hardcodeado, API key con fallback expuesto en el bundle, RLS desactivado, token de GitHub en texto plano).
+Ver [SECURITY.md](SECURITY.md) — no se duplica aquí, pero cuenta como deuda técnica activa (PIN hardcodeado, API key con fallback expuesto en el bundle, RLS desactivado, token de GitHub en texto plano, MCP de `isabel-api` sin autenticación, token de Telegram comprometido presente también en el perfil real de OpenClaw).

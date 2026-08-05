@@ -1,13 +1,13 @@
 Estado: implementado
-Última verificación: 2026-07-13
-Verificado en: lectura directa de setup.sql, migration_v1.sql, migration_v2.sql, hoto_migration.sql, hoto_migration_v2.sql, laundry_cleaning_migration_v1.sql + muestreo de filas reales vía REST de Supabase
+Última verificación: 2026-08-05
+Verificado en: lectura directa de setup.sql, migration_v1.sql, migration_v2.sql, hoto_migration.sql, hoto_migration_v2.sql, laundry_cleaning_migration_v1.sql, checkins_migration_v1.sql, interventions_migration_v1.sql + muestreo de filas reales vía REST de Supabase
 Fuente de verdad de datos: este documento ES la fuente de verdad de tablas
 
 # DATA_MODEL.md — Única fuente de verdad de las tablas de Supabase
 
 Ningún otro documento debe repetir columnas. Si necesitas saber qué campos tiene una tabla, es aquí. Los `/modules/*.md` solo enlazan a la sección correspondiente.
 
-Proyecto Supabase: `cllubptdwydifomlnxds`. RLS **desactivado en las 19 tablas** (ver [SECURITY.md](SECURITY.md) — es una decisión consciente para app de un solo usuario, no un descuido). `vj_laundry_cleaning_records` ya existe en Supabase (tabla creada y verificada) aunque el código que la usa todavía no está en `main` — ver nota de "no desplegado" en su sección.
+Proyecto Supabase: `cllubptdwydifomlnxds`. RLS **desactivado en las 21 tablas** (ver [SECURITY.md](SECURITY.md) — es una decisión consciente para app de un solo usuario, no un descuido). `vj_laundry_cleaning_records` ya existe en Supabase (tabla creada y verificada) aunque el código que la usa todavía no está en `main` — ver nota de "no desplegado" en su sección.
 
 ---
 
@@ -154,6 +154,39 @@ Storage: bucket `hoto-templates` (contiene `HOTO_official_v1.pdf`, la plantilla 
 Storage: bucket `laundry-cleaning-templates` (contiene `Laundry_Cleaning_Form_official_v1.pdf`, la plantilla oficial en blanco).
 
 ---
+
+## Salud — Isabel Core, especialista de sueño
+
+Migración: `isabel-api/migrations/checkins_migration_v1.sql` y `interventions_migration_v1.sql` (2026-08-05, aplicadas manualmente a Supabase real). No pasa por `db.js` ni por el frontend — son tablas propias de `isabel-api`, leídas/escritas solo por `src/core/specialists/health.js` vía las tools MCP `health_get_sleep_status`/`health_register_sleep`. Detalle de uso en [modules/HEALTH_AND_GYM.md](modules/HEALTH_AND_GYM.md).
+
+### `checkins`
+| Columna | Tipo | Notas |
+|---|---|---|
+| id | uuid PK | default `gen_random_uuid()` |
+| fecha | date | fecha civil Europe/Madrid del check-in, no UTC — ver `core/tz.js` |
+| sleep_minutes | int | check `0..1440` |
+| pain_level | int | check `0..10`, sin uso todavía (campo preparado, no escrito por ningún flujo actual) |
+| energy_level | int | check `1..5`, sin uso todavía |
+| symptoms | text | sin uso todavía |
+| created_at | timestamptz | default `now()` |
+
+Hoy solo se escribe `sleep_minutes` (vía `registerSleep()`). El resto de columnas existen porque la tabla se diseñó para todo el dominio Salud, no solo sueño — no confundir "columna existe" con "columna en uso".
+
+### `interventions`
+Entidad genérica de "pregunta pendiente de Isabel", reutilizable por cualquier dominio futuro, no exclusiva de Salud.
+| Columna | Tipo | Notas |
+|---|---|---|
+| id | uuid PK | default `gen_random_uuid()` |
+| domain | text | ej. `health.sleep` |
+| target_date | date | fecha civil Europe/Madrid a la que se refiere la pregunta |
+| reason_signature | text | clave de deduplicación — ver índice abajo |
+| status | text | `pending` \| `answered` \| `superseded`, default `pending` |
+| created_at | timestamptz | default `now()` |
+| answered_at | timestamptz | nullable |
+
+`CREATE UNIQUE INDEX ... ON interventions(reason_signature) WHERE status='pending'` — garantiza a nivel de base de datos que nunca puede haber dos preguntas pendientes con la misma firma (ej. dos preguntas de sueño abiertas para el mismo día), incluso si el código de aplicación tuviera un bug de dedup.
+
+Primer registro real conservado (no es dato de prueba descartable, es un check-in real de la usuaria): `fecha=2026-08-05`, `sleep_minutes=375` (6h15).
 
 ## Deuda técnica del modelo de datos
 
