@@ -7,6 +7,14 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-08-07 (tres defectos reales de export/UX del HOTO, encontrados probando D-AFBS en iPhone — D17)
+
+- **Texto duplicado en Tail Number/ICAO:** confirmado inspeccionando el PDF real — el formulario oficial tiene un widget legacy solapado casi exactamente sobre el correcto en ambas celdas. El exportador escribía el mismo valor en los dos, dibujando dos apariencias de texto superpuestas. Corregido: se escribe solo el campo canónico, el duplicado se blanquea explícitamente (nunca queda residuo, ni de la plantilla ni de un export anterior).
+- **Magazines no se preservaba al exportar — dos causas reales:** (1) auto-ajuste de fuente (`fontSize(0)`) dependiente del visor, combinado con `NeedAppearances=true`, que le pedía a cada visor recalcular su propia apariencia — soporte desigual para multilínea entre visores; (2) **bug más serio, encontrado verificando contra el dato real de producción**: el texto real de Magazines de 9H-VCQ contiene tabs, y WinAnsiEncoding lanza una excepción al codificarlos — podía abortar `updateFieldAppearances()` a mitad de proceso para TODO el formulario, no solo Magazines. Corregido: tamaño de fuente fijo calculado con métricas reales (nunca "0"/auto) + saneado de caracteres de control en el helper de texto compartido (protege cualquier campo, no solo Magazines).
+- **UX de exportación rediseñada como "Guardar PDF":** modal con nombre de archivo editable → Web Share API con `File` real (mejor UX en iOS, conserva el nombre en "Guardar en Archivos") → Blob+`<a download>` → visor nativo como último recurso. Cancelar el Share Sheet no dispara ningún fallback.
+- Verificado contra el HOTO real de 9H-VCQ (con sus tabs reales): export ya no lanza excepción, campos duplicados corregidos, round-trip export→reimport coincide campo a campo. 6 tests nuevos (218/218 en total).
+- Detalle completo en `DECISIONS.md` D17.
+
 ## 2026-08-06 (continuación — flujo real de import de HOTO, D16)
 
 - **Pedido explícito de la usuaria:** poder importar un HOTO real ya recibido (PDF oficial) en vez de re-teclearlo, eligiendo "Continuar este HOTO" (conserva columnas usadas, abre la siguiente libre) o "Nuevo HOTO desde este" (nueva generación, resetea las columnas de handover, conserva avión/stock/cabin care/focus/defects/comments/offload).
