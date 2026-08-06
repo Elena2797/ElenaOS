@@ -1,6 +1,6 @@
 Estado: implementado (mapa general — detalle en cada sub-módulo)
 Última verificación: 2026-08-06
-Verificado en: life-os-app/src/main.js (router de vistas, vjView) — nota: fila de Laundry & Cleaning Form refleja el estado de la rama feature/vj-landing-cleaning, no de main; isabel-api/src/core/specialists/vistajet.js (tres specialists); isabel-api/src/hoto/data.js + life-os-app/src/services/hoto.js (correlación HOTO↔avión, D13); 177/177 tests isabel-api, verificación manual en navegador
+Verificado en: life-os-app/src/main.js (router de vistas, vjView) — nota: fila de Laundry & Cleaning Form refleja el estado de la rama feature/vj-landing-cleaning, no de main; isabel-api/src/core/specialists/vistajet.js (tres specialists); isabel-api/src/hoto/data.js + life-os-app/src/services/hoto.js (correlación HOTO↔avión, D13); life-os-app/src/services/{db,inventory,laundryCleaning,readiness}.js + main.js (vj_state singleton real + correlación por avión generalizada a HOTO vivo/Inventario/Laundry, D14); 187/187 tests isabel-api, verificación manual en navegador incluyendo una escritura de Telegram simulada con la app abierta
 Fuente de verdad de datos: DATA_MODEL.md § vj_state, vj_tasks, interventions
 
 # modules/VISTAJET.md — Mapa del dominio VistaJet
@@ -41,8 +41,8 @@ Dos vertical slices construidos sobre el patrón formalizado en [core/DOMAIN_SPE
 - **`vistajet_get_status`** ahora incluye `hoto: {applicable, exists, ambiguous, id, status, tail_number, has_prior_hoto}` para el avión operativo actual.
 - **`vistajet_update_status`** cierra automáticamente el HOTO del avión anterior cuando la transición es a `libre` ("ya entregué el avión") — best-effort (si no había HOTO activo para ese avión, no es un error), fail-closed si es ambiguo (no cierra ninguno, lo reporta en `hoto_closed`), y nunca bloquea la transición de `vj_state` en sí.
 - Sin migración de esquema necesaria (`status`/`delivered_at` ya existían sin restricción) salvo un índice único parcial opcional (`hoto_migration_v4.sql`) — aditivo/reversible, verificado sin conflicto contra el único HOTO real existente antes de escribirlo, **pendiente de ejecución manual en Supabase**.
-- `readiness.js` (Aircraft Readiness) actualizado para pasar el avión actual a `loadActiveHoto` — comportamiento sin cambios mientras `vj_state.aircraft` esté vacío (como está hoy en producción); se activa solo cuando haya un avión asignado.
-- **Deliberadamente sin tocar**: la pantalla de edición viva de HOTO (`vjHotoView`) sigue llamando a `loadActiveHoto()` sin avión — cambio de mayor riesgo sobre la vista de uso diario, no verificable de punta a punta sin interacción real, pospuesto a propósito.
+- `readiness.js` (Aircraft Readiness) pasa el avión actual a `loadActiveHoto` y (desde D14) también a `loadLastSession` (Inventario) — nunca reutiliza en silencio la evidencia de otro avión solo por ser la más reciente.
+- **D14 (2026-08-06, mismo día):** lo que D13 había dejado deliberadamente sin tocar por riesgo (`vjHotoView`/`hotoReload`, la pantalla de edición viva de HOTO) se corrigió tras un bug real en producción — ahora también correlaciona por `vj_state.aircraft`. Se generalizó el mismo principio a `loadActiveLaundryCleaning` y a `loadActiveSession` de Inventario (usado por el módulo de Inventario y por "Estado del avión"). Sin HOTO/sesión/formulario propio para el avión actual, la UI lo dice explícitamente ("HOTO pendiente para D-AFBS") en vez de mostrar el del avión anterior. Además, `vj_state` pasó de ser un singleton solo documentado a uno real (índice único en Supabase — `vj_state_singleton_migration_v1.sql`, pendiente de ejecución manual) tras descubrir que había acumulado 3 filas en producción. Detalle completo en `DECISIONS.md` D14.
 
 ### 4. Administrativo — eLearnings y Facturas (mismo día)
 Auditoría de los tres huecos restantes de VistaJet (proceeding, maleta, administrativo) encontró que este era el único con una fuente de verdad ya limpia: `vj_tasks` (misma tabla que usa `readiness.js` para el dashboard), con la usuaria ya creando tareas tituladas "eLearning: ..." / "Enviar facturas" como acción normal en la app (`main.js:3044`, el propio placeholder del modal usa "Enviar facturas" de ejemplo). No era un hueco de dato, era un hueco de visibilidad: el dashboard ya lo categorizaba, Isabel no lo veía.
@@ -61,7 +61,7 @@ Criterio de cierre (fijado por la usuaria) verificado punto por punto:
 | Criterio | Estado |
 |---|---|
 | Rotación/estado operativo coherente | ✓ `vistajet_update_status` |
-| Avión actual coherente | ✓ `vistajet_get_status` + `vistajet_update_status` |
+| Avión actual coherente | ✓ `vistajet_get_status` + `vistajet_update_status` — verificado en un bug real el mismo día (D14): `vj_state` no era el singleton real que este criterio asumía |
 | Aircraft delivered limpia contexto | ✓ `status:'libre'` limpia `aircraft`/`rotation_*` automáticamente |
 | HOTO corresponde al avión correcto y conserva histórico | ✓ D13 — correlación por `tail_number`, `closeHoto()` nunca borra |
 | Passport specialist activo | ✓ primer specialist VistaJet, en producción |
