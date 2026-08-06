@@ -1,12 +1,12 @@
-Estado: en construcción — Gateway real desplegado en Railway, todavía sin ningún turno de agente funcionando de extremo a extremo
+Estado: en construcción — Gateway real desplegado en Railway, un turno de agente real ya completa de extremo a extremo; todavía sin cron diario ni Telegram activos
 Última verificación: 2026-08-06
-Verificado en: despliegue real de `isabel-gateway` en Railway (proyecto dedicado, separado de `isabel-api`), repro completo cron→runner→claude-cli→MCP→tool→respuesta en WSL/Linux (ver `KNOWN_PROBLEMS.md`), MCP `lifeos` autenticado y verificado con `openclaw mcp doctor --probe`, bloqueo actual de auth de `claude-cli` documentado con evidencia de `openclaw doctor`
+Verificado en: despliegue real de `isabel-gateway` en Railway (proyecto dedicado, separado de `isabel-api`), repro completo cron→runner→claude-cli→MCP→tool→respuesta en WSL/Linux (ver `KNOWN_PROBLEMS.md`), MCP `lifeos` autenticado y verificado con `openclaw mcp doctor --probe`, turno de agente real verificado en producción vía `railway ssh` (`openclaw agent --agent main --message ...` → `OK`, log `stopReason=stop`, sin error) tras aplicar `DECISIONS.md` D11
 Fuente de verdad de datos: ninguna
 
 # core/AUTOMATIONS.md — Qué corre solo, y qué no
 
-## Verificado: todavía no hay ninguna automatización real corriendo en producción
-El Gateway de OpenClaw (`isabel-gateway`, Railway) está desplegado, persistente, y arranca correctamente — pero ningún turno de agente real completa un turno todavía (ver bloqueo actual más abajo). Sin eso, no hay cron diario, no hay Telegram, no hay nada disparándose solo. Ver `DECISIONS.md` D10 para la decisión de arquitectura ya aprobada.
+## Verificado: un turno de agente real ya completa en producción; todavía no hay ninguna automatización disparándose sola
+El Gateway de OpenClaw (`isabel-gateway`, Railway) está desplegado, persistente, y arranca correctamente. El bloqueo de auth que impedía completar turnos (`FailoverError: Not logged in`) quedó resuelto el 2026-08-06 — no arreglando el login de `claude-cli`, sino abandonándolo: se confirmó que ese backend no está pensado para contenedores efímeros (ver D11 abajo) y se cambió a auth de API key, ya configurada. Un turno de agente real completa correctamente ahora mismo, verificado vía `railway ssh`. Lo que sigue faltando para tener algo "disparándose solo": el cron diario y Telegram siguen sin activar (instrucción explícita de la usuaria, no bloqueo técnico) — ver `NEXT_SESSION.md`. Ver `DECISIONS.md` D10 para la decisión de arquitectura ya aprobada y D11 para el cambio de backend de auth.
 
 ## Lo que quedó resuelto desde la última verificación (2026-08-05 → 2026-08-06)
 
@@ -22,31 +22,18 @@ Confirmado funcionando:
 - Arranca limpio, sin crash-loop.
 - Volumen persistente en `/data` — confirmado que la config sobrevive un restart completo del contenedor.
 - MCP `lifeos` conecta y autentica contra `isabel-api` producción (`openclaw mcp doctor --probe` → `ok`).
-- `claude-cli` funciona correctamente cuando se invoca manualmente dentro del contenedor (mismo `ANTHROPIC_API_KEY` que usa `isabel-api`).
+- **Un turno de agente real completa correctamente** (verificado el 2026-08-06 vía `railway ssh -- su node -c 'openclaw agent --agent main --message "..."'` → respuesta `OK`, log `run … ended with stopReason=stop`, sin error).
 
-## Bloqueo actual — el único que impide un turno de agente real
+## Bloqueo anterior — RESUELTO 2026-08-06 (se abandonó `claude-cli`, no se arregló su login)
 
-**Todo turno de agente real falla con `FailoverError: Not logged in · Please run /login`, aunque `claude-cli` invocado manualmente (mismos flags que usa el Gateway) funciona perfectamente.**
+Todo turno de agente real fallaba con `FailoverError: Not logged in · Please run /login`, aunque `claude-cli` invocado manualmente (mismos flags que usa el Gateway) funcionaba perfectamente. `openclaw doctor` señalaba como causa la falta del auth profile `anthropic:claude-cli`, que solo se puede crear con `claude auth login` (OAuth interactivo) — comando que exige una terminal interactiva real y que, tras múltiples intentos vía `railway ssh` (directo, `su node -c`, `su - node`, tmux, named pipe, e incluso un login interactivo real que imprimió "Login successful."), nunca llegó a persistir `~/.claude/.credentials.json` dentro del contenedor.
 
-Causa raíz confirmada vía `openclaw doctor`: el backend `claude-cli` (vía `agentRuntime`) requiere su **propio** auth profile interno de OpenClaw, guardado en `/data/.openclaw/agents/main/agent/openclaw-agent.sqlite`, con la clave exacta `anthropic:claude-cli` — distinto del perfil `anthropic:default` (API key) que ya registramos con éxito. Ese perfil específico solo se crea con:
+**La causa raíz resultó ser arquitectónica, no un problema de ejecución que arreglar.** Leyendo el código fuente empaquetado de OpenClaw (`node_modules/openclaw/dist/cli-auth-seam-CzFhiHUR.js` → `store-DcJR3uqo.js`) se confirmó que `readClaudeCliCredentialsForRuntime()` lee `~/.claude/.credentials.json` **directamente del sistema de archivos del host** en cada turno — no del perfil `anthropic:claude-cli` de `openclaw-agent.sqlite`, no de ninguna variable de entorno. Y la documentación oficial de OpenClaw (`node_modules/openclaw/docs/providers/anthropic.md`) lo confirma explícitamente: *"Claude CLI reuse expects the OpenClaw process to run on the same host as the Claude CLI login. Container installs... do not mount host `~/.claude` into setup or runtime; use an Anthropic API key there..."* — el backend `claude-cli` simplemente no está diseñado para un contenedor efímero como Railway. Ninguna variante de `railway ssh` iba a resolver esto.
 
-```bash
-claude auth login                                                    # OAuth interactivo
-openclaw models auth login --provider anthropic --method cli --set-default
-```
+**Solución aplicada (ver `DECISIONS.md` D11):** se quitó el override `agentRuntime: { id: "claude-cli" }` de `agents.defaults.models["anthropic/claude-sonnet-4-6"]` — tanto en el volumen en vivo (`openclaw config unset ... --provider anthropic` + `railway restart --yes`) como en `isabel-gateway/openclaw.default.json` (para que un volumen nuevo no reintroduzca el mismo bug). El modelo ahora resuelve auth vía `models.providers.anthropic.apiKey` (`${ANTHROPIC_API_KEY}`, ya configurada y ya verificada funcionando). **Trade-off aceptado explícitamente por la usuaria:** los turnos ahora facturan como uso de API de pago en vez de consumir la asignación del plan Claude Pro.
 
-Ambos comandos **requieren una terminal interactiva real**. Se intentó completar el login OAuth varias veces vía `railway ssh` (directo, con `su node -c`, con `su - node`, con tmux, con un named pipe para mantener el stdin abierto entre llamadas) — todos los intentos fallaron: o bien el proceso vuelve al shell antes de que se pueda pegar el código, o el login "tiene éxito" (imprime `Login successful.`) pero **no llega a escribir `~/.claude/.credentials.json`** — no se encontró ese archivo en ninguna ubicación del contenedor tras el intento.
-
-No se ha investigado por qué el proceso muere antes de persistir la credencial — es la tarea pendiente concreta de la siguiente sesión.
-
-### Lo que NO es el problema (descartado con evidencia)
-- No es el `ANTHROPIC_API_KEY` — `claude auth status` y una invocación manual real (`claude -p ...`) funcionan perfectamente con él, dentro del mismo contenedor, como el mismo usuario `node`.
-- No son los flags/argumentos que usa el Gateway (`--output-format stream-json --session-id ...`) — se probaron manualmente idénticos y funcionan.
-- No es el volumen/persistencia — la config sí persiste correctamente entre restarts.
-- No es `models.providers.anthropic.apiKey` (SecretRef `${ANTHROPIC_API_KEY}`, ya configurado) — ese es un mecanismo de auth *distinto*, para llamadas directas a la API de Anthropic, no para el backend `claude-cli`.
-
-## Antes de tener un turno de agente real, queda un único bloqueante
-Completar el registro del auth profile `anthropic:claude-cli` — necesita una sesión verdaderamente interactiva (terminal local del usuario conectada directamente, sin capas de `su`/pipe de por medio) para que el login OAuth persista, o encontrar por qué `railway ssh` + `su` está matando el proceso antes de que escriba el archivo de credenciales.
+### Hallazgo colateral: `railway.exe ssh` no re-escapa argumentos con espacios
+Detalle completo en `KNOWN_PROBLEMS.md`. Resumen: `railway ssh -- su node -c "comando con espacios"` llega al contenedor partido en tokens sueltos (bug del cliente `railway.exe`, no de OpenClaw). Workaround: `su node -c \'comando\ con\ espacios\'` (comillas literales escapadas dentro de un único token local).
 
 ## Todavía sin tocar esta sesión (según instrucción explícita)
 - Telegram (ni bot nuevo ni configuración).
