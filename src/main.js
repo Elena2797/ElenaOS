@@ -2036,11 +2036,48 @@ function hotoEntregaTab(){
   const rec=S.hotoRec;
   const lbl=(t)=>`<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:14px 0 6px">${t}</div>`;
   const fieldStyle=`width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg);color:var(--text)`;
+  const v2=(x)=>x==null?'':String(x).replace(/"/g,'&quot;');
 
-  // Sin HOTO activo → crear uno nuevo
-  if(!rec){
-    return `
+  // Input de archivo oculto compartido por el botón "Subir HOTO", presente en
+  // cualquier estado de esta pestaña (con o sin HOTO activo).
+  const importInput=`<input type="file" id="hoto-import-file" accept="application/pdf" style="display:none" onchange="hotoImportFileSelected(this)">`;
+  const uploadBtn=(label)=>`<button onclick="document.getElementById('hoto-import-file').click()" style="width:100%;padding:12px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px"><i class="ti ti-file-upload"></i> ${label}</button>`;
+
+  // ── Import en curso: analizando, con error, o esperando la decisión ──────
+  if(S.hotoImportBusy){
+    return `${importInput}<div style="background:var(--surface);border-radius:12px;padding:24px;border:0.5px solid var(--border);text-align:center;color:var(--t3);font-size:13px">Analizando el PDF…</div>`;
+  }
+  if(S.hotoImportErr){
+    return `${importInput}
     <div style="background:var(--surface);border-radius:12px;padding:20px;border:0.5px solid var(--border)">
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">No se pudo importar el HOTO</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px">${v2(S.hotoImportErr)}</div>
+      <button onclick="hotoImportCancel()" style="width:100%;padding:12px;border:none;background:var(--text);color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">Volver</button>
+    </div>`;
+  }
+  if(S.hotoImportAnalysis){
+    const a=S.hotoImportAnalysis;
+    const r=a.record||{};
+    const tailMismatch=r.tail_number&&S.vjState.aircraft&&r.tail_number.toUpperCase()!==S.vjState.aircraft.toUpperCase();
+    const canContinue=a.nextColumn!=null;
+    const notImportedList=(a.notImported||[]).map(x=>`<div style="font-size:11px;color:var(--t3);margin-top:4px">• ${v2(x.field)}: ${v2(x.reason)}</div>`).join('');
+    return `${importInput}
+    <div style="background:var(--surface);border-radius:12px;padding:20px;border:0.5px solid var(--border)">
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">HOTO detectado — ${a.usedColumns} columna${a.usedColumns===1?'':'s'} utilizada${a.usedColumns===1?'':'s'}</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px">${v2(r.tail_number)||'(sin matrícula)'} · ${v2(r.icao)||'—'} · ${v2(r.aircraft_status)||'—'} · ${v2(r.pattern)||'—'}</div>
+      ${tailMismatch?`<div style="background:#FBEAEA;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#A33636;line-height:1.5">El PDF dice ${v2(r.tail_number)}, pero el avión actual en LIFEOS es ${v2(S.vjState.aircraft)}. Se importará igualmente con matrícula ${v2(S.vjState.aircraft)} (la fuente de verdad es el avión actual) — confirma que es el documento correcto.</div>`:''}
+      ${notImportedList?`<div style="background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:12px">${notImportedList}</div>`:''}
+      <div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:16px">Elige qué hacer con este HOTO:</div>
+      <button onclick="hotoImportChoose('continue')" ${canContinue?'':'disabled'} style="width:100%;padding:13px;border:none;background:${canContinue?'var(--text)':'var(--border)'};color:${canContinue?'#fff':'var(--t3)'};border-radius:10px;font-size:14px;font-weight:600;cursor:${canContinue?'pointer':'not-allowed'};margin-bottom:8px">${canContinue?`Continuar en columna ${a.nextColumn+1}`:'Continuar (sin columnas libres)'}</button>
+      <button onclick="hotoImportChoose('new_from_existing')" style="width:100%;padding:13px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px">Nuevo HOTO desde este</button>
+      <button onclick="hotoImportCancel()" style="width:100%;padding:10px;border:none;background:none;color:var(--t3);font-size:12px;cursor:pointer">Cancelar</button>
+    </div>`;
+  }
+
+  // Sin HOTO activo → crear uno nuevo, o importar uno recibido
+  if(!rec){
+    return `${importInput}
+    <div style="background:var(--surface);border-radius:12px;padding:20px;border:0.5px solid var(--border);margin-bottom:12px">
       <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">Nuevo HOTO</div>
       <div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px">${S.vjState.aircraft?`HOTO pendiente para ${S.vjState.aircraft} — todavía no hay ninguno registrado para este avión.`:'No hay ningún HOTO activo.'} Empieza uno para esta rotación. Se irá construyendo solo mientras trabajas; el día de la entrega solo exportas el PDF oficial.</div>
       <label style="font-size:11px;font-weight:600;color:var(--t2)">Matrícula</label>
@@ -2053,7 +2090,9 @@ function hotoEntregaTab(){
       </select>
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2);margin:4px 0 16px"><input type="checkbox" id="hoto-new-noprior" checked> No recibí HOTO previo (reconstruido durante esta rotación)</label>
       <button onclick="hotoCreate()" style="width:100%;padding:13px;border:none;background:var(--text);color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Crear HOTO</button>
-    </div>`;
+    </div>
+    <div style="text-align:center;font-size:11px;color:var(--t3);margin:2px 0 8px">— o —</div>
+    ${uploadBtn('Subir HOTO recibido (PDF)')}`;
   }
 
   const v=(x)=>x==null?'':String(x).replace(/"/g,'&quot;');
@@ -2081,6 +2120,7 @@ function hotoEntregaTab(){
   const bannerNoPrior=!prior?`<div style="background:#FBF3E4;border:0.5px solid #E8D9B5;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#7A5B12;line-height:1.5">No existe HOTO previo. Las fechas históricas no pueden verificarse. Este HOTO se ha reconstruido durante esta rotación.</div>`:'';
 
   return `
+  ${importInput}
   ${bannerNoPrior}
   <div style="background:var(--surface);border-radius:12px;padding:16px;border:0.5px solid var(--border)">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -2099,6 +2139,11 @@ function hotoEntregaTab(){
       <div><label style="font-size:10px;font-weight:600;color:var(--t3)">FECHA DE RECEPCIÓN</label>
         <input value="${v(rec.received_date)}" onchange="hotoField('received_date',this.value)" placeholder="25-May-26" style="${fieldStyle};margin-top:4px"></div>
     </div>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0;padding:10px 14px;background:var(--surface);border-radius:10px;border:0.5px solid var(--border)">
+    <div style="font-size:11px;color:var(--t3)">Columna de handover ${(rec.ch_column_index??0)+1}/6${(rec.columns||[]).filter(c=>c&&(c.ch_code||c.received_date||c.days_on_aircraft||Object.values(c.duties||{}).some(Boolean))).length?` · ${(rec.columns||[]).filter(c=>c&&(c.ch_code||c.received_date||c.days_on_aircraft||Object.values(c.duties||{}).some(Boolean))).length} anterior${(rec.columns||[]).filter(c=>c&&(c.ch_code||c.received_date||c.days_on_aircraft||Object.values(c.duties||{}).some(Boolean))).length>1?'es':''} conservada${(rec.columns||[]).filter(c=>c&&(c.ch_code||c.received_date||c.days_on_aircraft||Object.values(c.duties||{}).some(Boolean))).length>1?'s':''}`:''}${rec.generation>1?` · Generación ${rec.generation}`:''}</div>
+    <button onclick="document.getElementById('hoto-import-file').click()" style="border:none;background:none;color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">Subir otro HOTO</button>
   </div>
 
   ${hotoCabinCareSection()}
@@ -2594,6 +2639,76 @@ async function hotoCreate(){
     await hotoSvc.createHoto({ tail_number:tail, icao, pattern, has_prior_hoto:!noPrior });
     await hotoReload();
   }catch(e){ alert('No se pudo crear el HOTO: '+e.message); }
+}
+
+// ── Import de un HOTO real recibido (PDF) — D16 ─────────────────────────────
+// Dos pasos sin estado en el servidor: analyze (solo lectura, decide qué
+// mostrar) y apply (escribe, una vez la usuaria elige Continuar/Nuevo). El
+// PDF se reenvía completo en ambas llamadas — mismo patrón simple que el
+// resto de imports de la app (ver invPreviewFile), sin sesión de subida.
+let _hotoImportBytes=null;
+let _hotoImportFilename='';
+
+async function hotoImportFileSelected(input){
+  const file=input.files?.[0];
+  if(!file) return;
+  _hotoImportBytes=await file.arrayBuffer();
+  _hotoImportFilename=file.name;
+  S.hotoImportBusy=true; S.hotoImportErr=null; S.hotoImportAnalysis=null;
+  render();
+  try{
+    const res=await fetch(`${ISABEL_API}/v1/hoto/import/analyze`,{
+      method:'POST',
+      headers:{'x-api-key':ISABEL_KEY,'Content-Type':'application/pdf'},
+      body:_hotoImportBytes,
+    });
+    const body=await res.json();
+    if(!res.ok||body.status==='error') throw new Error(body.error||'No se pudo analizar el PDF.');
+    S.hotoImportAnalysis=body;
+  }catch(e){
+    S.hotoImportErr=e.message;
+  }finally{
+    S.hotoImportBusy=false;
+    input.value='';
+    render();
+  }
+}
+
+async function hotoImportChoose(mode){
+  if(!_hotoImportBytes){ S.hotoImportErr='Se perdió el archivo — vuelve a subir el PDF.'; render(); return; }
+  S.hotoImportBusy=true; S.hotoImportErr=null;
+  render();
+  try{
+    const qs=new URLSearchParams({ tail_number:S.vjState.aircraft||'', mode, source_filename:_hotoImportFilename });
+    const res=await fetch(`${ISABEL_API}/v1/hoto/import/apply?${qs}`,{
+      method:'POST',
+      headers:{'x-api-key':ISABEL_KEY,'Content-Type':'application/pdf'},
+      body:_hotoImportBytes,
+    });
+    const body=await res.json();
+    if(!res.ok||body.status==='error') throw new Error(body.error||'No se pudo importar el HOTO.');
+    S.hotoRec=body.hoto;
+    S.hotoItems=await hotoSvc.loadItems(body.hoto.id);
+    // El HOTO cambió de raíz (columnas, generación, posiblemente cabecera) —
+    // invalidar todo lo que dependía del anterior, mismo principio que
+    // refreshVjContext() al cambiar de avión (D14/D15): nunca dejar en
+    // pantalla algo calculado sobre el HOTO viejo.
+    S._readiLoaded=false; S.vjReadiness=null;
+    S._hotoSummaryLoaded=false; S.hotoSummaryRec=null;
+    S.hotoImportAnalysis=null; S.hotoImportErr=null;
+    _hotoImportBytes=null; _hotoImportFilename='';
+  }catch(e){
+    S.hotoImportErr=e.message;
+  }finally{
+    S.hotoImportBusy=false;
+    render();
+  }
+}
+
+function hotoImportCancel(){
+  S.hotoImportAnalysis=null; S.hotoImportErr=null; S.hotoImportBusy=false;
+  _hotoImportBytes=null; _hotoImportFilename='';
+  render();
 }
 
 // No-optimista: guarda en Supabase PRIMERO; la UI solo refleja el valor tras éxito.
