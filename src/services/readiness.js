@@ -12,7 +12,7 @@
 //   - Sin HOTO previo no se esperan fechas históricas (no es un fallo de la CH actual).
 
 // ── Colector: lee el estado real de los módulos ──────────────────────────────
-export async function collectSignals({ hotoSvc, invSvc, vjTasks, vjState, now = new Date() }) {
+export async function collectSignals({ hotoSvc, invSvc, llcSvc, vjTasks, vjState, now = new Date() }) {
   const signals = { now, rotationStatus: vjState?.status || null };
 
   // HOTO (Supabase) — correlacionado con el avión operativo actual
@@ -80,12 +80,26 @@ export async function collectSignals({ hotoSvc, invSvc, vjTasks, vjState, now = 
     }
   } catch (e) { signals.inventory = { error: e.message }; }
 
-  // Laundry (localStorage — registro de este dispositivo)
-  const lDate = localStorage.getItem('vj_laundry_date');
-  const lItems = JSON.parse(localStorage.getItem('vj_laundry_items') || '{}');
-  signals.laundry = lDate
-    ? { lastDate: lDate, pieces: Object.values(lItems).reduce((a, b) => a + (b || 0), 0) }
-    : null;
+  // Laundry & Cleaning Form (Supabase) — correlacionado con el avión actual,
+  // igual que HOTO/Inventario (D15). Antes leía localStorage
+  // (vj_laundry_date/vj_laundry_items), una señal de una implementación
+  // previa a que Laundry & Cleaning se migrara a Supabase — sin ningún punto
+  // de escritura en el código actual (nada la actualiza nunca), así que un
+  // valor guardado en el dispositivo hace meses quedaba pegado
+  // indefinidamente y sin relación con ningún avión, apareciendo como
+  // "actual" pasase lo que pasase. Sustituido por el registro real.
+  try {
+    const rec = llcSvc ? await llcSvc.loadActiveLaundryCleaning(vjState?.aircraft) : null;
+    if (!rec) signals.laundry = null;
+    else if (rec.ambiguous) {
+      signals.laundry = { error: `${rec.matches.length} formularios activos para ${vjState?.aircraft} — revisar en Supabase` };
+    } else {
+      const filled = Object.values(rec.items || {}).filter(e =>
+        e && ((e.given != null && e.given !== '') || (e.received != null && e.received !== '') || e.note)
+      ).length;
+      signals.laundry = { lastDate: rec.updated_at || rec.created_at, pieces: filled };
+    }
+  } catch (e) { signals.laundry = { error: e.message }; }
 
   // eLearnings / Facturas (tareas del área VJ, Supabase)
   const pend = (vjTasks || []).filter(t => t.status !== 'done');
@@ -201,11 +215,12 @@ export function assess(s) {
 
   // ── Laundry ──
   {
-    const lines = [];
-    if (!s.laundry) { missing.push('Laundry: sin registros en este dispositivo'); lines.push(L('missing', 'Sin registros')); }
+    const l = s.laundry; const lines = [];
+    if (!l) { missing.push('Laundry: sin formulario activo para este avión'); lines.push(L('missing', 'Sin formulario activo')); }
+    else if (l.error) { missing.push('Laundry: no se pudo leer (' + l.error + ')'); lines.push(L('missing', 'No se pudo leer el módulo')); }
     else {
-      const days = Math.floor((s.now - new Date(s.laundry.lastDate)) / 864e5);
-      if (days <= 1) { strengths.push(`Laundry actualizado (${s.laundry.pieces} piezas)`); lines.push(L('ok', `Actualizado ${days === 0 ? 'hoy' : 'ayer'} · ${s.laundry.pieces} piezas`)); }
+      const days = Math.floor((s.now - new Date(l.lastDate)) / 864e5);
+      if (days <= 1) { strengths.push(`Laundry actualizado (${l.pieces} campos)`); lines.push(L('ok', `Actualizado ${days === 0 ? 'hoy' : 'ayer'} · ${l.pieces} campos`)); }
       else { lines.push(L(deliveryPhase ? 'warn' : 'missing', `Última actualización hace ${days} días`)); if (deliveryPhase) warnings.push(`Laundry sin actualizar desde hace ${days} días`); }
     }
     mod('Laundry', lines);

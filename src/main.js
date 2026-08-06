@@ -843,7 +843,7 @@ function areaView() {
       S._readiLoaded=true;
       (async()=>{
         try{
-          const sig=await readiSvc.collectSignals({hotoSvc,invSvc,vjTasks:S.vjTasks,vjState:vj});
+          const sig=await readiSvc.collectSignals({hotoSvc,invSvc,llcSvc,vjTasks:S.vjTasks,vjState:vj});
           S.vjReadiness=readiSvc.assess(sig);
         }catch(e){ console.error('readiness',e); S.vjReadiness={error:e.message}; }
         render();
@@ -891,8 +891,12 @@ function areaView() {
     const hotoTasksExist=pendTasks.some(t=>/hoto|hand.?over|defect/i.test(t.title));
     const primaryCTA=hotoTasksExist?{label:'Ir al HOTO',view:'vj_hoto'}:status==='rotacion'?{label:'Ver Laundry & Cleaning Form',view:'vj_laundry_cleaning'}:null;
 
-    // Fuente real = Supabase (si el HOTO ya se cargó); localStorage como fallback pre-migración.
-    const hoToChecks=S.hotoRec?.daily_duties||JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
+    // Fuente real = Supabase, correlacionada con el avión actual (D14/D15).
+    // Mientras carga, localStorage como placeholder transitorio; una vez
+    // sabemos la respuesta real (con avión o sin él), se usa solo esa — nunca
+    // se sigue mostrando el fallback local una vez confirmado el estado real.
+    triggerHotoSummaryLoad();
+    const hoToChecks=S._hotoSummaryLoaded?(S.hotoSummaryRec?.daily_duties||{}):JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
     const allHotoItems=VJ_HOTO_SECTIONS.flatMap(s=>s.items);
     const hotoCompleted=allHotoItems.filter(i=>hoToChecks[i.id]).length;
     const hotoTotal=allHotoItems.length;
@@ -1020,11 +1024,18 @@ function areaView() {
     </div>
 
     ${(()=>{
+      // "Bajo control" exige evidencia real de HOTO+Inventario del avión
+      // actual, no solo ausencia de tareas pendientes — R.confidence==='low'
+      // en readiness.js es exactamente "faltan ambos módulos core" (D15,
+      // bug real: esta tarjeta decía "Bajo control" para un avión que
+      // todavía no tenía ni HOTO ni inventario cargados).
+      const R0=S.vjReadiness;
+      const noCoreEvidence=status==='rotacion'&&R0&&!R0.error&&R0.confidence==='low';
       const hasProblems=allAircraftPend.length>0;
-      const acSL=status!=='rotacion'?'Fuera de rotación':hasProblems?allAircraftPend.length+' pendiente'+(allAircraftPend.length>1?'s':''):'Bajo control';
-      const acSC=status!=='rotacion'?'#9CA3AF':hasProblems?'#854F0B':'#0F6E56';
-      const acSB=status!=='rotacion'?'#F5F5F5':hasProblems?'#FAEEDA':'#E1F5EE';
-      const acSummary=status!=='rotacion'?'Disponible durante rotación':hasProblems?allAircraftPend.slice(0,2).map(t=>t.title).join(' · ')+(allAircraftPend.length>2?' · …':''):'HOTO, inventario y tareas al día';
+      const acSL=status!=='rotacion'?'Fuera de rotación':noCoreEvidence?'Sin evidencia':hasProblems?allAircraftPend.length+' pendiente'+(allAircraftPend.length>1?'s':''):'Bajo control';
+      const acSC=status!=='rotacion'?'#9CA3AF':noCoreEvidence?'#9CA3AF':hasProblems?'#854F0B':'#0F6E56';
+      const acSB=status!=='rotacion'?'#F5F5F5':noCoreEvidence?'#F5F5F5':hasProblems?'#FAEEDA':'#E1F5EE';
+      const acSummary=status!=='rotacion'?'Disponible durante rotación':noCoreEvidence?`HOTO e inventario sin cargar para ${vj.aircraft||'este avión'}`:hasProblems?allAircraftPend.slice(0,2).map(t=>t.title).join(' · ')+(allAircraftPend.length>2?' · …':''):'HOTO, inventario y tareas al día';
       return `<button onclick="go('vj_status')" style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:10px">
           <span style="font-size:20px">✈️</span>
@@ -2470,16 +2481,22 @@ function vjStatusView(){
   const invPend=items.filter(i=>(i.current_qty??i.std_qty??0)<(i.std_qty??0)).length;
   const sess=S.invSession;
 
-  // Fuente real = Supabase (si el HOTO ya se cargó); localStorage como fallback pre-migración.
-  const hoToChecks=S.hotoRec?.daily_duties||JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
+  // Fuente real = Supabase, correlacionada con el avión actual (D14/D15) —
+  // ver triggerHotoSummaryLoad.
+  triggerHotoSummaryLoad();
+  const hoToChecks=S._hotoSummaryLoaded?(S.hotoSummaryRec?.daily_duties||{}):JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
   const allHotoItems=VJ_HOTO_SECTIONS.flatMap(s=>s.items);
   const hotoDone=allHotoItems.filter(i=>hoToChecks[i.id]).length;
   const hotoTotal=allHotoItems.length;
 
+  // Mismo principio que la tarjeta del dashboard (D15): "bajo control" exige
+  // evidencia real de HOTO+Inventario del avión actual, no solo ausencia de
+  // tareas/discrepancias — ambos confirmados ausentes (no "todavía cargando").
+  const noCoreEvidence=status==='rotacion'&&S._hotoSummaryLoaded&&S._invLoaded&&!S.hotoSummaryRec&&!sess;
   const hasProblems=aircraftPend.length>0||invDisc>0;
-  const ctrlLabel=status!=='rotacion'?'Fuera de rotación':hasProblems?(aircraftPend.length+invDisc)+' elemento'+(aircraftPend.length+invDisc>1?'s':'')+' requieren atención':'El avión está bajo control';
-  const ctrlColor=status!=='rotacion'?'#9CA3AF':hasProblems?'#854F0B':'#0F6E56';
-  const ctrlBg=status!=='rotacion'?'#F5F5F5':hasProblems?'#FAEEDA':'#E1F5EE';
+  const ctrlLabel=status!=='rotacion'?'Fuera de rotación':noCoreEvidence?`HOTO e inventario sin cargar para ${vj.aircraft||'este avión'}`:hasProblems?(aircraftPend.length+invDisc)+' elemento'+(aircraftPend.length+invDisc>1?'s':'')+' requieren atención':'El avión está bajo control';
+  const ctrlColor=status!=='rotacion'?'#9CA3AF':noCoreEvidence?'#9CA3AF':hasProblems?'#854F0B':'#0F6E56';
+  const ctrlBg=status!=='rotacion'?'#F5F5F5':noCoreEvidence?'#F5F5F5':hasProblems?'#FAEEDA':'#E1F5EE';
 
   const secTitle=t=>`<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:16px 0 8px">${t}</div>`;
   const row=(label,val,hi=false)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:0.5px solid var(--border)"><span style="font-size:13px;color:var(--t2)">${label}</span><span style="font-size:13px;font-weight:600;color:${hi?'#854F0B':'var(--text)'}">${val}</span></div>`;
@@ -2955,6 +2972,7 @@ async function refreshVjContext(){
     if(fresh){
       if(fresh.aircraft!==prevAircraft){
         S._hotoLoaded=false; S.hotoRec=null; S.hotoItems=null; S.hotoErr=null;
+        S._hotoSummaryLoaded=false; S.hotoSummaryRec=null;
         S._llcLoaded=false; S.llcRec=null; S.llcErr=null;
         S._invLoaded=false; S.invSession=null; S.invItems=[]; S.invChat=[];
         S._readiLoaded=false; S.vjReadiness=null;
@@ -2963,6 +2981,30 @@ async function refreshVjContext(){
     }
   }catch(e){ console.error('vj state refresh',e); }
   finally{ _vjRefreshInFlight=false; render(); }
+}
+
+// El resumen del dashboard/"Estado del avión" necesita saber el checklist real
+// del HOTO del avión ACTUAL sin depender de que la usuaria haya visitado antes
+// la pantalla viva de HOTO (vjHotoView) — antes de este fix, si nunca se había
+// visitado vjHotoView en la sesión, S.hotoRec quedaba undefined para siempre y
+// el resumen caía a un fallback de localStorage (vj_hoto_checks) sin ningún
+// tag de avión, mostrando el checklist de la última rotación real usada en
+// ese dispositivo sin importar cuál fuera el avión actual — bug real
+// encontrado el 2026-08-06 (D14 no lo cubrió: la causa no era vj_state ni la
+// falta de correlación por matrícula, sino que este resumen nunca llegaba a
+// consultar Supabase). Flag independiente de S._hotoLoaded (el de la pantalla
+// viva, que además dispara la migración local→Supabase una sola vez) para no
+// interferir con esa lógica.
+function triggerHotoSummaryLoad(){
+  if(S._hotoSummaryLoaded) return;
+  S._hotoSummaryLoaded=true;
+  (async()=>{
+    try{
+      const rec=await hotoSvc.loadActiveHoto(S.vjState.aircraft);
+      S.hotoSummaryRec=(rec&&rec.ambiguous)?null:rec;
+    }catch(e){ console.error('hoto summary load',e); S.hotoSummaryRec=null; }
+    render();
+  })();
 }
 
 async function toggleMode() {
