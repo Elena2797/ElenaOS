@@ -68,7 +68,9 @@ Instrucción explícita de la usuaria, ya reflejada en cómo está construido el
 | VistaJet (pasaporte) | Sí (`vj_state.passport_exp`) | **Sí — construido en esta sesión** | Sí |
 | VistaJet (rotación/avión/contexto operativo) | Sí (`vj_state.status/aircraft/rotation_*`) | **Sí — construido en esta sesión** | Sí |
 | VistaJet (HOTO ligado al avión) | Sí (`vj_hoto_records`, modelo corregido en D13) | **Sí — construido en esta sesión** | Sí, tras corregir el modelo (D13) |
-| VistaJet (resto: maleta, e-learning/facturas) | Parcial (`vj_state.bag_checks`) | No | **No limpiamente todavía** — ver "Lo que se auditó y no se construyó" abajo |
+| VistaJet (administrativo: eLearnings/Facturas) | Sí (`vj_tasks`, misma tabla que ya usa el dashboard) | **Sí — construido en esta sesión** | Sí, sin cambios de esquema |
+| VistaJet (maleta) | Parcial (`vj_state.bag_checks`, sin plantillas server-side) | No | **No limpiamente** — bloqueado por dato, ver abajo |
+| VistaJet (proceeding) | No (cero dato) | No | **No limpiamente** — no hay ningún dato del que partir |
 | Gym | No (solo `metrics` genérico) | No | No hay tabla propia que interrogar |
 | Finanzas | Sí (`transactions`, 821 filas) | No | Sí, en teoría — pero sin `CREATE TABLE` versionado (deuda, ver KNOWN_PROBLEMS.md), habría que resolver eso primero |
 | JETMI | Parcial (`operators`) | No | El PRD describe fase/bloqueos/próximo movimiento como conceptos, pero no hay tabla que los modele todavía — ver sección JETMI abajo |
@@ -79,7 +81,8 @@ Instrucción explícita de la usuaria, ya reflejada en cómo está construido el
 - **`vistajet.maleta` (bag_checks) como trigger de Intervention**: auditado y descartado por ahora. `bag_checks` es un mapa `{plantilla_item: bool}`, pero las plantillas (cuántos items tiene cada maleta) viven en `localStorage` del frontend, no en Supabase — el backend no puede saber si "maleta completa" sin adivinar o sin migrar las plantillas a Supabase primero. Construirlo hoy habría significado inventar un umbral falso. Queda documentado como el primer paso pendiente si se retoma este dominio.
 - **HOTO recibido/pendiente**: auditado el 2026-08-06, encontrado NO cleanly-buildable tal como estaba (`status` solo tomaba `'active'` en la práctica, sin acción real de cierre, sin correlación con `vj_state.aircraft`) — pero, a diferencia de maleta/e-learnings, la usuaria decidió corregir el modelo en vez de posponerlo. **Resuelto el mismo día (D13)**: ver `modules/VISTAJET.md` § 3 y `DECISIONS.md` D13. ya no está en la lista de "no construido".
 - **HOTO readiness proactivo** (avisar si falta HOTO antes de fin de rotación): `services/readiness.js` ya calcula esto muy bien, pero solo client-side, a partir de HOTO + Inventory + Laundry + Shopping. Ahora que la correlación HOTO↔avión está resuelta (D13), este es el candidato más natural para convertir en specialist MCP-invocable — evaluado como próximo paso, no descartado, solo no priorizado todavía.
-- **E-learning/facturas**: no existe ninguna tabla ni módulo para esto en todo el código. No se puede construir un specialist sobre un dato que no existe — habría que diseñar el modelo desde cero, fuera del alcance de "conectar lo que ya existe".
+- **E-learning/facturas**: auditado el 2026-08-06 y resultó ser el caso contrario a maleta/HOTO — SÍ tenía una fuente de verdad limpia (`vj_tasks`, la misma tabla que ya categoriza `readiness.js` por título). Construido el mismo día: `summarizeTaskBucket()` porta esa misma lógica al backend, expuesto en `vistajet_get_status.admin`. Ver `modules/VISTAJET.md` § 4.
+- **Proceeding/movimiento operativo**: auditado el 2026-08-06 — cero referencias en código de aplicación en ningún repo, ningún campo, ninguna convención de tarea reutilizable. A diferencia de e-learnings/facturas, aquí no hay nada que conectar — habría que inventar el concepto entero. Bloqueado por dato, sin próximo paso claro hasta que exista una decisión de qué significa "proceeding" a nivel operativo.
 
 ## JETMI — diseño preparado para cuando tenga datos reales
 

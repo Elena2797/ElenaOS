@@ -44,11 +44,33 @@ Dos vertical slices construidos sobre el patrón formalizado en [core/DOMAIN_SPE
 - `readiness.js` (Aircraft Readiness) actualizado para pasar el avión actual a `loadActiveHoto` — comportamiento sin cambios mientras `vj_state.aircraft` esté vacío (como está hoy en producción); se activa solo cuando haya un avión asignado.
 - **Deliberadamente sin tocar**: la pantalla de edición viva de HOTO (`vjHotoView`) sigue llamando a `loadActiveHoto()` sin avión — cambio de mayor riesgo sobre la vista de uso diario, no verificable de punta a punta sin interacción real, pospuesto a propósito.
 
-Todos los specialists: sin UI propia (conversación/MCP únicamente, igual que sueño); el modal manual de `openVjState()` sigue funcionando exactamente igual, sin cambios. Tests: `isabel-api/src/__tests__/vistajet.test.js` (lógica pura) + `vistajet.orchestration.test.js` (fake-db en memoria, 25+ escenarios). Verificado también en navegador (Readiness/HOTO/Inventario, sin errores de consola, sin regresión).
+### 4. Administrativo — eLearnings y Facturas (mismo día)
+Auditoría de los tres huecos restantes de VistaJet (proceeding, maleta, administrativo) encontró que este era el único con una fuente de verdad ya limpia: `vj_tasks` (misma tabla que usa `readiness.js` para el dashboard), con la usuaria ya creando tareas tituladas "eLearning: ..." / "Enviar facturas" como acción normal en la app (`main.js:3044`, el propio placeholder del modal usa "Enviar facturas" de ejemplo). No era un hueco de dato, era un hueco de visibilidad: el dashboard ya lo categorizaba, Isabel no lo veía.
 
-### Auditado y explícitamente no construido en este pase
-- **Maleta/`bag_checks`** como trigger de Intervention: las plantillas de la maleta (cuántos items tiene cada una) viven en `localStorage` del frontend, no en Supabase — el backend no puede saber si "la maleta está completa" sin adivinar. Requeriría migrar las plantillas a Supabase primero.
-- **E-learning/facturas**: no existe ninguna tabla ni módulo para esto todavía en todo el código.
+- **`summarizeTaskBucket(tasks, titleRegex)`**: réplica exacta (mismas regex `/elearning|e.?learning/i` y `/factura/i`, mismos criterios `status!=='done'`/`due_date`) de la función `bucket()` de `readiness.js` — misma lógica, no una fuente de verdad nueva, solo expuesta también al backend.
+- **`vistajet_get_status`** incluye ahora `admin: {elearnings: {pending, overdue, next_due}, facturas: {...}}`, independiente del avión actual (son obligaciones generales, no de una rotación concreta).
+- Puramente informativo — sin flujo de Intervention: a diferencia de sueño/pasaporte, resolver un e-learning o una factura vencida es una acción en la app (marcar la tarea como `done`), no una respuesta conversacional que Isabel pueda registrar directamente.
+- Sin tabla nueva, sin UI nueva, sin duplicar datos — la única "duplicación" es de lógica de categorización entre dos runtimes (frontend/backend), inevitable dado que son procesos distintos; el dato en sí vive en un solo sitio.
+
+Todos los specialists: sin UI propia (conversación/MCP únicamente, igual que sueño); el modal manual de `openVjState()` sigue funcionando exactamente igual, sin cambios. Tests: `isabel-api/src/__tests__/vistajet.test.js` (lógica pura) + `vistajet.orchestration.test.js` (fake-db en memoria, 30+ escenarios). Verificado también en navegador (Readiness/HOTO/Inventario, sin errores de consola, sin regresión).
+
+## VistaJet cerrado como dominio operativo (2026-08-06)
+
+Criterio de cierre (fijado por la usuaria) verificado punto por punto:
+
+| Criterio | Estado |
+|---|---|
+| Rotación/estado operativo coherente | ✓ `vistajet_update_status` |
+| Avión actual coherente | ✓ `vistajet_get_status` + `vistajet_update_status` |
+| Aircraft delivered limpia contexto | ✓ `status:'libre'` limpia `aircraft`/`rotation_*` automáticamente |
+| HOTO corresponde al avión correcto y conserva histórico | ✓ D13 — correlación por `tail_number`, `closeHoto()` nunca borra |
+| Passport specialist activo | ✓ primer specialist VistaJet, en producción |
+| Automatización adicional solo si hay dato fiable | ✓ proceeding y maleta declarados bloqueados por dato (no construidos); administrativo construido porque el dato SÍ era fiable |
+| Nada depende de que la usuaria actualice dos sitios a mano | ✓ un solo punto de escritura por dato (`vj_state`, `vj_hoto_records`, `vj_tasks`); Isabel y el dashboard leen la misma fuente |
+
+**Bloqueados por dato, no por alcance de esta sesión** (quedan documentados como próximos pasos si algún día hay decisión de producto o migración):
+- **Proceeding/movimiento operativo**: cero dato hoy — ni tabla, ni campo, ni convención de tarea. Habría que diseñar el concepto desde cero.
+- **Maleta/`bag_checks`**: las plantillas (cuántos items tiene cada maleta) viven solo en `localStorage` del frontend, nunca en Supabase — el backend no puede saber si "la maleta está completa" sin adivinar. Requeriría migrar las plantillas a Supabase primero.
 
 ## Por qué VistaJet tiene módulos propios y el resto de áreas no
 Es el dominio con reglas de negocio reales, documentos oficiales que replicar exactamente, y consecuencias operativas concretas (entregar un avión mal preparado). El resto de áreas (JETMI, Salud, etc.) hoy no tienen ese nivel de especificidad — usan el sistema genérico de `tasks`/`metrics` porque es suficiente para lo que necesitan hoy.

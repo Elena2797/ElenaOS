@@ -7,6 +7,13 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-08-06 (continuación — VistaJet cerrado como dominio operativo)
+
+- **Auditados los tres huecos restantes de VistaJet** (proceeding, maleta, administrativo) con el mismo rigor que HOTO en D13 — código real, no suposiciones. Proceeding: cero dato en ningún repo. Maleta: confirmado que las plantillas viven solo en `localStorage`. Administrativo (eLearnings/Facturas): al contrario que los otros dos, **sí** tenía fuente de verdad limpia — `vj_tasks`, la misma tabla ya categorizada por título en `readiness.js` para el dashboard.
+- **Construido el mismo día**: `summarizeTaskBucket()` porta esa categorización exacta (mismas regex, mismos criterios) al backend — `vistajet_get_status` ahora incluye `admin: {elearnings, facturas}`. Sin tabla nueva, sin UI nueva, puramente informativo (sin flujo de Intervention, porque resolver una tarea administrativa es una acción en la app).
+- **VistaJet queda cerrado como dominio operativo** — los 7 criterios de cierre fijados por la usuaria verificados uno por uno (rotación/avión/entrega coherentes, HOTO correlacionado con historial, passport specialist activo, automatización solo sobre dato fiable, un único punto de escritura por dato). Proceeding y maleta quedan documentados como bloqueados por dato, no como pendientes de esta sesión.
+- 184/184 tests en `isabel-api`.
+
 ## 2026-08-06 (continuación — modelo de HOTO corregido, D13)
 
 - **Corregido el modelo de HOTO antes de conectarlo a Isabel, no encima de datos inconsistentes.** Auditoría encontró que `vj_hoto_records.status` solo tomaba el valor `'active'` en la práctica (`'delivered'` era un comentario SQL nunca escrito), sin ninguna acción real de cierre/entrega, y sin correlación entre `tail_number` y `vj_state.aircraft` — nada impedía que el HOTO "actual" mostrado fuera de un avión completamente distinto al operativo real.
