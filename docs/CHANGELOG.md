@@ -16,7 +16,9 @@ No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí
 - Endpoints `POST /v1/hoto/import/analyze` y `POST /v1/hoto/import/apply`. UI: "Subir HOTO" dentro de `vjHotoView` → "HOTO detectado — X columnas utilizadas" → Continuar/Nuevo → mismo editor de siempre.
 - Isabel no necesitó cambios — ya leía `vj_hoto_records` filtrando por `status:'active'`, así que las filas `superseded` (nueva) quedan excluidas automáticamente igual que las `delivered`.
 - 21 tests nuevos en `isabel-api` (207/207), incluida orquestación contra PDFs reales construidos con pdf-lib (mismos nombres de campo que el PDF oficial).
-- **Pendiente antes de desplegar:** `hoto_migration_v5.sql` (aditiva, columnas nuevas + backfill) sin ejecutar en Supabase todavía. Detalle completo en `DECISIONS.md` D16.
+- Migración ejecutada y verificada por la usuaria en Supabase (backfill confirmado sobre el HOTO real de 9H-VCQ). Verificación final contra producción real: import→apply→export→reparse con una matrícula desechable vía la API desplegada (100% de los campos, limpiado después), y en navegador contra un HOTO real (pantalla de detección correcta, sin tocar el D-AFBS real).
+- **Bug real encontrado en la propia QA, antes de que la usuaria lo viera:** los tres handlers nuevos (`hotoImportFileSelected`/`hotoImportChoose`/`hotoImportCancel`) no estaban registrados en el `Object.assign(window, {...})` que expone las funciones a los `onclick`/`onchange` inline — los tres botones del flujo de import habrían fallado en silencio al pulsarlos. Corregido y verificado en el mismo ciclo de QA antes del deploy final.
+- Detalle completo en `DECISIONS.md` D16.
 
 ## 2026-08-06 (continuación — el bug de D14 seguía filtrándose: fallbacks de localStorage y una señal desconectada, D15)
 
