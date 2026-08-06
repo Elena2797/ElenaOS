@@ -85,7 +85,9 @@ Contenido real: 821 filas importadas (185 Revolut + 636 Sabadell), ver `finance_
 ## VistaJet — Estado y tareas propias
 
 ### `vj_state`
-Migración: `setup.sql`. Columnas: id, status (`libre`\|`rotacion`\|`standby`), aircraft, rotation_day, rotation_total, rotation_start, hours_month, hours_year, passport_exp, active_bag, bag_checks (jsonb), updated_at.
+Migración: `setup.sql`. Columnas: id, status (`libre`\|`rotacion`\|`standby`), aircraft, rotation_day, rotation_total, rotation_start, hours_month, hours_year, passport_exp, active_bag, bag_checks (jsonb), updated_at. Fila única (singleton) — se lee con `.limit(1)` sin filtro, se escribe con `.update().eq('id', ...)`, sin historial.
+
+`passport_exp` se lee y escribe desde dos sitios desde 2026-08-06: el modal manual `openVjState()` en el frontend (sigue funcionando igual, sin cambios), y el specialist `isabel-api/src/core/specialists/vistajet.js` vía las tools MCP `vistajet_get_status`/`vistajet_update_passport` — ver [modules/VISTAJET.md](modules/VISTAJET.md). Mismos umbrales de riesgo en ambos sitios (≤30 días "red", ≤90 "amber"), duplicados como constante hasta que exista un sitio común del que ambos puedan leerlos.
 
 ### `vj_tasks`
 Migración: `setup.sql`. Columnas: id, title, status, priority (default `normal`), due_date, created_at.
@@ -173,18 +175,19 @@ Migración: `isabel-api/migrations/checkins_migration_v1.sql` y `interventions_m
 Hoy solo se escribe `sleep_minutes` (vía `registerSleep()`). El resto de columnas existen porque la tabla se diseñó para todo el dominio Salud, no solo sueño — no confundir "columna existe" con "columna en uso".
 
 ### `interventions`
-Entidad genérica de "pregunta pendiente de Isabel", reutilizable por cualquier dominio futuro, no exclusiva de Salud.
+Entidad genérica de "pregunta/aviso pendiente de Isabel", reutilizable por cualquier dominio — desde 2026-08-06 usada por dos: Salud y VistaJet (ver [modules/VISTAJET.md](modules/VISTAJET.md) § specialist de pasaporte). No confundir con la tabla `decisions` (decisiones abiertas de la usuaria) — esta es de Isabel hacia la usuaria.
 | Columna | Tipo | Notas |
 |---|---|---|
 | id | uuid PK | default `gen_random_uuid()` |
-| domain | text | ej. `health.sleep` |
-| target_date | date | fecha civil Europe/Madrid a la que se refiere la pregunta |
+| domain | text | valores reales hoy: `Salud`, `VistaJet` |
+| kind | text | añadida en `interventions_migration_v2.sql`; separa el tipo dentro de un domain (ej. `sleep_checkin`, `passport_expiry`) — `domain+kind+status` es la clave por la que se resuelve una respuesta entrante, sin id |
+| target_date | date | fecha a la que se refiere la pregunta (civil Europe/Madrid para Salud; para VistaJet, la fecha de vencimiento en cuestión) |
 | reason_signature | text | clave de deduplicación — ver índice abajo |
 | status | text | `pending` \| `answered` \| `superseded`, default `pending` |
 | created_at | timestamptz | default `now()` |
 | answered_at | timestamptz | nullable |
 
-`CREATE UNIQUE INDEX ... ON interventions(reason_signature) WHERE status='pending'` — garantiza a nivel de base de datos que nunca puede haber dos preguntas pendientes con la misma firma (ej. dos preguntas de sueño abiertas para el mismo día), incluso si el código de aplicación tuviera un bug de dedup.
+`CREATE UNIQUE INDEX ... ON interventions(reason_signature) WHERE status='pending'` — garantiza a nivel de base de datos que nunca puede haber dos preguntas pendientes con la misma firma (ej. dos preguntas de sueño abiertas para el mismo día), incluso si el código de aplicación tuviera un bug de dedup. Índice adicional `(domain, kind, status)` para la resolución sin id.
 
 Primer registro real conservado (no es dato de prueba descartable, es un check-in real de la usuaria): `fecha=2026-08-05`, `sleep_minutes=375` (6h15).
 
