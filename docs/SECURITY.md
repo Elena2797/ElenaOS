@@ -1,6 +1,6 @@
 Estado: implementado (documenta riesgos reales, no un plan de mitigación)
-Última verificación: 2026-08-05
-Verificado en: grep directo sobre isabel-api/src y life-os-app/src, lectura de .git/config; riesgo #5 confirmado en la práctica el 2026-08-02; riesgos #7 y #8 confirmados el 2026-08-05 durante la auditoría de OpenClaw
+Última verificación: 2026-08-06
+Verificado en: grep directo sobre isabel-api/src y life-os-app/src, lectura de .git/config; riesgo #5 confirmado en la práctica el 2026-08-02; riesgos #7 y #8 confirmados el 2026-08-05 durante la auditoría de OpenClaw; riesgo #7 resuelto y verificado en producción el 2026-08-06; riesgo #9 encontrado el 2026-08-06 durante el despliegue de isabel-gateway
 Fuente de verdad de datos: ninguna
 
 # SECURITY.md — Riesgos reales observados
@@ -29,11 +29,14 @@ Confirmado explícitamente en las migraciones (`ALTER TABLE ... DISABLE ROW LEVE
 ### 6. Sin autenticación de usuario
 No hay login, no hay sesiones de usuario, no hay JWT propio del sistema. Todo el acceso se basa en "quien tiene la URL y las claves". Es coherente con ser una app estrictamente personal de un solo usuario — pero significa que no hay ninguna capa que impida acceso si las claves se filtran.
 
-### 7. `isabel-api/src/mcp.js` no tiene ninguna autenticación
-`GET/POST /mcp` es la única ruta del servidor sin `requireApiKey` (a diferencia de `/v1/message`, `/v1/confirm`, etc.). Cualquiera con la URL puede abrir una sesión MCP y llamar a cualquier tool expuesta (inventario VistaJet, y desde 2026-08-05 también `health_get_sleep_status`/`health_register_sleep`). Confirmado el 2026-08-05 como bloqueante explícito antes de conectar cualquier Gateway remoto (OpenClaw en Railway u otro) a este endpoint — ver `DECISIONS.md` D10 y `core/AUTOMATIONS.md`. No remediado todavía; es trabajo de diseño (qué mecanismo de auth, no solo "añadir una clave más"), pendiente de fase separada.
+### 7. `isabel-api/src/mcp.js` no tenía ninguna autenticación — RESUELTO
+`GET/POST /mcp` era la única ruta del servidor sin `requireApiKey`. Corregido el 2026-08-06, commit `c02d4cd`: `requireApiKey` aplicado a `/mcp` igual que al resto de rutas. Verificado en producción: `GET /mcp` sin token → 401. Necesario porque `isabel-gateway` (Railway) ya se conecta a este endpoint — ver `core/AUTOMATIONS.md`.
 
 ### 8. El token de Telegram comprometido está también en el perfil real de OpenClaw
 El mismo token ya identificado como expuesto en `lifeos-agent` (riesgo relacionado con #5 — expuesto en un archivo de configuración versionado) está configurado igualmente en `~/.openclaw/openclaw.json` (perfil real de OpenClaw en esta máquina). No es un incidente nuevo — es la misma incidencia abierta, confirmada ahora en una segunda superficie el 2026-08-05. Implica que, además de rotar el token, cualquier despliegue futuro de OpenClaw como runtime debe usar un bot de Telegram nuevo y dedicado (un mismo token no puede compartirse entre `lifeos-agent` y OpenClaw sin conflicto de long-polling, 409, independientemente del problema de seguridad). No remediado.
+
+### 9. `ANTHROPIC_API_KEY` real expuesta en texto plano en la salida de esta sesión de chat
+Encontrado el 2026-08-06, autoidentificado (no reportado por la usuaria): durante el debugging del despliegue de `isabel-gateway`, el valor real de `ANTHROPIC_API_KEY` apareció en texto plano dos veces en la salida de comandos de este chat — una vez vía un `env | grep ANTHROPIC` de diagnóstico, y otra vez en el eco de un comando fallido ("command not found") que incluía la clave sin querer. La clave sigue siendo la misma usada en producción por `isabel-api` y ahora también por `isabel-gateway` — no se ha rotado. Candidata a rotación; no se ha hecho porque requiere generar una clave nueva desde el dashboard de Anthropic y decidir con la usuaria, no es una acción unilateral de un chat. Ver `NEXT_SESSION.md`.
 
 ## Lo que NO se encontró (positivo)
 - No hay contraseñas ni secretos de terceros hardcodeados más allá de lo anterior.
@@ -41,4 +44,4 @@ El mismo token ya identificado como expuesto en `lifeos-agent` (riesgo relaciona
 - No hay inyección SQL evidente — todo el acceso a Supabase pasa por el cliente oficial (`@supabase/supabase-js`) o por PostgREST vía HTTP con parámetros escapados.
 
 ## Medidas pendientes (no implementadas, solo constancia)
-Ninguna medida de mitigación de lo anterior está implementada a día de hoy. No se lista un "plan" porque no se ha decidido ninguno — si se decide abordar algo de esto, la decisión debe registrarse en [DECISIONS.md](DECISIONS.md). El riesgo #7 (MCP sin auth) es, de toda la lista, el único marcado explícitamente como bloqueante para un trabajo futuro concreto (desplegar OpenClaw como runtime remoto) — no puede quedar pendiente indefinidamente si ese despliegue avanza.
+Ninguna medida de mitigación del resto de riesgos está implementada a día de hoy (el #7 ya se resolvió, ver arriba). No se lista un "plan" porque no se ha decidido ninguno — si se decide abordar algo de esto, la decisión debe registrarse en [DECISIONS.md](DECISIONS.md). El riesgo #9 (`ANTHROPIC_API_KEY` expuesta en texto plano en este chat) es el único con una acción concreta recomendada y todavía no tomada: rotarla desde el dashboard de Anthropic.

@@ -1,11 +1,20 @@
 Estado: conocimiento vigente — se añade cronológicamente, nunca se reescribe
-Última verificación: 2026-07-10
-Verificado en: git log de isabel-api y life-os-app
+Última verificación: 2026-08-06
+Verificado en: git log de isabel-api, life-os-app e isabel-gateway
 Fuente de verdad de datos: ninguna
 
 # CHANGELOG.md — Historial relevante
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
+
+## 2026-08-06
+
+- **Cerrado el misterio del timeout de cron en Windows: es específico del runtime Windows, no de OpenClaw.** Repro completo en WSL2/Linux nativo (mismo OpenClaw 2026.6.10, mismo modelo, mismo MCP): cron → runner_entered → claude-cli → MCP autenticado → tool → respuesta → run OK, sin fallo. El bug de Windows se explica por un reinicio de Gateway en cascada que cae en modo degradado por falta de integración con Scheduled Tasks — no bloquea Railway/Linux. Ver `KNOWN_PROBLEMS.md`.
+- **Fix de seguridad real: `isabel-api/src/mcp.js` ya tiene autenticación.** `requireApiKey` aplicado también a `GET/POST /mcp` (antes era la única ruta sin protección). Desplegado y verificado en producción. Commit `c02d4cd`. Ver `SECURITY.md` riesgo #7 (ahora resuelto).
+- **Rediseño y despliegue de la correlación de Interventions: ya no depende de que el LLM recuerde un `intervention_id`.** `health_register_sleep({text})` pierde el parámetro `intervention_id` — LIFEOS resuelve la Intervention pendiente de forma determinista por `domain+kind+status=pending`, fail-closed ante cero o más de una coincidencia (nunca adivina). Incluye fix de una condición de carrera real (dos llamadas concurrentes a `createIntervention` con el mismo `reason_signature` ahora convergen en la misma fila en vez de que una explote por `23505 unique_violation`). 113/113 tests pasando (14 nuevos de orquestación, incluida concurrencia). Migración `kind` aplicada contra Supabase real (columna nueva + índice, sin tocar datos históricos — verificado read-only después). Commit `7ab806f` (isabel-api). Ver `modules/HEALTH_AND_GYM.md`.
+- **Primer despliegue real de un Gateway de OpenClaw persistente en Railway: `isabel-gateway`.** Repo y servicio nuevos, separados de `isabel-api`. `gateway.bind: loopback`, sin dominio público, administración exclusivamente vía `railway ssh`. Confirmado funcionando: arranque limpio sin crash-loop, volumen persistente en `/data` (config sobrevive un restart completo), MCP `lifeos` autenticado contra `isabel-api` producción (`openclaw mcp doctor --probe` → `ok`), `claude-cli` funciona al invocarlo manualmente dentro del contenedor. **Bloqueado un turno de agente real**: falta el auth profile interno `anthropic:claude-cli` (distinto del `anthropic:default` de API key, ya registrado) — requiere un login OAuth interactivo que no ha logrado completarse a través de las capas anidadas de `railway ssh`/`su`. Detalle completo, incluido todo lo ya descartado como causa, en `core/AUTOMATIONS.md` y `KNOWN_PROBLEMS.md`. Commits `34b430a`, `de2ab5a` (isabel-gateway, repo local, sin remoto en GitHub todavía).
+- **Hallazgo de seguridad nuevo, autoidentificado: `ANTHROPIC_API_KEY` real apareció en texto plano dos veces en la salida de este chat** durante el debugging del despliegue. No remediado (requiere rotación manual desde el dashboard de Anthropic). Ver `SECURITY.md` riesgo #9.
+- Sin tocar esta sesión, según instrucción explícita: Telegram (ni bot nuevo ni config), cron diario de las 08:00, `isabel-bridge.js`, `openChat()`, perfil real de OpenClaw del portátil, Control UI (sigue sin exponerse públicamente).
 
 ## 2026-08-05
 

@@ -1,31 +1,55 @@
-Estado: arquitectura de runtime aprobada (D10), nada desplegado en producción todavía — sigue sin haber ninguna automatización real corriendo sola
-Última verificación: 2026-08-05
-Verificado en: auditoría read-only de la instalación real de OpenClaw v2026.6.10 + dos experimentos locales en perfil dev aislado (cron vía CLI, cron vía Control UI) + búsqueda de cron/schedulers/triggers en los tres repos de LIFEOS — sin resultados propios
+Estado: en construcción — Gateway real desplegado en Railway, todavía sin ningún turno de agente funcionando de extremo a extremo
+Última verificación: 2026-08-06
+Verificado en: despliegue real de `isabel-gateway` en Railway (proyecto dedicado, separado de `isabel-api`), repro completo cron→runner→claude-cli→MCP→tool→respuesta en WSL/Linux (ver `KNOWN_PROBLEMS.md`), MCP `lifeos` autenticado y verificado con `openclaw mcp doctor --probe`, bloqueo actual de auth de `claude-cli` documentado con evidencia de `openclaw doctor`
 Fuente de verdad de datos: ninguna
 
 # core/AUTOMATIONS.md — Qué corre solo, y qué no
 
-## Verificado: sigue sin haber ninguna automatización real corriendo hoy en producción
-Ningún cron job, scheduler, webhook programado ni trigger de Supabase (más allá de los `DEFAULT now()` de columnas de timestamp) corre en producción hoy en ninguno de los tres repos de LIFEOS. Todo lo que ocurre en el sistema sigue ocurriendo porque la usuaria (o un chat de Claude) lo dispara manualmente. Esto no ha cambiado desde la última verificación — lo que cambió el 2026-08-05 es que ahora existe una decisión arquitectónica aprobada sobre **cómo** se construirá la automatización, más una pieza de dominio (Salud/sueño) ya lista para ser disparada por ella. Ver `DECISIONS.md` D10.
+## Verificado: todavía no hay ninguna automatización real corriendo en producción
+El Gateway de OpenClaw (`isabel-gateway`, Railway) está desplegado, persistente, y arranca correctamente — pero ningún turno de agente real completa un turno todavía (ver bloqueo actual más abajo). Sin eso, no hay cron diario, no hay Telegram, no hay nada disparándose solo. Ver `DECISIONS.md` D10 para la decisión de arquitectura ya aprobada.
 
-## Decisión de arquitectura (D10): OpenClaw como runtime autónomo
-**Aprobado, no desplegado.** OpenClaw pasa a ser el runtime que en el futuro ejecutará el ciclo Gateway → cron → sesión de agente → tools MCP → canal de entrega (Telegram u otro), mientras LIFEOS/`isabel-api` sigue siendo la única fuente de verdad de estado, reglas, deduplicación, especialistas y auditoría. El bridge local (`isabel-bridge.js`, ver `core/ISABEL_CHANNELS.md`) queda congelado — sin funcionalidad nueva — pendiente de retirarse cuando OpenClaw esté realmente en producción, pero no se ha borrado.
+## Lo que quedó resuelto desde la última verificación (2026-08-05 → 2026-08-06)
 
-## Lo que se probó en el spike (perfil `dev` aislado de OpenClaw, nunca el perfil real ni Telegram real)
-- **Control plane de cron vía CLI (`agent`/`cron` con token compartido): FALLA.** Bloqueado por el scope `operator.admin`, que la autenticación por token compartido no concede sobre el protocolo WS que usa la CLI (esa vía de bypass documentada solo aplica a superficies HTTP concretas, no al WS de cron). Confirmado no investigar workarounds de pairing — instrucción explícita de la usuaria de parar ante ese error.
-- **Control plane de cron vía Control UI (navegador, auto-aprobación de loopback): FUNCIONA.** Esta es la vía confirmada para administrar cron en una futura configuración real. El job se creó y se disparó correctamente en el horario programado.
-- **Ejecución del agente aislado disparado por ese cron: FALLA de forma no explicada.** Al dispararse el cron, el turno de agente no llegó a arrancar (`"cron: isolated agent setup timed out before runner start"`). No investigado — fuera del objetivo acotado de esa fase — ver `KNOWN_PROBLEMS.md`.
-- **Tools MCP de Salud/sueño invocadas por un agente real de OpenClaw: FUNCIONA**, en una sesión manual (no vía cron), con resultado correcto contra Supabase real. Ver `modules/HEALTH_AND_GYM.md`.
+1. **"isolated agent setup timed out before runner start" — causa raíz: específico del runtime Windows, no de OpenClaw.** Demostrado con un repro completo (cron isolated → runner_entered → claude-cli → MCP autenticado → tool → respuesta → run OK) en WSL2/Linux nativo, misma versión OpenClaw 2026.6.10, mismo modelo. El bug de Windows se explica por un reinicio de Gateway en cascada que en Windows cae en un modo degradado ("in-process restart") por falta de integración con Scheduled Tasks — no bloquea el despliegue en Railway (Linux). Detalle completo en `KNOWN_PROBLEMS.md`.
+2. **`isabel-api/src/mcp.js` ya tiene autenticación.** `requireApiKey` aplicado también a `/mcp` (antes solo a `/v1/*`). Verificado en producción: `GET /mcp` sin token → 401. Commit `c02d4cd`.
+3. **`health_register_sleep` ya no depende de que el LLM recuerde un `intervention_id`.** LIFEOS resuelve la Intervention pendiente por `domain+kind+status=pending`, fail-closed ante cero o más de una coincidencia. Ver `modules/HEALTH_AND_GYM.md` y commit `7ab806f` (isabel-api). Migración `kind` aplicada a Supabase real.
 
-## Lo más cercano a "automático" que existe hoy en producción (sin cambios respecto a antes)
-- **Aircraft Readiness**: se recalcula automáticamente al entrar en la vista de VistaJet o al volver del HOTO — evaluación bajo demanda al navegar, no un proceso en background.
-- **Migración de checklist localStorage → Supabase**: corre automáticamente la primera vez que se abre el HOTO tras el deploy, disparada por la carga de la vista, no por un scheduler.
-- **El bot de Telegram** (`lifeos-agent`) responde a mensajes entrantes — no actúa por iniciativa propia ni en background.
+## Gateway real: `isabel-gateway` (Railway)
 
-## Antes de desplegar OpenClaw como runtime real, quedan bloqueantes sin resolver
-1. `isabel-api/src/mcp.js` no tiene autenticación — no se puede conectar un Gateway remoto hasta resolverlo (ver `SECURITY.md`).
-2. El fallo de "isolated agent setup timed out" no está explicado — no se puede confiar en cron para producción sin entender esta causa.
-3. Telegram necesita un bot nuevo y dedicado — el token actual está comprometido (ver `SECURITY.md`) y, además, un mismo token no puede compartirse entre `lifeos-agent` y OpenClaw sin conflicto de long-polling (409).
+Repo propio en `LIFE OS/isabel-gateway/` (git local, no en GitHub todavía). Servicio Railway dedicado, **separado del proyecto de `isabel-api`**. Arquitectura: `gateway.bind: "loopback"`, sin dominio público, sin Control UI expuesta — administración exclusivamente vía `railway ssh` (loopback genuino desde dentro del contenedor, evita el bloqueo circular de pairing que apareció en el repro efímero previo). Detalle de archivos/variables en `isabel-gateway/README.md`.
 
-## Próximo experimento decidido
-Ninguno iniciado automáticamente. El siguiente paso (Fase 3 en adelante del plan de convergencia, ver `DECISIONS.md` D10) requiere autorización explícita nueva de la usuaria antes de ejecutarse.
+Confirmado funcionando:
+- Arranca limpio, sin crash-loop.
+- Volumen persistente en `/data` — confirmado que la config sobrevive un restart completo del contenedor.
+- MCP `lifeos` conecta y autentica contra `isabel-api` producción (`openclaw mcp doctor --probe` → `ok`).
+- `claude-cli` funciona correctamente cuando se invoca manualmente dentro del contenedor (mismo `ANTHROPIC_API_KEY` que usa `isabel-api`).
+
+## Bloqueo actual — el único que impide un turno de agente real
+
+**Todo turno de agente real falla con `FailoverError: Not logged in · Please run /login`, aunque `claude-cli` invocado manualmente (mismos flags que usa el Gateway) funciona perfectamente.**
+
+Causa raíz confirmada vía `openclaw doctor`: el backend `claude-cli` (vía `agentRuntime`) requiere su **propio** auth profile interno de OpenClaw, guardado en `/data/.openclaw/agents/main/agent/openclaw-agent.sqlite`, con la clave exacta `anthropic:claude-cli` — distinto del perfil `anthropic:default` (API key) que ya registramos con éxito. Ese perfil específico solo se crea con:
+
+```bash
+claude auth login                                                    # OAuth interactivo
+openclaw models auth login --provider anthropic --method cli --set-default
+```
+
+Ambos comandos **requieren una terminal interactiva real**. Se intentó completar el login OAuth varias veces vía `railway ssh` (directo, con `su node -c`, con `su - node`, con tmux, con un named pipe para mantener el stdin abierto entre llamadas) — todos los intentos fallaron: o bien el proceso vuelve al shell antes de que se pueda pegar el código, o el login "tiene éxito" (imprime `Login successful.`) pero **no llega a escribir `~/.claude/.credentials.json`** — no se encontró ese archivo en ninguna ubicación del contenedor tras el intento.
+
+No se ha investigado por qué el proceso muere antes de persistir la credencial — es la tarea pendiente concreta de la siguiente sesión.
+
+### Lo que NO es el problema (descartado con evidencia)
+- No es el `ANTHROPIC_API_KEY` — `claude auth status` y una invocación manual real (`claude -p ...`) funcionan perfectamente con él, dentro del mismo contenedor, como el mismo usuario `node`.
+- No son los flags/argumentos que usa el Gateway (`--output-format stream-json --session-id ...`) — se probaron manualmente idénticos y funcionan.
+- No es el volumen/persistencia — la config sí persiste correctamente entre restarts.
+- No es `models.providers.anthropic.apiKey` (SecretRef `${ANTHROPIC_API_KEY}`, ya configurado) — ese es un mecanismo de auth *distinto*, para llamadas directas a la API de Anthropic, no para el backend `claude-cli`.
+
+## Antes de tener un turno de agente real, queda un único bloqueante
+Completar el registro del auth profile `anthropic:claude-cli` — necesita una sesión verdaderamente interactiva (terminal local del usuario conectada directamente, sin capas de `su`/pipe de por medio) para que el login OAuth persista, o encontrar por qué `railway ssh` + `su` está matando el proceso antes de que escriba el archivo de credenciales.
+
+## Todavía sin tocar esta sesión (según instrucción explícita)
+- Telegram (ni bot nuevo ni configuración).
+- Cron diario de las 08:00.
+- `isabel-bridge.js` (sigue congelado, sin retirarse).
+- Perfil real de OpenClaw del portátil.

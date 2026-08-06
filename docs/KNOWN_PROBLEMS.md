@@ -1,6 +1,6 @@
 Estado: conocimiento vigente — lista viva, se actualiza con "Actualiza la documentación"
-Última verificación: 2026-08-05
-Verificado en: auditorías de sesiones anteriores (HOTO, Inventario, arquitectura de Isabel, incidente de Supabase pausado) + incidentes de infraestructura reales del 2026-08-03 (Isabel Core Fase 1/2, Railway, Vercel) + spike de OpenClaw del 2026-08-05
+Última verificación: 2026-08-06
+Verificado en: auditorías de sesiones anteriores (HOTO, Inventario, arquitectura de Isabel, incidente de Supabase pausado) + incidentes de infraestructura reales del 2026-08-03 (Isabel Core Fase 1/2, Railway, Vercel) + spike de OpenClaw del 2026-08-05 + repro Windows-vs-Linux y despliegue real de `isabel-gateway` en Railway del 2026-08-06
 
 # KNOWN_PROBLEMS.md — Deuda técnica y grietas conocidas
 
@@ -28,11 +28,11 @@ Ver [core/ISABEL_CHANNELS.md](core/ISABEL_CHANNELS.md) para el detalle completo.
 ### Cron de OpenClaw vía CLI está bloqueado por el scope `operator.admin`, incluso con token compartido
 Confirmado el 2026-08-05, perfil `dev` aislado: `agent cron add` (y comandos `cron` equivalentes) fallan con "scope upgrade pending approval" al autenticar por token compartido. La vía de bypass documentada para token compartido ("restaura scope completo") solo aplica a superficies HTTP concretas (`/tools/invoke`, endpoints compatibles con OpenAI), no al protocolo WS que usa la CLI para administrar cron. **Workaround confirmado que sí funciona:** administrar cron desde la Control UI (navegador), que se auto-aprueba vía loopback. Cualquier automatización futura con OpenClaw debe planificarse asumiendo Control UI como vía de administración de cron, no CLI. Ver `core/AUTOMATIONS.md`.
 
-### El turno de agente aislado disparado por un cron de OpenClaw no arranca — "isolated agent setup timed out before runner start"
-Encontrado el 2026-08-05, perfil `dev` aislado: un cron creado correctamente vía Control UI se disparó en el horario programado, pero el turno de agente que debía ejecutar nunca llegó a arrancar, con ese mensaje de timeout. No investigado — estaba fuera del objetivo acotado de esa fase de spike. Bloqueante para confiar en cron de OpenClaw en producción hasta que se entienda la causa. Ver `core/AUTOMATIONS.md`.
+### El turno de agente aislado disparado por un cron de OpenClaw no arrancaba en Windows — RESUELTO (específico del runtime Windows, no bloquea Railway)
+Encontrado el 2026-08-05 en Windows: un cron creado vía Control UI se disparaba en el horario programado, pero el turno de agente nunca llegaba a arrancar ("isolated agent setup timed out before runner start"). El 2026-08-05/06 se reprodujo el mismo escenario exacto (mismo OpenClaw 2026.6.10, mismo modelo, mismo MCP) en WSL2/Linux nativo y **completó el ciclo entero sin fallo**: cron → runner_entered → claude-cli → MCP autenticado → tool → respuesta → run OK. Conclusión: el bug es específico del runtime Windows (relacionado con un reinicio en cascada que en Windows cae en modo degradado "in-process restart" por falta de integración con Scheduled Tasks), no de OpenClaw en general. No bloquea el despliegue en Railway (Linux). La causa exacta del cuelgue previo al watchdog de 60s en Windows sigue sin acotarse a nivel de código, pero deja de ser relevante para producción.
 
-### `isabel-api/src/mcp.js` no tiene autenticación
-Ver [SECURITY.md](SECURITY.md) riesgo #7 — no se duplica el detalle aquí. Cuenta como bloqueante concreto (no solo deuda genérica) para el plan de desplegar OpenClaw como runtime remoto.
+### `claude-cli` no completa su registro de auth profile dentro del contenedor de `isabel-gateway` (Railway)
+Encontrado el 2026-08-06: todo turno de agente real en `isabel-gateway` falla con `FailoverError: Not logged in · Please run /login`, aunque `claude-cli` invocado manualmente dentro del mismo contenedor (mismos flags que usa el Gateway, mismo `ANTHROPIC_API_KEY`) funciona perfectamente. `openclaw doctor` confirma la causa: falta el auth profile `anthropic:claude-cli` en `/data/.openclaw/agents/main/agent/openclaw-agent.sqlite` — distinto del perfil `anthropic:default` (API key) que sí se registró con éxito. Registrarlo requiere `claude auth login` (OAuth interactivo) + `openclaw models auth login --provider anthropic --method cli --set-default`, ambos exigen una terminal interactiva real. Se intentó vía `railway ssh` de varias formas (directo, `su node -c`, `su - node`, tmux, named pipe) — todos los intentos o vuelven al shell antes de poder pegar el código OAuth, o "tienen éxito" (`Login successful.`) pero no llegan a escribir `~/.claude/.credentials.json`. Bloqueante único para tener un turno de agente real funcionando. Ver `core/AUTOMATIONS.md`.
 
 ## Duplicación de datos
 
@@ -75,4 +75,4 @@ Encontrado el 2026-08-03 en `isabel-api`: la región estaba fijada en `sfo` (inv
 Encontrado el 2026-08-03: con la región ya corregida, Railway seguía sin recoger el commit más nuevo de `isabel-api` — ni "Redeploy" ni "Latest deploy" ni re-seleccionar la rama en el dropdown lo resolvían (todos reconstruían el mismo commit viejo). Solo un `Disconnect` + `Connect Repo` completo del Source forzó una resincronización real. Ver `operations/RAILWAY.md`.
 
 ## Seguridad
-Ver [SECURITY.md](SECURITY.md) — no se duplica aquí, pero cuenta como deuda técnica activa (PIN hardcodeado, API key con fallback expuesto en el bundle, RLS desactivado, token de GitHub en texto plano, MCP de `isabel-api` sin autenticación, token de Telegram comprometido presente también en el perfil real de OpenClaw).
+Ver [SECURITY.md](SECURITY.md) — no se duplica aquí, pero cuenta como deuda técnica activa (PIN hardcodeado, API key con fallback expuesto en el bundle, RLS desactivado, token de GitHub en texto plano, token de Telegram comprometido presente también en el perfil real de OpenClaw, `ANTHROPIC_API_KEY` expuesta en texto plano en chat el 2026-08-06). El riesgo de MCP sin autenticación ya se resolvió (2026-08-06).
