@@ -2158,7 +2158,7 @@ function hotoEntregaTab(){
   ${section('Additional Comments','comment','Añadir comentario…',null)}
   ${section('Items to offload','offload','Añadir item a descargar…',3)}
 
-  <button onclick="hotoExport()" style="width:100%;margin-top:18px;padding:15px;border:none;background:#0F6E56;color:#fff;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ti ti-file-download"></i> Exportar HOTO PDF oficial</button>
+  <button onclick="openHotoSaveModal()" style="width:100%;margin-top:18px;padding:15px;border:none;background:#0F6E56;color:#fff;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ti ti-file-download"></i> Guardar PDF</button>
   <div style="text-align:center;font-size:11px;color:var(--t3);margin-top:8px;line-height:1.5">Genera el PDF oficial de VistaJet con estos datos.<br>El PDF nunca se edita a mano: siempre se exporta desde aquí.</div>`;
 }
 
@@ -2744,12 +2744,84 @@ async function hotoDelItem(id){
   }catch(e){ alert('No se pudo borrar: '+e.message); }
 }
 
-function hotoExport(){
+// ── Guardar PDF (D17) ─────────────────────────────────────────────────────
+// Antes: window.open() directo a la URL de export — funcionaba (visor nativo
+// de iOS con compartir/guardar), pero no se sentía como "guardar mi HOTO": ni
+// nombre elegible, ni acción explícita de guardado. Ahora: nombre editable
+// antes de generar, y se intenta la mejor vía soportada, en orden:
+//   1. Web Share API con un File real (navigator.share({files})) — Share
+//      Sheet nativo de iOS, "Guardar en Archivos" conserva el nombre exacto.
+//      Funciona también dentro de la PWA instalada, a diferencia del blob.
+//   2. Blob + <a download="nombre.pdf"> — fiable en desktop/Android; en iOS
+//      Safari/PWA es donde falla con más frecuencia (motivo de intentar 1º
+//      la vía anterior), pero como fallback nunca hace daño intentarlo.
+//   3. Último recurso: abrir el PDF en el visor nativo (el comportamiento
+//      que había antes de D17) — nunca falla, aunque el control del nombre
+//      dependa de que el visor respete el filename del Content-Disposition.
+// Cancelar el Share Sheet (AbortError) no es un fallo: no se fuerza ningún
+// fallback, simplemente se cierra el modal.
+function openHotoSaveModal(){
   if(!S.hotoRec) return;
-  // Navegación directa (no fetch+blob): en iOS/PWA los blobs de descarga fallan,
-  // pero abrir la URL muestra el PDF en el visor nativo con compartir/guardar.
-  const url=`${ISABEL_API}/v1/hoto/${S.hotoRec.id}/export?inline=1&api_key=${encodeURIComponent(ISABEL_KEY)}`;
-  window.open(url,'_blank');
+  const tail=(S.hotoRec.tail_number||'AIRCRAFT').replace(/[^A-Za-z0-9-]/g,'')||'AIRCRAFT';
+  const dateStr=new Date().toISOString().slice(0,10);
+  const defaultName=`HOTO_${tail}_${dateStr}`;
+  const m=document.createElement('div');
+  m.className='overlay'; m.id='modal';
+  m.innerHTML=`<div class="modal">
+    <h3>Guardar PDF</h3>
+    <label style="font-size:11px;font-weight:600;color:var(--t2);display:block;margin:2px 0 4px">Nombre del archivo</label>
+    <input class="fi" id="hoto-save-name" value="${defaultName}" autocomplete="off">
+    <div class="ma">
+      <button class="btn btn-s" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-p" id="hoto-save-btn" onclick="hotoSaveConfirm()">Guardar PDF</button>
+    </div>
+  </div>`;
+  m.onclick=e=>{if(e.target===m)closeModal()};
+  document.body.appendChild(m);
+  setTimeout(()=>{ const el=document.getElementById('hoto-save-name'); if(el){el.focus();el.select();} },150);
+}
+
+async function hotoSaveConfirm(){
+  if(!S.hotoRec) return;
+  const rawName=(document.getElementById('hoto-save-name')?.value||'').trim()||'HOTO';
+  const filename=rawName.replace(/\.pdf$/i,'').replace(/[\\/:*?"<>|]/g,'').trim()+'.pdf';
+  const btn=document.getElementById('hoto-save-btn');
+  if(btn){ btn.disabled=true; btn.textContent='Generando…'; }
+
+  const fallbackToViewer=()=>{
+    const url=`${ISABEL_API}/v1/hoto/${S.hotoRec.id}/export?inline=1&filename=${encodeURIComponent(rawName)}&api_key=${encodeURIComponent(ISABEL_KEY)}`;
+    window.open(url,'_blank');
+    closeModal();
+  };
+
+  try{
+    const url=`${ISABEL_API}/v1/hoto/${S.hotoRec.id}/export?filename=${encodeURIComponent(rawName)}`;
+    const res=await fetch(url,{headers:{'x-api-key':ISABEL_KEY}});
+    if(!res.ok) throw new Error('No se pudo generar el PDF ('+res.status+')');
+    const blob=await res.blob();
+    const file=new File([blob],filename,{type:'application/pdf'});
+
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file],title:filename});
+        closeModal();
+        return;
+      }catch(shareErr){
+        if(shareErr && shareErr.name==='AbortError'){ closeModal(); return; }
+        throw shareErr;
+      }
+    }
+
+    const blobUrl=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=blobUrl; a.download=filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(blobUrl),4000);
+    closeModal();
+  }catch(e){
+    console.warn('[hoto] Guardar PDF: no se pudo compartir/descargar, se abre el visor nativo —',e.message);
+    fallbackToViewer();
+  }
 }
 
 // ── Cabin Care · Date last done ──────────────────────────────────────────────
@@ -3997,7 +4069,8 @@ Object.assign(window, {
   selectProposal, empezarPropuesta,
   setVjTab, toggleHotoCheck, resetHotoChecks,
   invBack, invPreviewFile, invCreateSession, invSendMessage, invConfirm, invSetSearch, invCloseSession, invExport,
-  hotoBack, hotoCreate, hotoField, hotoAddItem, hotoDelItem, hotoExport,
+  hotoBack, hotoCreate, hotoField, hotoAddItem, hotoDelItem,
+  openHotoSaveModal, hotoSaveConfirm,
   hotoImportFileSelected, hotoImportChoose, hotoImportCancel,
   hotoCareToggle, hotoCareToday, hotoCareUnknown, hotoCareDate, hotoCareNote,
   hotoShopToggle, hotoShopSet, hotoResetSection,
