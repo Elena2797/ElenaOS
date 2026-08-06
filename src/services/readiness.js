@@ -15,10 +15,20 @@
 export async function collectSignals({ hotoSvc, invSvc, vjTasks, vjState, now = new Date() }) {
   const signals = { now, rotationStatus: vjState?.status || null };
 
-  // HOTO (Supabase)
+  // HOTO (Supabase) — correlacionado con el avión operativo actual
+  // (vj_state.aircraft), no simplemente "el active más reciente" (D13). Si
+  // vjState.aircraft está vacío, loadActiveHoto cae en su comportamiento
+  // histórico sin filtrar (mismo resultado que antes de D13).
   try {
-    const rec = await hotoSvc.loadActiveHoto();
+    const rec = await hotoSvc.loadActiveHoto(vjState?.aircraft);
     if (!rec) signals.hoto = null;
+    else if (rec.ambiguous) {
+      // Fail-closed: más de un HOTO activo para el mismo avión es una
+      // inconsistencia real de datos, no algo que Readiness deba adivinar.
+      // Reusa el mismo camino que un error de lectura (h.error) — ya
+      // manejado en assess() — en vez de inventar una rama nueva.
+      signals.hoto = { error: `${rec.matches.length} HOTO activos para ${vjState?.aircraft} — revisar en Supabase` };
+    }
     else {
       const items = await hotoSvc.loadItems(rec.id);
       const care = Array.isArray(rec.cabin_care) ? rec.cabin_care : [];

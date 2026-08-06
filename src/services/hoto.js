@@ -6,15 +6,39 @@ let _db = null;
 export function setClient(client) { _db = client; }
 
 // ── Record activo ──────────────────────────────────────────────────────────
-export async function loadActiveHoto() {
+//
+// Sin tailNumber: comportamiento histórico exacto (el active más reciente,
+// sin importar matrícula) — no rompe llamadores existentes que todavía no
+// pasan el avión actual.
+//
+// Con tailNumber: el HOTO "actual" es el que corresponde al avión operativo
+// actual (vj_state.aircraft), no simplemente el active más reciente — mismo
+// principio aplicado en isabel-api/src/hoto/data.js (DECISIONS.md D13). Si
+// hay más de un active para esa matrícula, no se adivina cuál usar: se
+// devuelve { ambiguous: true, matches } igual que el backend.
+export async function loadActiveHoto(tailNumber) {
+  if (!tailNumber) {
+    const { data, error } = await _db
+      .from('vj_hoto_records')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    return data?.[0] ?? null;
+  }
+
   const { data, error } = await _db
     .from('vj_hoto_records')
     .select('*')
     .eq('status', 'active')
-    .order('created_at', { ascending: false })
-    .limit(1);
+    .eq('tail_number', tailNumber)
+    .order('created_at', { ascending: false });
   if (error) throw error;
-  return data?.[0] ?? null;
+
+  if (!data || data.length === 0) return null;
+  if (data.length > 1) return { ambiguous: true, matches: data };
+  return data[0];
 }
 
 export async function createHoto(fields = {}) {

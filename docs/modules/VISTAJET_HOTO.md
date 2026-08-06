@@ -54,10 +54,10 @@ Crear HOTO (o continuar el activo) → editar secciones durante la rotación (ca
 - Protocolo antes/después aplicado en cada cambio de esquema o exportador: conteo de registros + comparación campo a campo del PDF exportado.
 
 # Bugs conocidos
-Ver [KNOWN_PROBLEMS.md](../KNOWN_PROBLEMS.md): duplicación de Shopping con Inventario, ausencia de módulo Defects propio, columnas históricas de CH no exportadas, y (nuevo, 2026-08-06) el modelo de `status`/`tail_number` no soporta "HOTO recibido/pendiente" sin inventar lógica nueva — ver ahí el detalle completo.
+Ver [KNOWN_PROBLEMS.md](../KNOWN_PROBLEMS.md): duplicación de Shopping con Inventario, ausencia de módulo Defects propio, columnas históricas de CH no exportadas. El hueco de correlación `tail_number`/`status` encontrado el 2026-08-06 quedó resuelto ese mismo día (D13) — ver `DECISIONS.md` D13 y la sección de specialists en `modules/VISTAJET.md`.
 
 # Decisiones cerradas
-Ver [DECISIONS.md](../DECISIONS.md) D2, D3, D4, D5, D6.
+Ver [DECISIONS.md](../DECISIONS.md) D2, D3, D4, D5, D6, D13 (correlación por matrícula + transición `active → delivered`, 2026-08-06).
 
 # Por qué está así (el hallazgo central de la auditoría)
 El modelo actual de HOTO refleja las celdas del documento PDF, no la rotación como proceso. Varios datos que hoy vive "dentro" del HOTO (shopping/stock, defects) son conceptualmente propiedad de otros dominios (Inventario, un futuro módulo de Defects). La reconstrucción hacia un modelo de "datos propios vs. datos prestados" (donde HOTO lee en vivo de otros módulos al exportar, en vez de copiar) está diseñada pero explícitamente pospuesta por fases — ver D6.
@@ -66,4 +66,4 @@ El modelo actual de HOTO refleja las celdas del documento PDF, no la rotación c
 Importar HOTO recibido, Focus of the Month, conversación con Isabel durante la rotación, columnas históricas de otras CH — todo pedido explícitamente por la usuaria como "después, no ahora".
 
 # Próximo hito
-Ninguno decidido. La reconstrucción por fases (D6) queda pendiente de que la usuaria decida retomarla.
+La reconstrucción por fases hacia "datos propios vs. prestados" (D6) sigue pendiente de que la usuaria decida retomarla — sin cambios. La corrección del modelo de correlación/cierre (D13, 2026-08-06) ya está hecha; ver `modules/VISTAJET.md` § specialists para el detalle de cómo Isabel lo usa.

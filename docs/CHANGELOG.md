@@ -7,6 +7,15 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-08-06 (continuación — modelo de HOTO corregido, D13)
+
+- **Corregido el modelo de HOTO antes de conectarlo a Isabel, no encima de datos inconsistentes.** Auditoría encontró que `vj_hoto_records.status` solo tomaba el valor `'active'` en la práctica (`'delivered'` era un comentario SQL nunca escrito), sin ninguna acción real de cierre/entrega, y sin correlación entre `tail_number` y `vj_state.aircraft` — nada impedía que el HOTO "actual" mostrado fuera de un avión completamente distinto al operativo real.
+- **Corregido el mismo día:** `getActiveHoto(tailNumber)`/`loadActiveHoto(tailNumber)` correlacionan por matrícula cuando se les pasa el avión actual (fallback exacto al comportamiento histórico si no, cero regresión en Inventario/Readiness), fail-closed (`{ambiguous:true, matches}`) si hay más de un HOTO activo para la misma matrícula. `closeHoto(id)` implementa la transición real `active → delivered`, conservando la fila (nunca se borra historial). `vistajet_update_status` cierra automáticamente el HOTO del avión anterior al reportar "ya entregué el avión". `vistajet_get_status` expone el HOTO del avión actual como tercera tool del specialist VistaJet.
+- Se eligió `delivered` sobre `closed` verificando el vocabulario operativo real del dominio ("entregar el avión"), no por copiar el comentario SQL preexistente — instrucción explícita de la usuaria.
+- Cero migración de esquema obligatoria (`status`/`delivered_at` ya existían sin restricción); único cambio de DB es un índice único parcial opcional, aditivo/reversible, verificado sin conflicto contra el único HOTO real en producción antes de escribirlo — queda pendiente de ejecución manual (no hay mecanismo programático de DDL en este proyecto).
+- Bug real encontrado y corregido durante el testing: el `state` local podía quedar mutado por el propio harness de test (mutación in-place del fake-db) antes de leer `aircraft` para decidir qué HOTO cerrar — se corrigió capturando el valor explícitamente antes de escribir, más robusto independientemente del mecanismo de persistencia.
+- 177/177 tests (18 nuevos), verificado también en navegador contra datos reales (Aircraft Readiness, HOTO, Inventario) sin errores de consola ni regresión.
+
 ## 2026-08-06 (continuación — arquitectura multidominio + VistaJet)
 
 - **Auditoría completa de LIFEOS a través de todos los dominios**, seguida de una decisión de arquitectura: la infraestructura común pedida (eventos, estado operacional, interventions, tareas, specialists, identidad/contexto, prioridades) **ya existía** — construida para el vertical slice de sueño, nunca formalizada como patrón general. Documentado en `core/DOMAIN_SPECIALISTS.md` (nuevo) y `DECISIONS.md` D12.

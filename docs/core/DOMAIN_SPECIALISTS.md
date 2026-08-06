@@ -1,6 +1,6 @@
-Estado: implementado (el patrón); parcial (dos dominios lo usan hoy: Salud/sueño, y VistaJet con dos specialists — pasaporte y estado operacional/rotación)
+Estado: implementado (el patrón); parcial (dos dominios lo usan hoy: Salud/sueño, y VistaJet con tres specialists — pasaporte, estado operacional/rotación, HOTO ligado al avión)
 Última verificación: 2026-08-06
-Verificado en: isabel-api/src/core/specialists/health.js (primer especialista, referencia), isabel-api/src/core/specialists/vistajet.js (segundo especialista), isabel-api/src/core/interventions.js, isabel-api/src/core/now.js + globalContext.js
+Verificado en: isabel-api/src/core/specialists/health.js (primer especialista, referencia), isabel-api/src/core/specialists/vistajet.js (segundo especialista, 3 tools), isabel-api/src/hoto/data.js (correlación HOTO↔avión, D13), isabel-api/src/core/interventions.js, isabel-api/src/core/now.js + globalContext.js
 Fuente de verdad de datos: DATA_MODEL.md § interventions, checkins, vj_state; ver también TASKS_AND_EVENTS.md (sustrato genérico de frontend) y SPECIALISTS_PROTOCOL.md (contrato histórico de Inventario, anterior a este patrón)
 
 # core/DOMAIN_SPECIALISTS.md — Cómo un dominio nuevo se conecta a Isabel
@@ -67,7 +67,8 @@ Instrucción explícita de la usuaria, ya reflejada en cómo está construido el
 | Salud (sueño) | Sí (`checkins`) | **Sí — el original** | — |
 | VistaJet (pasaporte) | Sí (`vj_state.passport_exp`) | **Sí — construido en esta sesión** | Sí |
 | VistaJet (rotación/avión/contexto operativo) | Sí (`vj_state.status/aircraft/rotation_*`) | **Sí — construido en esta sesión** | Sí |
-| VistaJet (resto: maleta, HOTO, e-learning/facturas) | Parcial (`vj_state.bag_checks`, `vj_hoto_records`) | No | **No limpiamente todavía** — ver "Lo que se auditó y no se construyó" abajo |
+| VistaJet (HOTO ligado al avión) | Sí (`vj_hoto_records`, modelo corregido en D13) | **Sí — construido en esta sesión** | Sí, tras corregir el modelo (D13) |
+| VistaJet (resto: maleta, e-learning/facturas) | Parcial (`vj_state.bag_checks`) | No | **No limpiamente todavía** — ver "Lo que se auditó y no se construyó" abajo |
 | Gym | No (solo `metrics` genérico) | No | No hay tabla propia que interrogar |
 | Finanzas | Sí (`transactions`, 821 filas) | No | Sí, en teoría — pero sin `CREATE TABLE` versionado (deuda, ver KNOWN_PROBLEMS.md), habría que resolver eso primero |
 | JETMI | Parcial (`operators`) | No | El PRD describe fase/bloqueos/próximo movimiento como conceptos, pero no hay tabla que los modele todavía — ver sección JETMI abajo |
@@ -76,8 +77,8 @@ Instrucción explícita de la usuaria, ya reflejada en cómo está construido el
 ## Lo que se auditó y no se construyó (a propósito, no por falta de tiempo)
 
 - **`vistajet.maleta` (bag_checks) como trigger de Intervention**: auditado y descartado por ahora. `bag_checks` es un mapa `{plantilla_item: bool}`, pero las plantillas (cuántos items tiene cada maleta) viven en `localStorage` del frontend, no en Supabase — el backend no puede saber si "maleta completa" sin adivinar o sin migrar las plantillas a Supabase primero. Construirlo hoy habría significado inventar un umbral falso. Queda documentado como el primer paso pendiente si se retoma este dominio.
-- **HOTO recibido/pendiente**: auditado en profundidad el 2026-08-06 (no solo "parece complicado" — se leyó el código real). No es cleanly-buildable: `status` en `vj_hoto_records` solo toma el valor `'active'` en la práctica (`'delivered'` existe solo como comentario SQL, nunca escrito), no existe ninguna acción de "entregar/cerrar" en la UI ni backend, y `loadActiveHoto()` nunca correlaciona `tail_number` con `vj_state.aircraft` — devuelve sencillamente la fila `active` más reciente, sea cual sea la matrícula. Construir esto significaría inventar tanto la correlación como la semántica de estado, no conectar lo que ya existe. Ver `KNOWN_PROBLEMS.md` para el detalle completo. Requiere una decisión de producto sobre el propio módulo HOTO (añadir una acción real de entrega + correlación por matrícula) antes de que un specialist tenga sentido.
-- **HOTO readiness proactivo** (avisar si falta HOTO antes de fin de rotación): `services/readiness.js` ya calcula esto muy bien, pero solo client-side, a partir de HOTO + Inventory + Laundry + Shopping. Depende del mismo hueco de arriba (sin "HOTO recibido/pendiente" fiable, un readiness proactivo heredaría la misma ambigüedad). Convertirlo en un specialist MCP-invocable es más trabajo — evaluado como candidato futuro, no descartado.
+- **HOTO recibido/pendiente**: auditado el 2026-08-06, encontrado NO cleanly-buildable tal como estaba (`status` solo tomaba `'active'` en la práctica, sin acción real de cierre, sin correlación con `vj_state.aircraft`) — pero, a diferencia de maleta/e-learnings, la usuaria decidió corregir el modelo en vez de posponerlo. **Resuelto el mismo día (D13)**: ver `modules/VISTAJET.md` § 3 y `DECISIONS.md` D13. ya no está en la lista de "no construido".
+- **HOTO readiness proactivo** (avisar si falta HOTO antes de fin de rotación): `services/readiness.js` ya calcula esto muy bien, pero solo client-side, a partir de HOTO + Inventory + Laundry + Shopping. Ahora que la correlación HOTO↔avión está resuelta (D13), este es el candidato más natural para convertir en specialist MCP-invocable — evaluado como próximo paso, no descartado, solo no priorizado todavía.
 - **E-learning/facturas**: no existe ninguna tabla ni módulo para esto en todo el código. No se puede construir un specialist sobre un dato que no existe — habría que diseñar el modelo desde cero, fuera del alcance de "conectar lo que ya existe".
 
 ## JETMI — diseño preparado para cuando tenga datos reales

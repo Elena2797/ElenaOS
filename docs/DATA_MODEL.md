@@ -126,9 +126,11 @@ Migración: `hoto_migration.sql` + `hoto_migration_v2.sql`. Detalle de uso en [m
 | shopping | jsonb | default `{}` — incluye `magazines_list` anidado |
 | cabin_care | jsonb | default `[]` — array de 17 `{d, n}` (fecha + nota) |
 | daily_duties | jsonb | default `{}` — `{item_id: true}`, añadida en v2 (2026-07-10) |
-| status | text | default `active` |
+| status | text | `active` \| `delivered` (transición real desde `hoto_migration_v4.sql`/D13, 2026-08-06 — antes solo `active` se escribía en la práctica) |
 | source_template | text | default `HOTO_official_v1.pdf` |
-| created_at, updated_at, delivered_at | timestamptz | |
+| created_at, updated_at, delivered_at | timestamptz | `delivered_at` se rellena al cerrar (`closeHoto()`), antes nunca se escribía |
+
+Índice `idx_hoto_active_unique_tail`: único parcial `(tail_number) WHERE status='active'` — `hoto_migration_v4.sql`, pendiente de ejecución manual en Supabase (verificado sin conflicto contra los datos reales antes de escribirlo). Garantiza a nivel de DB lo que `getActiveHoto(tailNumber)`/`loadActiveHoto(tailNumber)` ya manejan de forma fail-closed en código: nunca puede haber (o si ya existiera, se reporta como `ambiguous`, nunca se elige uno) más de un HOTO activo para la misma matrícula. Detalle completo en `DECISIONS.md` D13 y `modules/VISTAJET.md` § 3.
 
 ### `vj_hoto_items`
 id, hoto_id (FK, cascade), section (`defect`\|`comment`\|`offload`), position, content, source (default `manual`), created_at.

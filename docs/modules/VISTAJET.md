@@ -1,6 +1,6 @@
 Estado: implementado (mapa general — detalle en cada sub-módulo)
 Última verificación: 2026-08-06
-Verificado en: life-os-app/src/main.js (router de vistas, vjView) — nota: fila de Laundry & Cleaning Form refleja el estado de la rama feature/vj-landing-cleaning, no de main; isabel-api/src/core/specialists/vistajet.js (specialist de pasaporte, nuevo)
+Verificado en: life-os-app/src/main.js (router de vistas, vjView) — nota: fila de Laundry & Cleaning Form refleja el estado de la rama feature/vj-landing-cleaning, no de main; isabel-api/src/core/specialists/vistajet.js (tres specialists); isabel-api/src/hoto/data.js + life-os-app/src/services/hoto.js (correlación HOTO↔avión, D13); 177/177 tests isabel-api, verificación manual en navegador
 Fuente de verdad de datos: DATA_MODEL.md § vj_state, vj_tasks, interventions
 
 # modules/VISTAJET.md — Mapa del dominio VistaJet
@@ -33,11 +33,21 @@ Dos vertical slices construidos sobre el patrón formalizado en [core/DOMAIN_SPE
 - Sin flujo de Intervention — a diferencia de sueño/pasaporte, no hay una señal fiable de "dato ausente" que detectar sin inventar una suposición (`rotation_day` nunca se auto-incrementa). Es un reporte que Isabel registra cuando la usuaria lo cuenta, mismo patrón que `isabel_message` para Inventario.
 - Bug real encontrado y corregido durante el testing: la rama de "limpiar al quedar libre" se disparaba con la lógica de status *heredado* del estado actual, no solo con un `status:'libre'` explícito en el input — un input vacío contra un `vj_state` ya libre "validaba" como si fuera una transición real en vez de devolver `no_fields_to_update`.
 
-Ambos specialists: sin UI propia (conversación/MCP únicamente, igual que sueño); el modal manual de `openVjState()` sigue funcionando exactamente igual, sin cambios. Tests: `isabel-api/src/__tests__/vistajet.test.js` (lógica pura) + `vistajet.orchestration.test.js` (fake-db en memoria, 14 escenarios).
+### 3. HOTO ligado al avión operativo (D13)
+`vj_hoto_records` tenía un modelo inconsistente: `status` solo tomaba el valor `'active'` en la práctica, no existía ninguna acción real de "entregar/cerrar", y nunca se correlacionaba `tail_number` con `vj_state.aircraft`. Se corrigió el modelo antes de conectarlo a Isabel (nunca un specialist encima de datos inconsistentes) — ver `DECISIONS.md` D13 para el detalle completo.
+
+- **`getActiveHoto(tailNumber)`** (`isabel-api/src/hoto/data.js`) / **`loadActiveHoto(tailNumber)`** (`life-os-app/src/services/hoto.js`): sin argumento, comportamiento histórico exacto (compatibilidad total con Inventario/Readiness, que no pasan avión). Con argumento, el HOTO "actual" es el que corresponde a ese avión — y si hay más de un `active` para la misma matrícula (inconsistencia real que el modelo no impedía), devuelve `{ambiguous:true, matches}` en vez de elegir uno al azar.
+- **`closeHoto(id)`**: transición explícita `active → delivered` con `delivered_at` — nunca borra la fila, solo deja de ser la activa.
+- **`vistajet_get_status`** ahora incluye `hoto: {applicable, exists, ambiguous, id, status, tail_number, has_prior_hoto}` para el avión operativo actual.
+- **`vistajet_update_status`** cierra automáticamente el HOTO del avión anterior cuando la transición es a `libre` ("ya entregué el avión") — best-effort (si no había HOTO activo para ese avión, no es un error), fail-closed si es ambiguo (no cierra ninguno, lo reporta en `hoto_closed`), y nunca bloquea la transición de `vj_state` en sí.
+- Sin migración de esquema necesaria (`status`/`delivered_at` ya existían sin restricción) salvo un índice único parcial opcional (`hoto_migration_v4.sql`) — aditivo/reversible, verificado sin conflicto contra el único HOTO real existente antes de escribirlo, **pendiente de ejecución manual en Supabase**.
+- `readiness.js` (Aircraft Readiness) actualizado para pasar el avión actual a `loadActiveHoto` — comportamiento sin cambios mientras `vj_state.aircraft` esté vacío (como está hoy en producción); se activa solo cuando haya un avión asignado.
+- **Deliberadamente sin tocar**: la pantalla de edición viva de HOTO (`vjHotoView`) sigue llamando a `loadActiveHoto()` sin avión — cambio de mayor riesgo sobre la vista de uso diario, no verificable de punta a punta sin interacción real, pospuesto a propósito.
+
+Todos los specialists: sin UI propia (conversación/MCP únicamente, igual que sueño); el modal manual de `openVjState()` sigue funcionando exactamente igual, sin cambios. Tests: `isabel-api/src/__tests__/vistajet.test.js` (lógica pura) + `vistajet.orchestration.test.js` (fake-db en memoria, 25+ escenarios). Verificado también en navegador (Readiness/HOTO/Inventario, sin errores de consola, sin regresión).
 
 ### Auditado y explícitamente no construido en este pase
 - **Maleta/`bag_checks`** como trigger de Intervention: las plantillas de la maleta (cuántos items tiene cada una) viven en `localStorage` del frontend, no en Supabase — el backend no puede saber si "la maleta está completa" sin adivinar. Requeriría migrar las plantillas a Supabase primero.
-- **HOTO recibido/pendiente**: auditado en profundidad, no solo pospuesto — `status` en `vj_hoto_records` solo toma el valor `'active'` en la práctica, no existe ninguna acción real de "entregar/cerrar", y nunca se correlaciona `tail_number` con `vj_state.aircraft`. Ver `KNOWN_PROBLEMS.md` para el detalle. Requiere una decisión de producto sobre el propio módulo HOTO antes de que un specialist tenga sentido — no es solo "conectar lo que existe".
 - **E-learning/facturas**: no existe ninguna tabla ni módulo para esto todavía en todo el código.
 
 ## Por qué VistaJet tiene módulos propios y el resto de áreas no
