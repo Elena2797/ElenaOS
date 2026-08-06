@@ -1,6 +1,6 @@
 Estado: implementado, con gaps documentados explícitamente
-Última verificación: 2026-07-10
-Verificado en: isabel-api/src/hoto/*, pipeline real ejecutado contra el registro de producción (9H-VCQ), verificación visual de render del PDF con marcadores
+Última verificación: 2026-08-07
+Verificado en: isabel-api/src/hoto/*, pipeline real ejecutado contra el registro de producción (9H-VCQ), verificación visual de render del PDF con marcadores. Import de HOTO real (D16) y fixes de export (D17, texto duplicado + Magazines) verificados contra el HOTO real de 9H-VCQ y contra la API ya desplegada — el HOTO de D-AFBS está en uso real en producción (Generación 2 al cierre de esta sesión).
 Fuente de verdad de datos: DATA_MODEL.md § vj_hoto_records, vj_hoto_items
 
 # modules/VISTAJET_HOTO.md
@@ -21,6 +21,7 @@ Implementado, con auditoría exhaustiva realizada (2026-07-09/10) que reveló qu
 - **Export write-all**: todos los campos modelados se escriben siempre (valor o vacío explícito) — el PDF es función pura de Supabase, verificado rellenando un template deliberadamente "sucio".
 - **Daily Duties (checklist)** — conectado 2026-07-10: 46 de 47 tareas de la app mapean a checkboxes reales del PDF oficial, verificado renderizando cada sección de Daily Duties en una columna distinta y confirmando visualmente que cada tick cae en su fila y columna exacta. Desde D16 (2026-08-06) las 6 columnas se escriben siempre, cada una con sus propios datos — antes solo se escribía `ch_column_index` y se limpiaban las otras 5.
 - **Import de un HOTO real recibido (PDF → LIFEOS)** — D16, 2026-08-06: sube el PDF oficial ya rellenado, LIFEOS lo analiza (AcroForm real, sin OCR) y pregunta "Continuar este HOTO" (conserva todas las columnas usadas, abre la siguiente libre) o "Nuevo HOTO desde este" (conserva avión/stock/cabin care/focus/defects/comments/offload, resetea las 6 columnas de handover, generación nueva). Verificado con el HOTO real de 9H-VCQ: 100% de los campos (tail_number, icao, status, 4 defects, 1 offload, 2 comments, 40 daily duties, stock, focus) se recuperaron exactos en un round-trip export→import. El PDF importado nunca se edita a mano — se convierte al modelo de LIFEOS y de ahí en adelante se edita en la app, igual que un HOTO creado desde cero.
+- **Export sin texto duplicado ni Magazines rota** — D17, 2026-08-07: encontrado probando el HOTO real de D-AFBS en iPhone. Tail Number/ICAO se escribían dos veces en widgets solapados del PDF oficial (texto visualmente duplicado) — ahora solo el campo canónico recibe el valor, el duplicado se blanquea explícitamente. Magazines fallaba por dos causas — auto-ajuste de fuente dependiente del visor, y un bug de codificación real (el texto de Magazines de 9H-VCQ contiene tabs; `WinAnsiEncoding` no los codifica y podía abortar la generación de apariencias de todo el formulario) — corregido con tamaño de fuente fijo + saneado de caracteres de control en todos los campos de texto, no solo Magazines. "Exportar" pasó a ser "Guardar PDF": nombre de archivo editable, Web Share API con archivo real como vía principal en iOS.
 - Guardado no-optimista en toda la edición del HOTO (cabecera, Cabin Care, Shopping, Magazines, checklist): la UI solo refleja un valor tras confirmar Supabase.
 - Reset por sección (Shopping, Magazines, Cabin Care, Defects, Comments, Offload, Daily Duties), con confirmación, acotado por `hoto_id` — nunca borra otro HOTO ni otra tabla.
 
@@ -56,7 +57,7 @@ Crear HOTO (o continuar el activo) → editar secciones durante la rotación (ca
 Ver [KNOWN_PROBLEMS.md](../KNOWN_PROBLEMS.md): duplicación de Shopping con Inventario, ausencia de módulo Defects propio. El hueco de correlación `tail_number`/`status` (D13) y el de columnas históricas de CH no exportadas (D16) quedaron resueltos, ambos el 2026-08-06 — ver `DECISIONS.md` D13/D16.
 
 # Decisiones cerradas
-Ver [DECISIONS.md](../DECISIONS.md) D2, D3, D4, D5, D6, D13 (correlación por matrícula + transición `active → delivered`), D16 (import de HOTO real + modelo de columnas, 2026-08-06).
+Ver [DECISIONS.md](../DECISIONS.md) D2, D3, D4, D5, D6, D13 (correlación por matrícula + transición `active → delivered`), D16 (import de HOTO real + modelo de columnas, 2026-08-06), D17 (texto duplicado, Magazines, "Guardar PDF", 2026-08-07).
 
 # Por qué está así (el hallazgo central de la auditoría)
 El modelo actual de HOTO refleja las celdas del documento PDF, no la rotación como proceso. Varios datos que hoy vive "dentro" del HOTO (shopping/stock, defects) son conceptualmente propiedad de otros dominios (Inventario, un futuro módulo de Defects). La reconstrucción hacia un modelo de "datos propios vs. datos prestados" (donde HOTO lee en vivo de otros módulos al exportar, en vez de copiar) está diseñada pero explícitamente pospuesta por fases — ver D6.
@@ -65,4 +66,4 @@ El modelo actual de HOTO refleja las celdas del documento PDF, no la rotación c
 Conversación con Isabel durante la rotación sobre el propio HOTO (Isabel ya lee `hoto: {...}` en `vistajet_get_status`, pero no expone edición conversacional de sus campos).
 
 # Próximo hito
-La reconstrucción por fases hacia "datos propios vs. prestados" (D6) sigue pendiente de que la usuaria decida retomarla — sin cambios. El import de HOTO real (D16) queda como base para cargar el HOTO real de D-AFBS cuando llegue — sin cambios adicionales de modelo previstos salvo que el PDF real revele algo que `fieldMap.js` no cubra.
+La reconstrucción por fases hacia "datos propios vs. prestados" (D6) sigue pendiente de que la usuaria decida retomarla — sin cambios. El HOTO real de D-AFBS ya se importó y está en uso (Generación 2 al cierre de esta sesión, D16/D17) — sin cambios adicionales de modelo previstos salvo que aparezca algo que `fieldMap.js` no cubra.
