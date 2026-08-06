@@ -1969,7 +1969,11 @@ function vjHotoView(){
     S._hotoLoaded=true;
     (async()=>{
       try{
-        S.hotoRec=await hotoSvc.loadActiveHoto();
+        S.hotoRec=await hotoSvc.loadActiveHoto(S.vjState.aircraft);
+        if(S.hotoRec&&S.hotoRec.ambiguous){
+          S.hotoErr=`${S.hotoRec.matches.length} HOTO activos para ${S.vjState.aircraft} — revisar en Supabase`;
+          S.hotoRec=null;
+        }
         S.hotoItems=S.hotoRec?await hotoSvc.loadItems(S.hotoRec.id):[];
       }catch(e){ console.error('hoto load',e); S.hotoErr=e.message; }
       // Migración one-time del checklist: localStorage → Supabase (corre en ESTE
@@ -1992,7 +1996,7 @@ function vjHotoView(){
       // Inventario: SOLO LECTURA, como referencia para Aircraft Shopping.
       // Si falla o no hay sesión abierta, la sección funciona igual en modo manual.
       try{
-        const invSess=await invSvc.loadActiveSession();
+        const invSess=await invSvc.loadActiveSession(S.vjState.aircraft);
         S.hotoInvItems=invSess?await invSvc.loadSessionItems(invSess.id):[];
       }catch(e){ S.hotoInvItems=[]; }
       render();
@@ -2027,9 +2031,9 @@ function hotoEntregaTab(){
     return `
     <div style="background:var(--surface);border-radius:12px;padding:20px;border:0.5px solid var(--border)">
       <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">Nuevo HOTO</div>
-      <div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px">No hay ningún HOTO activo. Empieza uno para esta rotación. Se irá construyendo solo mientras trabajas; el día de la entrega solo exportas el PDF oficial.</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px">${S.vjState.aircraft?`HOTO pendiente para ${S.vjState.aircraft} — todavía no hay ninguno registrado para este avión.`:'No hay ningún HOTO activo.'} Empieza uno para esta rotación. Se irá construyendo solo mientras trabajas; el día de la entrega solo exportas el PDF oficial.</div>
       <label style="font-size:11px;font-weight:600;color:var(--t2)">Matrícula</label>
-      <input id="hoto-new-tail" placeholder="9H-JHK" style="${fieldStyle};margin:4px 0 10px;text-transform:uppercase">
+      <input id="hoto-new-tail" value="${S.vjState.aircraft||''}" placeholder="9H-JHK" style="${fieldStyle};margin:4px 0 10px;text-transform:uppercase">
       <label style="font-size:11px;font-weight:600;color:var(--t2)">ICAO destino</label>
       <input id="hoto-new-icao" placeholder="LPFR" style="${fieldStyle};margin:4px 0 10px;text-transform:uppercase">
       <label style="font-size:11px;font-weight:600;color:var(--t2)">Pattern</label>
@@ -2138,7 +2142,7 @@ function vjInventarioView(){
     S._invLoaded=true;
     (async()=>{
       try{
-        S.invSession=await invSvc.loadActiveSession();
+        S.invSession=await invSvc.loadActiveSession(S.vjState.aircraft);
         if(S.invSession){
           S.invItems=await invSvc.loadSessionItems(S.invSession.id);
           S.invChat=await invSvc.getChatHistory(S.invSession.id,30);
@@ -2162,7 +2166,7 @@ function vjInventarioView(){
 
       <div style="margin-bottom:12px">
         <label style="font-size:11px;font-weight:600;color:var(--t2);display:block;margin-bottom:4px">Matrícula</label>
-        <input id="inv-reg" type="text" placeholder="9H-VCQ" maxlength="10"
+        <input id="inv-reg" type="text" value="${S.vjState.aircraft||''}" placeholder="9H-VCQ" maxlength="10"
           style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:600;background:var(--bg);color:var(--text);letter-spacing:.05em;text-transform:uppercase">
       </div>
 
@@ -2357,8 +2361,15 @@ function vjLandingCleaningView(){
   if(!S._llcLoaded){
     S._llcLoaded=true;
     (async()=>{
-      try{ S.llcRec=await llcSvc.loadActiveLaundryCleaning(); S.llcErr=null; }
-      catch(e){ console.error('llc load',e); S.llcErr=e.message; }
+      try{
+        S.llcRec=await llcSvc.loadActiveLaundryCleaning(S.vjState.aircraft);
+        if(S.llcRec&&S.llcRec.ambiguous){
+          S.llcErr=`${S.llcRec.matches.length} formularios activos para ${S.vjState.aircraft} — revisar en Supabase`;
+          S.llcRec=null;
+        } else {
+          S.llcErr=null;
+        }
+      }catch(e){ console.error('llc load',e); S.llcErr=e.message; }
       render();
     })();
     return `${head}<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--t3);font-size:13px">Cargando…</div>`;
@@ -2377,9 +2388,9 @@ function vjLandingCleaningView(){
     return `${head}
     <div style="background:var(--surface);border-radius:12px;padding:20px;border:0.5px solid var(--border)">
       <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">Nuevo Laundry & Cleaning Form</div>
-      <div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px">No hay ningún formulario activo. Empieza uno para esta rotación; se irá construyendo solo mientras trabajas. El día de la entrega solo exportas el PDF oficial.</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px">${S.vjState.aircraft?`Formulario pendiente para ${S.vjState.aircraft} — todavía no hay ninguno registrado para este avión.`:'No hay ningún formulario activo.'} Empieza uno para esta rotación; se irá construyendo solo mientras trabajas. El día de la entrega solo exportas el PDF oficial.</div>
       <label style="font-size:11px;font-weight:600;color:var(--t2)">Matrícula</label>
-      <input id="llc-new-tail" placeholder="9H-JHK" style="${fieldStyle};margin:4px 0 10px;text-transform:uppercase">
+      <input id="llc-new-tail" value="${S.vjState.aircraft||''}" placeholder="9H-JHK" style="${fieldStyle};margin:4px 0 10px;text-transform:uppercase">
       <label style="font-size:11px;font-weight:600;color:var(--t2)">ICAO</label>
       <input id="llc-new-icao" placeholder="LPFR" style="${fieldStyle};margin:4px 0 16px;text-transform:uppercase">
       <button onclick="llcCreate()" style="width:100%;padding:13px;border:none;background:var(--text);color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Crear formulario</button>
@@ -2433,7 +2444,7 @@ function vjStatusView(){
     S._invLoaded=true;
     (async()=>{
       try{
-        S.invSession=await invSvc.loadActiveSession();
+        S.invSession=await invSvc.loadActiveSession(S.vjState.aircraft);
         if(S.invSession){
           S.invItems=await invSvc.loadSessionItems(S.invSession.id);
           S.invChat=await invSvc.getChatHistory(S.invSession.id,30);
@@ -2545,9 +2556,13 @@ function hotoBack(){ S._hotoLoaded=false; S.hotoErr=null; S.hotoMigrationErr=nul
 
 async function hotoReload(){
   try{
-    S.hotoRec=await hotoSvc.loadActiveHoto();
+    S.hotoRec=await hotoSvc.loadActiveHoto(S.vjState.aircraft);
+    if(S.hotoRec&&S.hotoRec.ambiguous){
+      S.hotoErr=`${S.hotoRec.matches.length} HOTO activos para ${S.vjState.aircraft} — revisar en Supabase`;
+      S.hotoRec=null;
+    }
     S.hotoItems=S.hotoRec?await hotoSvc.loadItems(S.hotoRec.id):[];
-    S.hotoErr=null;
+    S.hotoErr=S.hotoErr||null;
   }catch(e){ S.hotoErr=e.message; }
   render();
 }
@@ -2912,9 +2927,42 @@ function hotoFocusSection(){
   </div>`;
 }
 
+const VJ_SUBVIEWS=['vj_hoto','vj_inventario','vj_laundry_cleaning','vj_fresh','vj_status'];
+
 function go(view, id=null) {
   S.view=view; if(id) S.areaId=id;
-  window.scrollTo(0,0); render();
+  window.scrollTo(0,0);
+  const enteringVJ=(view==='area'&&S.areas.find(a=>a.id===S.areaId)?.name==='VistaJet')||VJ_SUBVIEWS.includes(view);
+  if(enteringVJ) refreshVjContext();
+  render();
+}
+
+// Al entrar (o volver) al dominio VistaJet se refresca vj_state contra
+// Supabase — la única verdad operacional también la puede escribir Isabel por
+// Telegram, y no hay forma de saber si cambió desde la última carga sin
+// volver a preguntar. Si el avión actual cambió desde la última vez que se
+// cargó, todo lo aircraft-scoped que ya estuviera en memoria (HOTO, Laundry &
+// Cleaning, Aircraft Readiness) se invalida para que se recargue
+// correlacionado con el avión nuevo — nunca se sigue mostrando en pantalla
+// algo que pertenece al avión anterior.
+let _vjRefreshInFlight=false;
+async function refreshVjContext(){
+  if(_vjRefreshInFlight) return;
+  _vjRefreshInFlight=true;
+  try{
+    const prevAircraft=S.vjState.aircraft;
+    const fresh=await dbSvc.loadVjState();
+    if(fresh){
+      if(fresh.aircraft!==prevAircraft){
+        S._hotoLoaded=false; S.hotoRec=null; S.hotoItems=null; S.hotoErr=null;
+        S._llcLoaded=false; S.llcRec=null; S.llcErr=null;
+        S._invLoaded=false; S.invSession=null; S.invItems=[]; S.invChat=[];
+        S._readiLoaded=false; S.vjReadiness=null;
+      }
+      S.vjState=fresh;
+    }
+  }catch(e){ console.error('vj state refresh',e); }
+  finally{ _vjRefreshInFlight=false; render(); }
 }
 
 async function toggleMode() {

@@ -89,7 +89,15 @@ CREATE TABLE IF NOT EXISTS vj_state (
   updated_at timestamptz DEFAULT now()
 );
 
-INSERT INTO vj_state (status) VALUES ('libre');
+-- Idempotente a propósito: vj_state es un singleton operacional (D14). Antes
+-- este INSERT era incondicional y, al re-ejecutarse setup.sql más de una vez
+-- contra el mismo proyecto de Supabase, acumuló 3 filas en producción — causa
+-- raíz de que Isabel (Telegram) y el frontend leyeran "el avión actual" de
+-- filas distintas sin ORDER BY. El índice único real que impide que esto
+-- vuelva a pasar vive en la migración D14, no aquí — esto es solo defensa en
+-- profundidad para no reintroducir el problema si setup.sql se reejecuta.
+INSERT INTO vj_state (status)
+SELECT 'libre' WHERE NOT EXISTS (SELECT 1 FROM vj_state);
 
 -- VistaJet: tareas propias
 CREATE TABLE IF NOT EXISTS vj_tasks (

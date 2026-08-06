@@ -61,9 +61,11 @@ export async function collectSignals({ hotoSvc, invSvc, vjTasks, vjState, now = 
     }
   } catch (e) { signals.hoto = { error: e.message }; }
 
-  // Inventario (Supabase) — solo lectura
+  // Inventario (Supabase) — solo lectura, correlacionado con el avión actual
+  // (vj_state.aircraft) igual que HOTO (D13) — no reutilizar en silencio el
+  // inventario de otro avión solo porque es el más reciente.
   try {
-    const sess = await invSvc.loadLastSession();
+    const sess = await invSvc.loadLastSession(vjState?.aircraft);
     if (!sess) signals.inventory = null;
     else {
       const items = await invSvc.loadSessionItems(sess.id);

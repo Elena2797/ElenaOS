@@ -22,7 +22,7 @@ export async function loadAll() {
     _db.from('metrics').select('*'),
     _db.from('operators').select('*').order('created_at'),
     _db.from('transactions').select('*').gte('date', new Date().getFullYear() + '-01-01').order('date', { ascending: false }),
-    _db.from('vj_state').select('*').limit(1),
+    _db.from('vj_state').select('*').order('updated_at', { ascending: false }).limit(1),
     _db.from('vj_tasks').select('*').order('created_at'),
     _db.from('projects').select('*').in('status', ['active', 'paused']).order('last_activity_at', { ascending: false }),
     _db.from('eventos').select('*').order('created_at', { ascending: false }).limit(50),
@@ -96,6 +96,16 @@ export async function upsertBudget(cat, val, existingId) {
 
 export async function updateVjState(id, patch) {
   await _db.from('vj_state').update(patch).eq('id', id);
+}
+
+// Refresco puntual (no el loadAll() completo) — usado al entrar/volver al área
+// VistaJet para que el estado operacional (avión actual, rotación) converja
+// con lo que Isabel haya podido cambiar por Telegram desde que se abrió la app,
+// sin depender de recargar la página entera.
+export async function loadVjState() {
+  const { data, error } = await _db.from('vj_state').select('*').order('updated_at', { ascending: false }).limit(1);
+  if (error) throw error;
+  return (data && data[0]) || null;
 }
 
 // ─── VistaJet — tareas ────────────────────────────────────────────────────────

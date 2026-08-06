@@ -32,25 +32,37 @@ export async function uploadTemplate(file, filename) {
   if (error) throw error;
 }
 
-export async function loadActiveSession() {
-  const { data, error } = await _db
-    .from('vj_inventory_sessions')
-    .select('*')
-    .eq('status', 'open')
-    .order('created_at', { ascending: false })
-    .limit(1);
+// Sin tailNumber: comportamiento histórico exacto (la sesión open más
+// reciente, sin importar matrícula).
+//
+// Con tailNumber: la sesión "activa" es la abierta para el avión operativo
+// actual (vj_state.aircraft) — nunca la de otro avión, aunque siga 'open'.
+// Mismo principio que HOTO/Laundry (D13/D14): sin sesión abierta para ese
+// avión, se devuelve null (permite empezar una nueva), nunca se reutiliza en
+// silencio la de un avión distinto.
+export async function loadActiveSession(tailNumber) {
+  let q = _db.from('vj_inventory_sessions').select('*').eq('status', 'open');
+  if (tailNumber) q = q.eq('aircraft_registration', tailNumber);
+  const { data, error } = await q.order('created_at', { ascending: false }).limit(1);
   if (error) throw error;
   return data?.[0] ?? null;
 }
 
 // Última sesión en cualquier estado (open o closed). Solo lectura — la usa
 // Aircraft Readiness para evaluar la evidencia de inventario.
-export async function loadLastSession() {
-  const { data, error } = await _db
-    .from('vj_inventory_sessions')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(1);
+//
+// Sin tailNumber: comportamiento histórico exacto (la última sesión global,
+// sin importar matrícula) — no rompe llamadores existentes.
+//
+// Con tailNumber: la sesión "actual" es la del avión operativo actual
+// (vj_state.aircraft), no simplemente la última creada — mismo principio que
+// HOTO (D13). Si no hay ninguna sesión para esa matrícula, no se cae de
+// vuelta a la de otro avión: devuelve null (Readiness ya trata null como
+// "sin evidencia", nunca inventa datos de otro avión).
+export async function loadLastSession(tailNumber) {
+  let q = _db.from('vj_inventory_sessions').select('*');
+  if (tailNumber) q = q.eq('aircraft_registration', tailNumber);
+  const { data, error } = await q.order('created_at', { ascending: false }).limit(1);
   if (error) throw error;
   return data?.[0] ?? null;
 }
