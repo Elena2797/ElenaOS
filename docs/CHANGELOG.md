@@ -7,6 +7,17 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-08-06 (continuación — flujo real de import de HOTO, D16)
+
+- **Pedido explícito de la usuaria:** poder importar un HOTO real ya recibido (PDF oficial) en vez de re-teclearlo, eligiendo "Continuar este HOTO" (conserva columnas usadas, abre la siguiente libre) o "Nuevo HOTO desde este" (nueva generación, resetea las columnas de handover, conserva avión/stock/cabin care/focus/defects/comments/offload).
+- **Auditoría reveló el bloqueo real:** el PDF oficial es un AcroForm real (364 campos, ya mapeados en `fieldMap.js`) — no hacía falta OCR. Pero `vj_hoto_records` solo podía representar UNA columna de handover; `pdfExport.js` limpiaba explícitamente las otras 5 en cada export. El caso pedido ("columnas 1-4 usadas, empiezo en la 5") era literalmente irrepresentable con el modelo anterior.
+- **Modelo (aditivo, sin "HOTO v2"):** `columns` jsonb guarda las columnas ya cerradas; los campos planos existentes siguen siendo "la columna de trabajo actual" sin cambios — el editor vivo no se tocó. `generation`/`superseded_by`/`imported_at`/`source_filename` nuevos para la trazabilidad de generaciones, sin tabla nueva.
+- **Parser nuevo** (`isabel-api/src/hoto/pdfImport.js`), inversa exacta del exportador, mismo `fieldMap.js`. Verificado exportando el HOTO real de 9H-VCQ y reimportándolo: 100% de los campos coincidieron exactos (defects, offload, comments, 40/40 daily duties, stock, focus). `magazines` se reporta como no reimportable en vez de reconstruirse a ciegas.
+- Endpoints `POST /v1/hoto/import/analyze` y `POST /v1/hoto/import/apply`. UI: "Subir HOTO" dentro de `vjHotoView` → "HOTO detectado — X columnas utilizadas" → Continuar/Nuevo → mismo editor de siempre.
+- Isabel no necesitó cambios — ya leía `vj_hoto_records` filtrando por `status:'active'`, así que las filas `superseded` (nueva) quedan excluidas automáticamente igual que las `delivered`.
+- 21 tests nuevos en `isabel-api` (207/207), incluida orquestación contra PDFs reales construidos con pdf-lib (mismos nombres de campo que el PDF oficial).
+- **Pendiente antes de desplegar:** `hoto_migration_v5.sql` (aditiva, columnas nuevas + backfill) sin ejecutar en Supabase todavía. Detalle completo en `DECISIONS.md` D16.
+
 ## 2026-08-06 (continuación — el bug de D14 seguía filtrándose: fallbacks de localStorage y una señal desconectada, D15)
 
 - **La usuaria reportó que el bug de D14 NO estaba resuelto del todo:** tras el fix, la cabecera y "Ver evaluación por módulos" ya mostraban D-AFBS correctamente, pero la tarjeta HOTO seguía en "12/47", el resumen de Readiness seguía con "215 items sin verificar; 61 discrepancias" de 9H-VCQ, Inventario seguía mostrando la sesión de 9H-VCQ como "Activa", y Laundry decía "hace 30 días". Instrucción explícita: no dar el bug por cerrado, auditar TODAS las rutas.

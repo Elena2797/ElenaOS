@@ -119,18 +119,24 @@ Migración: `hoto_migration.sql` + `hoto_migration_v2.sql`. Detalle de uso en [m
 | Columna | Tipo | Notas |
 |---|---|---|
 | id | uuid PK | |
-| tail_number, aircraft_status, icao, pattern, ch_code | text | cabecera del HOTO |
-| ch_column_index | int | default 0 — qué columna de las 6 del PDF es la CH actual |
-| received_date, days_on_aircraft | text | texto libre, tal cual va al PDF |
+| tail_number, aircraft_status, icao, pattern | text | cabecera del HOTO |
+| ch_code, received_date, days_on_aircraft, daily_duties | text/text/text/jsonb | de la COLUMNA DE TRABAJO actual (`ch_column_index`) — el editor vivo lee/escribe estos 4 campos directamente, sin cambios desde D13 |
+| ch_column_index | int | default 0 — cuál de las 6 columnas del PDF es la de trabajo actual |
+| columns | jsonb | default `[]` — array de hasta 6 `{ch_code, received_date, days_on_aircraft, duties:{item_id:true}}`, una por columna del PDF **ya cerrada** (importada o de una generación anterior). La columna que indica `ch_column_index` NO vive aquí — vive en los 4 campos planos de arriba (D16, `DECISIONS.md`) |
+| generation | int | default 1 — número de generación lógica de este HOTO (una nueva generación = "Nuevo HOTO desde este", D16) |
+| superseded_by | uuid | FK a `vj_hoto_records.id` — si no es null, esta fila quedó reemplazada por esa generación nueva (nunca se borra) |
+| imported_at | timestamptz | solo si el HOTO se originó importando un PDF real (D16); null si se creó desde el formulario manual |
+| source_filename | text | nombre del PDF importado, si aplica |
 | has_prior_hoto | boolean | default false |
 | shopping | jsonb | default `{}` — incluye `magazines_list` anidado |
 | cabin_care | jsonb | default `[]` — array de 17 `{d, n}` (fecha + nota) |
-| daily_duties | jsonb | default `{}` — `{item_id: true}`, añadida en v2 (2026-07-10) |
-| status | text | `active` \| `delivered` (transición real desde `hoto_migration_v4.sql`/D13, 2026-08-06 — antes solo `active` se escribía en la práctica) |
+| status | text | `active` \| `delivered` \| `superseded` (D16: `superseded` = reemplazada por una generación nueva, distinto de `delivered` = avión entregado) |
 | source_template | text | default `HOTO_official_v1.pdf` |
-| created_at, updated_at, delivered_at | timestamptz | `delivered_at` se rellena al cerrar (`closeHoto()`), antes nunca se escribía |
+| created_at, updated_at, delivered_at | timestamptz | `delivered_at` se rellena al cerrar (`closeHoto()`) |
 
-Índice `idx_hoto_active_unique_tail`: único parcial `(tail_number) WHERE status='active'` — `hoto_migration_v4.sql`, pendiente de ejecución manual en Supabase (verificado sin conflicto contra los datos reales antes de escribirlo). Garantiza a nivel de DB lo que `getActiveHoto(tailNumber)`/`loadActiveHoto(tailNumber)` ya manejan de forma fail-closed en código: nunca puede haber (o si ya existiera, se reporta como `ambiguous`, nunca se elige uno) más de un HOTO activo para la misma matrícula. Detalle completo en `DECISIONS.md` D13 y `modules/VISTAJET.md` § 3.
+Índice `idx_hoto_active_unique_tail`: único parcial `(tail_number) WHERE status='active'` — `hoto_migration_v4.sql`, aplicado y verificado en Supabase el 2026-08-06 (un `INSERT` de prueba con matrícula duplicada fue rechazado). Garantiza a nivel de DB lo que `getActiveHoto(tailNumber)`/`loadActiveHoto(tailNumber)` ya manejan de forma fail-closed en código: nunca puede haber (o si ya existiera, se reporta como `ambiguous`, nunca se elige uno) más de un HOTO activo para la misma matrícula. Detalle completo en `DECISIONS.md` D13 y `modules/VISTAJET.md` § 3.
+
+`hoto_migration_v5.sql` (D16, `columns`/`generation`/`superseded_by`/`imported_at`/`source_filename`) — pendiente de ejecución manual en Supabase.
 
 ### `vj_hoto_items`
 id, hoto_id (FK, cascade), section (`defect`\|`comment`\|`offload`), position, content, source (default `manual`), created_at.
