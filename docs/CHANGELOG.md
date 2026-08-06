@@ -7,6 +7,15 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-08-06 (continuación — Telegram y cron reales)
+
+- **Isabel operativa 24/7 por Telegram, verificado en producción de punta a punta.** Bot nuevo dedicado `@Isabellifeosbot` (token nunca reutilizado), pareado y endurecido a `dmPolicy: allowlist` con el ID numérico de la usuaria. Cadena Telegram → Isabel (`isabel-gateway`) → MCP `lifeos` → `isabel-api` → Supabase confirmada con una tool real (`health_get_sleep_status`).
+- **Flujo de sueño pregunta→respuesta→registro validado con datos reales de la usuaria**, no un test sintético: al probar el camino de lectura, el sueño de hoy (2026-08-06) genuinamente estaba sin registrar; Isabel preguntó por Telegram, la usuaria respondió "8 horas", `health_register_sleep` resolvió la Intervention y creó el CheckIn — sin duplicados, confirmado revisando el transcript completo.
+- **Cron diario real creado y persistido:** `sleep-check-0800-madrid`, `0 8 * * *` Europe/Madrid, `health_get_sleep_status` como fuente determinista, guarda silencio si no hace falta preguntar. Precedido de un cron one-shot de prueba que disparó exacto a la hora programada y completó el ciclo cron→agente→MCP→Telegram sin errores ni duplicados; se eliminó tras confirmar.
+- **Resuelto el bloqueo de `operator.admin` para gestionar cron por CLI** (documentado desde el 2026-08-05): la Control UI de `isabel-gateway` — deliberadamente no expuesta públicamente — es alcanzable de forma privada vía un túnel SSH (`ssh -L <puerto>:127.0.0.1:8080 <alias>`, usando el alias que genera `railway ssh config`), autenticando con `OPENCLAW_GATEWAY_TOKEN`. Desde ahí, crear/editar/eliminar cron funciona sin el bucle de auto-solicitud de scope que bloquea la CLI.
+- **Hallazgo de seguridad nuevo:** `ISABEL_API_KEY` y `ANTHROPIC_API_KEY` aparecen como valores literales resueltos en el `openclaw.json` del volumen de producción, no como referencias `${ENV}` sin resolver — confirmado también por `openclaw doctor`. Ver `SECURITY.md` riesgo #10. No remediado.
+- Desliz menor de manejo de secretos: un `railway variables --kv` sin filtrar imprimió `TELEGRAM_BOT_TOKEN` en la salida de una herramienta (no llegó a la respuesta visible a la usuaria). Corregido el hábito para el resto de la sesión (uso de `--kv` siempre con filtro/redacción a partir de ahí).
+
 ## 2026-08-06
 
 - **Cerrado el misterio del timeout de cron en Windows: es específico del runtime Windows, no de OpenClaw.** Repro completo en WSL2/Linux nativo (mismo OpenClaw 2026.6.10, mismo modelo, mismo MCP): cron → runner_entered → claude-cli → MCP autenticado → tool → respuesta → run OK, sin fallo. El bug de Windows se explica por un reinicio de Gateway en cascada que cae en modo degradado por falta de integración con Scheduled Tasks — no bloquea Railway/Linux. Ver `KNOWN_PROBLEMS.md`.
