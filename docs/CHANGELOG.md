@@ -7,6 +7,14 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-08-06 (continuación — arquitectura multidominio + VistaJet)
+
+- **Auditoría completa de LIFEOS a través de todos los dominios**, seguida de una decisión de arquitectura: la infraestructura común pedida (eventos, estado operacional, interventions, tareas, specialists, identidad/contexto, prioridades) **ya existía** — construida para el vertical slice de sueño, nunca formalizada como patrón general. Documentado en `core/DOMAIN_SPECIALISTS.md` (nuevo) y `DECISIONS.md` D12.
+- **Segundo dominio con specialists de Isabel: VistaJet.** Dos vertical slices, ambos sobre `vj_state` (sin tabla nueva): vencimiento de pasaporte (`vistajet_get_status`/`vistajet_update_passport`, con Intervention/dedup igual que sueño) y continuidad operacional (`vistajet_update_status` — rotación/avión/standby, reportado por la usuaria, sin flujo de Intervention porque no hay señal fiable de "dato ausente" sin inventar una). Desplegado en producción, verificado (MCP autenticado, 7 tools presentes, sin regresión en sueño/cron).
+- **Bug real encontrado y corregido antes de llegar a producción** (condición de carrera en `getVistajetStatus`: el `reason_signature` de pasaporte está atado a un valor mutable, a diferencia de la fecha estable de sueño — una renovación por otra vía dejaba la alerta "huérfana") y otro durante el testing de `vistajet_update_status` (la limpieza al quedar "libre" se disparaba con el status heredado, no solo con uno explícito).
+- **Auditado y explícitamente no construido, con evidencia**: maleta/`bag_checks` (plantillas en `localStorage`, no en Supabase), HOTO recibido/pendiente (`status` de `vj_hoto_records` solo tiene un valor real, `'delivered'` nunca se implementó, no hay correlación con `vj_state.aircraft` — hallazgo nuevo, ver `KNOWN_PROBLEMS.md`), e-learning/facturas (no existe ninguna tabla). JETMI: diseño dejado listo, sin construir, sin datos reales que lo justifiquen todavía.
+- 160/160 tests pasando en `isabel-api` (16 nuevos: parser de fechas, lógica de riesgo/decisión de pasaporte, validación de cambios de estado, y escenarios de orquestación contra Supabase falso en memoria).
+
 ## 2026-08-06 (continuación — Telegram y cron reales)
 
 - **Isabel operativa 24/7 por Telegram, verificado en producción de punta a punta.** Bot nuevo dedicado `@Isabellifeosbot` (token nunca reutilizado), pareado y endurecido a `dmPolicy: allowlist` con el ID numérico de la usuaria. Cadena Telegram → Isabel (`isabel-gateway`) → MCP `lifeos` → `isabel-api` → Supabase confirmada con una tool real (`health_get_sleep_status`).

@@ -55,6 +55,14 @@ No existe un módulo "Defects" independiente. Los defectos documentados en HOTO 
 ### Columnas 2-6 de la tabla de CH histórico no se exportan
 El PDF oficial soporta hasta 6 CH distintos por rotación (histórico). El HOTO vivo en LIFEOS solo modela la columna actual (`ch_column_index`). Las otras 5 se limpian explícitamente en cada export (comportamiento correcto para "sin HOTO previo"), pero si se recibe un HOTO con histórico real de otras CH, ese histórico no tiene dónde vivir hoy.
 
+### `vj_hoto_records.status` no soporta "recibido/pendiente" — solo tiene un valor real (`'active'`)
+Encontrado el 2026-08-06 auditando si un specialist de Isabel podía responder "¿tengo el HOTO recibido para el avión actual?" (ver `DECISIONS.md` D12, `core/DOMAIN_SPECIALISTS.md`). Tres huecos reales, verificados leyendo el código, no solo el esquema:
+- `status` se escribe una sola vez, siempre como `'active'`, tanto en `life-os-app/src/services/hoto.js` como en `isabel-api/src/hoto/data.js`. `'delivered'` existe únicamente como comentario SQL en `hoto_migration.sql` (`-- active | delivered`) — cero apariciones como valor real en ningún sitio del código de ambos repos.
+- `delivered_at` nunca se escribe desde ningún flujo — no existe ninguna acción de "entregar/handover/cerrar" en la UI ni un endpoint `/deliver` en el backend. Exportar el PDF (`hotoExport()`) no toca el registro en absoluto.
+- `loadActiveHoto()`/`getActiveHoto()` no correlacionan nunca `vj_hoto_records.tail_number` con `vj_state.aircraft` — devuelven sencillamente la fila `status='active'` más reciente por `created_at`, sea cual sea su matrícula. No hay índice único que impida múltiples filas `active` a la vez (a diferencia de `interventions`, que sí tiene uno).
+
+Consecuencia: "HOTO recibido/pendiente para el avión actual" no es una pregunta respondible hoy sin inventar tanto la correlación por matrícula como la semántica de estado — ninguna de las dos existe en el comportamiento real de la app. Construir un specialist de Isabel sobre esto significaría inventar lógica nueva, no conectar la existente. Antes de intentarlo, HOTO necesitaría: (a) una acción real de "entregar" que cierre el registro (`status`, `delivered_at`), y (b) correlacionar `tail_number` con `vj_state.aircraft` al crear/buscar el HOTO activo. Es una decisión de producto sobre el propio módulo HOTO, no solo una integración de Isabel — pendiente de que la usuaria decida si merece la pena antes de construir el specialist.
+
 ## Modelo de datos
 
 ### `transactions`, `metrics` y `operators` no tienen `CREATE TABLE` en ningún repo

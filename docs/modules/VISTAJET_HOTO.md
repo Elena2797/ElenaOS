@@ -54,7 +54,7 @@ Crear HOTO (o continuar el activo) → editar secciones durante la rotación (ca
 - Protocolo antes/después aplicado en cada cambio de esquema o exportador: conteo de registros + comparación campo a campo del PDF exportado.
 
 # Bugs conocidos
-Ver [KNOWN_PROBLEMS.md](../KNOWN_PROBLEMS.md): duplicación de Shopping con Inventario, ausencia de módulo Defects propio, columnas históricas de CH no exportadas.
+Ver [KNOWN_PROBLEMS.md](../KNOWN_PROBLEMS.md): duplicación de Shopping con Inventario, ausencia de módulo Defects propio, columnas históricas de CH no exportadas, y (nuevo, 2026-08-06) el modelo de `status`/`tail_number` no soporta "HOTO recibido/pendiente" sin inventar lógica nueva — ver ahí el detalle completo.
 
 # Decisiones cerradas
 Ver [DECISIONS.md](../DECISIONS.md) D2, D3, D4, D5, D6.
