@@ -3998,6 +3998,7 @@ Object.assign(window, {
   setVjTab, toggleHotoCheck, resetHotoChecks,
   invBack, invPreviewFile, invCreateSession, invSendMessage, invConfirm, invSetSearch, invCloseSession, invExport,
   hotoBack, hotoCreate, hotoField, hotoAddItem, hotoDelItem, hotoExport,
+  hotoImportFileSelected, hotoImportChoose, hotoImportCancel,
   hotoCareToggle, hotoCareToday, hotoCareUnknown, hotoCareDate, hotoCareNote,
   hotoShopToggle, hotoShopSet, hotoResetSection,
   hotoMagToggle, hotoMagAdd, hotoMagSet, hotoMagDel, hotoMagDropLegacy,
