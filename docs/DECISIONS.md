@@ -260,3 +260,19 @@ Formato: decisión · fecha · contexto · alternativa descartada · razón · e
 ### D32 — Limpieza de frontend: una vista huérfana fuera, dos CTAs indistinguibles diferenciados
 **Fecha:** 2026-08-07
 **Estado:** vigente. **REMOVE:** `dashboardView()` eliminada — cero navegación hacia ella (ni nav, ni botón, ni `go('dashboard')`); duplicaba conteos ya presentes en Home y Avanzar. **SIMPLIFY:** las tarjetas "eLearnings" y "Facturas" llamaban ambas a `openAddVjTask()` sin contexto — dos controles que abrían el mismo formulario genérico, indistinguibles al usarlos; ahora prerrellenan según la tarjeta. Verificado en navegador (viewport móvil) sin errores de consola.
+
+
+### D33 — Contrato universal de señales y relevancia temporal: "existe" deja de significar "urgente"
+**Fecha:** 2026-08-07
+**Contexto:** D29/D30 traducían `time_sensitive` a `urgent` **siempre**. Resultado real en producción: una bolsa pendiente de bajar del avión mantenía VistaJet en `urgent` durante toda la rotación. La usuaria lo señaló como fallo de diseño: *"un `offload_pending` puede existir durante una rotación sin ser urgente hoy"*.
+**Decisión:** separar severidad **intrínseca** de relevancia **temporal**, de forma general y sin ningún caso especial.
+`core/signals.js` define el contrato para cualquier dominio — `type`, `domain`, `subject`, `evidence`, `action`, `severity`, `temporal`, `source` — y la resolución:
+- `expires_when: 'window_closed'` + ventana cerrada → **la señal deja de competir por atención** (el dato histórico se conserva; simplemente ya no es de hoy).
+- `escalates_when: 'window_closing'` + ventana cerrándose → **sube un nivel**.
+- Ventana `unknown` → **nunca escala**. Sin dato no se afirma urgencia.
+
+**El dominio declara cuándo importa; el Core aplica la regla sin conocer el dominio.** VistaJet traduce su estado a la ventana normalizada: `libre` → `closed` (entregado), rotación con ≤2 días restantes → `closing`, resto → `open`, sin datos → `unknown`. Ni una condición sobre aviones en el motor.
+**`subject: {kind, id}`** generaliza la invariante que costó tres bugs (D14/D15/D28): `dropStaleSignals()` descarta cualquier señal cuya entidad ya no sea la actual, para cualquier dominio.
+**Invariante de arquitectura, con test:** `signals.js` no puede contener literales de dominio — si añadir Gym o Finanzas obligara a tocarlo, la abstracción estaría mal. Además, un guardarraíl **mide** (no ignora) la deuda preexistente de `globalContext.js`, que aún tiene bloques de VistaJet/JETMI anteriores al contrato: no impiden añadir dominios nuevos (las señales entran por la vía general) pero no deben crecer.
+**Estado:** vigente, verificado en producción. VistaJet pasó de `urgent` a `maintain` y la prioridad global volvió a JETMI (`reentry`) — la falsa urgencia desapareció.
+**Bug encontrado al verificar y corregido:** `withSeverity()` buscaba en su mapa por `signal`, que en el contrato nuevo se llama `type`, así que degradaba a `informational` justo las señales recién migradas, anulando su relevancia. Ahora respeta cualquier severidad ya declarada. 3 tests de regresión.

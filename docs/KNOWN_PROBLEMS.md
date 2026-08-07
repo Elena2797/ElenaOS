@@ -93,6 +93,14 @@ Encontrado el 2026-08-07: `life_context.mode` se leía, se pintaba en la píldor
 ### Ninguna llamada a Anthropic registra tokens/modelo/coste
 Confirmado el 2026-08-07 auditando las 4 llamadas reales a Anthropic en `isabel-api` (`core/now.js`, `core/generalHandler.js`, `core/intentRouter.js`, `intentProvider.js`) — todas bien acotadas con filtros deterministas previos (ninguna es un caso del anti-patrón "preguntar al LLM si hay algo que hacer"), pero ninguna captura `response.usage` (tokens de entrada/salida) ni lo registra en `eventos` ni en ningún otro sitio. Hoy no hay forma de responder "¿cuánto ha costado Isabel este mes, y en qué dominio?" sin ir a mirar el dashboard de Anthropic directamente.
 
+## Arquitectura de señales
+
+### `globalContext.js` todavía tiene bloques específicos de VistaJet y JETMI
+Anteriores al contrato universal de señales (D33): leen `vj_state`, `vj_tasks` y `operators` directamente dentro del Core. **No bloquean añadir un dominio nuevo** — las señales entran por la vía general (`resolveSignals`) y un specialist nuevo no necesita tocar el motor — pero son el resto de acoplamiento a migrar. Hay un test que mide ese acoplamiento y falla si crece (`signals.test.js`, máximo tolerado 12 referencias). Migrarlos consistiría en que VistaJet y JETMI emitan también su estado como señales del contrato, en vez de que el Core lo lea.
+
+### Señales sin ventana operativa definida se quedan en `unknown`
+Hoy `vj_state` de D-AFBS está en `rotacion` **sin `rotation_day`/`rotation_total`**, así que la ventana es `unknown` y ninguna señal escala. Es el comportamiento correcto (sin dato no se afirma urgencia), pero significa que la escalada por proximidad de entrega **no se activará** hasta que la rotación tenga día y total registrados. No es un bug: es una dependencia de dato real.
+
 ## Modelo de datos
 
 ### `transactions`, `metrics` y `operators` no tienen `CREATE TABLE` en ningún repo
