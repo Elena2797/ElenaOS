@@ -19,11 +19,12 @@ Confirmado el 2026-08-07 (auditoría de frontend, `DECISIONS.md` D18): no era un
 
 ## Arquitectura
 
-### Isabel real (Telegram) y el botón de chat dentro de LIFEOS son cerebros distintos — vía técnica ya identificada (D23), bloqueada por una decisión de infraestructura
-**Actualizado 2026-08-07 (D23):** la investigación de cómo unificarlos está cerrada con evidencia leída dentro del contenedor real de producción. La vía soportada es el WebSocket del Gateway (`chat.send`/`chat.history`, con `sessionId` para continuidad) consumido desde `isabel-api` como proxy server-to-server — nunca desde el navegador. Descartado con evidencia: el plugin `admin-http-rpc` de OpenClaw (existe y es HTTP, pero su allowlist **no incluye `chat.send`/`agent`/`sessions.*`** — sirve para administrar, no para conversar), y cualquier endpoint HTTP de chat (no existe en 2026.6.10). **Lo que bloquea la implementación no es técnico sino de infraestructura:** `isabel-gateway` está en un proyecto Railway distinto al de `isabel-api` y con `bind:"loopback"`, así que ni siquiera el private networking de Railway (mismo proyecto solamente) los conecta hoy. Recomendación registrada en D23: mover `isabel-gateway` al proyecto de `isabel-api` y usar private networking (`*.railway.internal`), que no expone ninguna superficie nueva a internet. Decisión de la usuaria, no tomable por un chat.
+### Isabel real (Telegram) y el chat de LIFEOS — RESUELTO 2026-08-07 (D23/D26/D27)
+Ya no son cerebros distintos. `openChat()` dejó de usar el bridge local y pasa por `POST /v1/chat` de `isabel-api` → red privada IPv6 de Railway → `gateway-adapter` → **el mismo agente `main`** que atiende Telegram, con sus mismas tools MCP y su mismo estado en Supabase. El navegador nunca ve ningún secreto del Gateway (verificado: 0 coincidencias en el bundle). Una sola sesión `lifeos` para todas las pantallas; la superficie viaja como contexto estructurado, no como sesión aparte.
 
+**Matiz honesto sobre el transcript:** Telegram usa `agent:main:main` y LIFEOS `agent:main:lifeos` — mismo agente, transcripts distintos. La memoria **operacional** (Supabase, tools) sí es compartida; la conversacional no. No se forzó un transcript común porque la sesión de Telegram lleva un binding de canal y las respuestas podrían enrutarse por Telegram en vez de a la pantalla. Ver `operations/GATEWAY_MIGRATION.md` § modelo de sesión.
 
-Ver [core/ISABEL_CHANNELS.md](core/ISABEL_CHANNELS.md) para el detalle completo (actualizado 2026-08-07: confirmado que `isabel-gateway`+Telegram+MCP es la Isabel real y única en uso diario; `lifeos-agent` se confirma muerto; `api/chat.js` y `core/router.js` siguen sin conectar). Lo que sigue sin resolver: el botón "Hablar con Isabel" dentro de LIFEOS (`openChat()`) sigue apuntando a un bridge local (`isabel-bridge.js`, proceso `openclaw` en el portátil, requiere `Arrancar Isabel.bat`) — una segunda Isabel, sin las tools MCP ni el contexto que sí tiene la de Telegram. No se puede repuntar sin más porque `isabel-gateway` corre con `gateway.bind:"loopback"`, sin endpoint HTTP público — exponerlo es una decisión de seguridad/infraestructura real (nueva superficie de ataque, requiere diseño de auth), no un cambio de configuración trivial. Ver `DECISIONS.md` D18 (decisión pendiente, explícitamente no tomada por un chat sin autorización de la usuaria). Impacto adicional: el chat de Inventario (`/v1/message`/`/v1/confirm`, UI propia dentro de VistaJet) es una *tercera* implementación conversacional, con su propio historial y su propio modelo — legítima como acción contextual acotada a una sesión de inventario, pero nadie ha confirmado si ese es el diseño deseado o deuda heredada.
+**Lo que sigue abierto:** el chat estructurado de Inventario (`/v1/message`/`/v1/confirm`) se conserva como ruta legacy — tiene un flujo propuesta→confirmar que la ruta unificada **alcanza** (usa los mismos tools MCP, verificado) pero cuya escritura real no se ha podido probar todavía: no existe sesión de inventario para D-AFBS y fabricar conteos sería corromper datos. `isabel-bridge.js` queda LEGACY/FROZEN, fuera del runtime, conservado solo como rollback.
 
 ### `isabel-api/src/core/router.js` (Isabel Core con routing a especialistas) existe pero no está montado
 **Actualizado 2026-08-03: ya no aplica a todo `core/`.** `index.js` monta `core/now.js` (`GET /v1/now`, solo lectura, ver `core/ISABEL_NOW.md`), pero sigue sin importar `core/router.js` (`POST /chat`, `intentRouter`, `inventoryDelegate`, `generalHandler`). Es código completo, probablemente funcional si se conectara, pero no forma parte del servidor que corre en producción. Impacto: cualquier chat que lea el código de `core/` sin verificar `index.js` línea por línea asumirá que todo está activo, o que nada lo está — ninguna de las dos es cierta.
@@ -92,6 +93,19 @@ Encontrado el 2026-08-07: `life_context.mode` se leía, se pintaba en la píldor
 
 ### Ninguna llamada a Anthropic registra tokens/modelo/coste
 Confirmado el 2026-08-07 auditando las 4 llamadas reales a Anthropic en `isabel-api` (`core/now.js`, `core/generalHandler.js`, `core/intentRouter.js`, `intentProvider.js`) — todas bien acotadas con filtros deterministas previos (ninguna es un caso del anti-patrón "preguntar al LLM si hay algo que hacer"), pero ninguna captura `response.usage` (tokens de entrada/salida) ni lo registra en `eventos` ni en ningún otro sitio. Hoy no hay forma de responder "¿cuánto ha costado Isabel este mes, y en qué dominio?" sin ir a mirar el dashboard de Anthropic directamente.
+
+## BLOQUEANTE ACTIVO
+
+### La cuenta de Anthropic se quedó sin crédito — Isabel no puede responder (2026-08-07)
+Detectado al cerrar la sesión, verificando producción. Los logs del Gateway son explícitos:
+`"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."`
+No es un bug del sistema: es saldo de la cuenta.
+
+**Qué está caído:** cualquier cosa que necesite el modelo — chat de LIFEOS (`/v1/chat` devuelve `gateway_timeout`), Isabel por Telegram, la redacción de `GET /v1/now`, y el cron de sueño de las 08:00 fallará mientras siga así.
+
+**Qué sigue funcionando (y esto valida el diseño):** toda la capa determinista. `/v1/now` responde `status: llm_error` pero conserva `attention_mode`, `evidence` y las 4 señales de VistaJet intactas; el frontend sigue mostrando prioridad real porque nunca dependió del LLM para decidirla (D9/D22). Supabase, el frontend, el adaptador y el Gateway están sanos.
+
+**Acción:** recargar crédito en `console.anthropic.com` → Plans & Billing. Conviene hacerlo **a la vez** que la rotación de clave pendiente (`operations/ROTAR_ANTHROPIC_KEY.md`), para no reiniciar servicios dos veces.
 
 ## Arquitectura de señales
 
