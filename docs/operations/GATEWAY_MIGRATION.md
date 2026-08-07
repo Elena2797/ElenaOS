@@ -79,7 +79,53 @@ Dos Gateways haciendo long-polling del mismo bot provocan `409 Conflict` y pérd
 - [ ] **Cutover de Telegram** (quitar token del viejo → añadir al nuevo)
 - [ ] Verificación post-cutover y apagado del Gateway antiguo ← requiere autorización explícita
 
-## Lo que bloquea ahora mismo: el bind del Gateway
+## BLOQUEO REAL: OpenClaw no puede escuchar en IPv6, y la red privada de Railway es IPv6-only
+
+Esto no es un problema de configuración ni de versión — es una incompatibilidad de diseño entre las dos piezas, demostrada con evidencia por ambos lados:
+
+**Lado Railway (medido, no supuesto).** Desde el contenedor de `isabel-api`:
+```
+getent hosts isabel-gateway.railway.internal
+fd12:b812:c76d:1:d000:37:8702:99d2   isabel-gateway.railway.internal
+```
+Solo IPv6. No hay registro A/IPv4.
+
+**Lado OpenClaw (probado en producción, y confirmado con la documentación vigente).** Se intentaron los tres modos posibles:
+| Intento | Resultado real |
+|---|---|
+| `bind: "custom"` + `customBindHost: "::"` | El Gateway **rechaza arrancar**: `gateway.bind=custom requires a valid IPv4 customBindHost (got ::)` |
+| `bind: "lan"` | Arranca, pero escucha **solo IPv4**: `/proc/net/tcp` muestra `00000000:1F90` (0.0.0.0:8080) y `/proc/net/tcp6` vacío |
+| `bind: "loopback"` (original) | `127.0.0.1:8080` y `::1:8080` — inalcanzable desde otro contenedor |
+
+La documentación vigente de OpenClaw lo confirma como decisión de diseño, no como límite de la versión instalada: los modos son *"auto, loopback (default), lan (0.0.0.0), tailnet (Tailscale IPv4 when available...), or custom (**one IPv4 address**)"*, y `::` aparece explícitamente entre los alias legacy a evitar. **Actualizar OpenClaw no resolvería esto.**
+
+### Consecuencia
+No existe ningún camino solo-de-configuración de `isabel-api` → `isabel-gateway`. Hace falta un adaptador IPv6→IPv4/loopback dentro del contenedor del Gateway (implementado en `isabel-gateway/private-net-forwarder.mjs`, ~30 líneas sin dependencias, **construido pero NO desplegado**).
+
+### El adaptador tiene una implicación de seguridad que debe decidirse, no asumirse
+El Gateway vería esas conexiones con origen `127.0.0.1`, es decir, como **loopback directo**. OpenClaw reserva a ese origen un camino de confianza (`client.id:"gateway-client"` + `client.mode:"backend"`) que concede scopes de operador solo con el token compartido, sin device pairing. El adaptador, por tanto, **ensancha la frontera de confianza de "el mismo host" a "el mismo proyecto Railway"**.
+
+Hoy ese proyecto (`laudable-consideration`) contiene `isabel-api`, el propio Gateway y **`faithful-light`** — un servicio que nadie usa (ver auditoría abajo). Recomendación: **parar `faithful-light` primero**; con eso, la frontera pasa a ser efectivamente "solo isabel-api", que es justo lo que se quiere. La alternativa más estricta, si el proyecto llegara a alojar servicios menos confiables, es device pairing explícito para `isabel-api` (`device.pair.*`) — pero eso no elimina el ensanchamiento, solo deja de depender de él.
+
+## Auditoría read-only de `faithful-light` → **ORPHANED**
+
+| Aspecto | Hallazgo |
+|---|---|
+| Qué es | `isabel-api/src/core/index.js` — **Isabel Core como servicio independiente**, la arquitectura que `DECISIONS.md` D9 descartó explícitamente. Log de arranque: `Isabel Core v0.1.0 corriendo en http://localhost:3003` |
+| Source | Mismo repo que `isabel-api` (`Elena2797/isabel-api`, rama `main`) — **se redespliega con cada push**; su último deploy es el commit `4915e6d` de esta misma sesión |
+| Creado | 2026-07-07 |
+| Rutas | `/v1/chat` y `/v1/now` responden `401` (existen, autenticadas); `/`, `/chat`, `/health` → `404` |
+| Dominio | **Público**: `faithful-light-production-3384.up.railway.app` |
+| Variables | `ANTHROPIC_API_KEY`, `SUPABASE_SERVICE_KEY`, `ISABEL_CORE_API_KEY`, `INVENTORY_API_KEY`, `INVENTORY_API_URL` (secretos de producción reales) |
+| ¿Quién lo referencia? | **Nadie.** Cero referencias a `faithful-light` en `life-os-app/src`, en `isabel-api`, en la config del Gateway y en `/docs` |
+| ¿Cron/webhook apuntando? | Ninguno — el único cron es `sleep-check-0800-madrid`, que entrega por Telegram |
+| Tráfico | Sin evidencia de uso: los logs solo contienen líneas de arranque, ninguna petición servida |
+
+**Veredicto: ORPHANED.** Está vivo y redesplegándose, pero nada lo consume. Riesgo real: expone secretos de producción y una superficie autenticada a internet, sin propósito, y — relevante para la decisión de arriba — estaría dentro de la frontera de confianza del adaptador de red privada.
+
+**Propuesta (no ejecutada):** *detenerlo*, no borrarlo. En Railway, quitar el dominio público y hacer `railway down` deja el servicio y su configuración intactos; el rollback es un `railway redeploy`. No se ha hecho nada: apagar un servicio Online es destructivo y requiere autorización explícita.
+
+## Lo que bloqueaba antes: el bind del Gateway (resuelto en lo posible)
 
 **Evidencia dura** (leída de `/proc/net/tcp`/`tcp6` dentro del contenedor nuevo): el Gateway escucha **solo en loopback** — `127.0.0.1:8080` y `::1:8080`. El private networking de Railway es IPv6 y exige escuchar en `::`, así que `isabel-api` **no puede alcanzarlo todavía**. Esto no es una suposición: el proxy funciona perfectamente desde dentro del contenedor (loopback) y no tiene ninguna ruta desde fuera.
 
