@@ -232,3 +232,31 @@ Formato: decisión · fecha · contexto · alternativa descartada · razón · e
 5. **Bonus, botón muerto:** "Empezar con esta acción" hacía `go('home')` para tareas y decisiones — devolvía a la usuaria justo donde empezó, sin abrir nada. Ahora navega al área real del elemento.
 **Estado:** vigente, implementado y verificado en navegador (viewport móvil) contra Supabase de producción real, sin errores de consola. 4/4 tests, build limpio.
 **Ver también:** D19, D22 (misma regla, otras superficies), `PRINCIPLES.md` #8.
+
+
+### D28 — El inventario se resuelve por avión actual, nunca por "sesión abierta más reciente"
+**Fecha:** 2026-08-07
+**Contexto:** probando Inventario desde la Isabel unificada, respondió *"la Coca-Cola ya estaba en 6"* — pero el avión actual es D-AFBS y las únicas sesiones abiertas son de 9H-VCQ.
+**Diagnóstico:** `getActiveSession()` (`isabel-api/src/data.js`) devolvía la sesión `open` más reciente **sin correlacionar matrícula**. Un *"he contado 6 cocacolas"* dicho por Telegram habría escrito en el inventario del avión anterior — corrupción silenciosa entre aviones. Es la misma clase de fallo que D14/D15 corrigieron en el frontend; la ruta del backend nunca se arregló porque hasta ahora solo la alcanzaba la UI de Inventario, que resuelve su propia sesión. Hacer a Isabel capaz de llegar ahí por MCP expuso el hueco.
+**Estado:** vigente, implementado y verificado en producción. `getActiveSession(tailNumber)` correlaciona y falla en cerrado; `getCurrentAircraft()` lee el singleton `vj_state`; `/v1/message` pasa siempre el avión actual y, si no hay sesión suya, lo dice: *"No hay sesión de inventario abierta para D-AFBS — no voy a usar la de otro avión."* Sin argumento se conserva el comportamiento histórico, del que depende la UI. 8 tests.
+
+### D29/D30 — VistaJet como segundo cerebro: señales deterministas con severidad, dentro del motor global
+**Fecha:** 2026-08-07
+**Contexto:** el objetivo era que VistaJet dejara de limitarse a "estado correcto" y produjera señales operativas accionables, sin que el LLM inspeccionara tablas ni inventara conclusiones.
+**Auditoría previa (con datos reales, antes de escribir ninguna regla):** se revisó cada fuente del dominio. Corrección importante de una conclusión anterior errónea: `shopping.magazines_list` **sí es estructurado** (D3) — `{name, status: up_to_date|needs_renewal}`; lo que es texto libre es `shopping.magazines`, el resumen derivado para el PDF.
+**Señales implementadas** (`core/specialists/vistajetSignals.js`): `stock_low` (`current_qty < std_qty`), `inventory_discrepancies`, `inventory_unverified`, `inventory_missing`, `offload_pending`, `magazine_renewal_needed`, `cabin_defect_open`, `hoto_missing`, `hoto_ambiguous`. Todas correlacionadas con el avión actual.
+**Deliberadamente NO modeladas, por falta de dato y no de tiempo:** `laundry_due` (la tabla está **vacía**), cadencia de `cabin_care` (17 fechas reales pero ninguna cadencia definida por nadie), reposición desde `shopping` (texto libre humano: *"At least 20 at the back"*, *"+4"*), y cualquier regla sobre `req_qty` (está a 0 en todos los items reales: el campo existe pero no se usa).
+**Severidad — no toda señal es una notificación:** `informational` (contexto; nunca despierta a Isabel), `actionable`, `time_sensitive`, `blocking`. `inventory_unverified` (347 items) y `cabin_defect_open` son informational a propósito: avisarlas sería el spam que se quiere evitar, pero siguen citables bajo consulta.
+**Prioridad global, no paralela:** las señales entran a `globalContext.js`, el mismo motor que ya prioriza el resto de dominios. `blocking`/`time_sensitive` → `urgent`, `actionable` → `maintain`, `informational` → no clasifica. Verificado con test: una factura vencida de Finanzas sigue ganando a una señal `actionable` de VistaJet.
+**Estado:** vigente, verificado en producción con datos reales — `offload_pending` (*"blue bag in aft lav closet"*) elevó VistaJet a `urgent`, y `magazine_renewal_needed` devolvió *Vogue Summer, Economist, time*. Isabel responde con acciones concretas ("bajar la bolsa azul del armario del lavabo de cola"), no con *"revisa el HOTO"*. 35 tests.
+
+### D31 — Trazabilidad del consumo de IA sobre la tabla que ya existe
+**Fecha:** 2026-08-07
+**Contexto:** ninguna llamada a modelo registraba tokens ni coste (`KNOWN_PROBLEMS.md`), así que no se podía responder "cuánto cuesta Isabel y por qué".
+**Alternativa descartada:** crear una tabla nueva de billing y un dashboard.
+**Razón:** `eventos` ya es el audit trail del sistema y no requiere migración manual (que en este proyecto siempre es un paso bloqueante). Se pidió explícitamente "datos auditables primero, dashboard después".
+**Estado:** vigente. `core/aiUsage.js` registra timestamp, source, domain, purpose, kind, modelo, tokens, cache y coste estimado. Clasificación del trabajo: `deterministic` (cero LLM, el caso por defecto), `light_ai`, `reasoning` (hoy inexistente en isabel-api), `conversation` (turnos del agente, en el Gateway). Instrumentados los dos puntos reales: `/v1/now` y el parser de inventario — ambos `light_ai` y ambos detrás de un filtro determinista. **La regla principal se mantiene: con `attention_mode: clear`, `/v1/now` responde sin llamar al modelo.** El precio por Mtok vive en una sola constante marcada como estimación interna; un modelo desconocido devuelve `null` en vez de un número inventado. 9 tests.
+
+### D32 — Limpieza de frontend: una vista huérfana fuera, dos CTAs indistinguibles diferenciados
+**Fecha:** 2026-08-07
+**Estado:** vigente. **REMOVE:** `dashboardView()` eliminada — cero navegación hacia ella (ni nav, ni botón, ni `go('dashboard')`); duplicaba conteos ya presentes en Home y Avanzar. **SIMPLIFY:** las tarjetas "eLearnings" y "Facturas" llamaban ambas a `openAddVjTask()` sin contexto — dos controles que abrían el mismo formulario genérico, indistinguibles al usarlos; ahora prerrellenan según la tarjeta. Verificado en navegador (viewport móvil) sin errores de consola.
