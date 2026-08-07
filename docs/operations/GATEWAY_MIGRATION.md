@@ -1,4 +1,4 @@
-Estado: en ejecución — blue/green en curso, cutover NO realizado todavía
+Estado: en ejecución — chat de LIFEOS ya sobre el Gateway nuevo; cutover de Telegram NO realizado todavía
 Última verificación: 2026-08-07
 Verificado en: `railway ssh` contra el contenedor real de `isabel-gateway`, `railway api` (GraphQL), backup lógico extraído y verificado localmente
 Fuente de verdad de datos: ninguna
@@ -61,25 +61,38 @@ Conclusión: **blue/green con volumen nuevo y restore del estado.** Es además l
 Dos Gateways haciendo long-polling del mismo bot provocan `409 Conflict` y pérdida de mensajes. La garantía aplicada **no depende de recordar apagar nada**: el nuevo servicio se crea **sin la variable `TELEGRAM_BOT_TOKEN`**. `openclaw.default.json` tiene `channels.telegram.enabled: true`, pero sin token en el entorno el canal no puede autenticarse ni hacer polling — es imposible que compita con el viejo. El token solo se añade en el momento del cutover, después de quitarlo del Gateway antiguo.
 
 ## Estado de ejecución
-- [x] Auditoría del estado persistente
-- [x] Backup lógico verificado (con el cron dentro)
-- [x] Confirmado que Railway no permite mover service+volume entre proyectos
-- [x] Servicio `isabel-gateway` creado en `laudable-consideration` (`1a66077d-…`)
-- [x] Variables copiadas **excepto** `TELEGRAM_BOT_TOKEN`
-- [x] Volumen nuevo creado y montado en `/data` (`eda9bc22-…`)
-- [x] Deploy verde y arrancado (`[gateway] ready`)
-- [x] Restore del estado y verificación — **el cron sobrevivió con su id original** (`99fd7a3b-…`), `enabled`, mismo schedule y delivery
-- [x] MCP `lifeos: ok` desde el Gateway nuevo
-- [x] Turno de agente real: responde "el avión actual es D-AFBS" usando la tool real
-- [x] Proxy de chat implementado y testeado en `isabel-api` (`POST /v1/chat`, 25 tests)
-- [x] Adapter validado **contra el Gateway real** (loopback), no solo con un fake
-- [ ] **`gateway.bind` a `custom`/`::`** ← BLOQUEADO, ver abajo
-- [ ] Prueba end-to-end isabel-api → private networking → Gateway
-- [ ] Migrar `openChat()` del frontend
-- [ ] **Cutover de Telegram** (quitar token del viejo → añadir al nuevo)
-- [ ] Verificación post-cutover y apagado del Gateway antiguo ← requiere autorización explícita
+- [x] Auditoría del estado persistente + backup lógico verificado (con el cron dentro)
+- [x] Confirmado que Railway no permite mover service+volume entre proyectos → blue/green
+- [x] Servicio `isabel-gateway` creado en `laudable-consideration`, volumen nuevo, variables copiadas **excepto** `TELEGRAM_BOT_TOKEN`
+- [x] Estado restaurado — **el cron sobrevivió con su id original** (`99fd7a3b-…`), enabled, mismo schedule y delivery
+- [x] MCP `lifeos: ok` y turno de agente real correcto desde el Gateway nuevo
+- [x] `faithful-light` **detenido** (reversible, ver `_faithful_light_snapshot_20260807/ROLLBACK.md`)
+- [x] Decidido B sobre A con evidencia del source (ver abajo) e implementado `gateway-adapter.mjs`
+- [x] Gateway de vuelta en `bind: loopback` — solo el adaptador escucha en la red privada
+- [x] **Cadena end-to-end demostrada en producción** (ver evidencia abajo)
+- [x] Pestaña Isabel de LIFEOS migrada a `POST /v1/chat`; bridge local fuera del runtime
+- [ ] **Cutover de Telegram** (quitar token del viejo → añadir al nuevo) ← siguiente paso
+- [ ] Restart completo del nuevo y verificación de supervivencia
+- [ ] Apagado del Gateway antiguo ← requiere autorización explícita
 
-## BLOQUEO REAL: OpenClaw no puede escuchar en IPv6, y la red privada de Railway es IPv6-only
+## Evidencia de la cadena completa (2026-08-07, producción real)
+
+| Prueba | Resultado |
+|---|---|
+| Conversación general vía `/v1/chat` | `{"ok":true,"reply":"PRIVADO_OK","session_key":"lifeos"}` en 3.7 s |
+| VistaJet con MCP real | *"Avión **D-AFBS**, en **rotación** (HOTO activo)"* — dato real de Supabase |
+| Adaptador escuchando | `[adapter] escuchando en [::]:8081 — solo /chat/send, /chat/history, /healthz`; socket IPv6 confirmado en `/proc/net/tcp6` |
+| DNS de la red privada | `isabel-gateway.railway.internal` → `fd12:b812:c76d:1:d000:37:8702:99d2` (solo IPv6) |
+| Sin API key | `401` |
+| Mensaje vacío | `empty_message`, sin llegar al Gateway |
+| **Dos peticiones simultáneas** | ALFA→`ALFA`, BETA→`BETA`, sin mezcla |
+| **Memoria entre pantallas** | Número pedido en `global`, recordado desde contexto `inventory` — misma sesión `lifeos` |
+| **Secretos en el bundle del navegador** | `OPENCLAW_GATEWAY_TOKEN`, `GATEWAY_ADAPTER_TOKEN`, `railway.internal`: **0 coincidencias** |
+| Contexto estructurado desde VistaJet | `{domain:"vistajet",surface:"vistajet",aircraft:"D-AFBS"}` — avión real, no inventado por el frontend |
+
+Que la petición atraviesa realmente la red privada queda demostrado por construcción: el Gateway está en `bind: loopback` **sin dominio público**, así que la única ruta desde `isabel-api` es `isabel-gateway.railway.internal:8081` (IPv6 privado) — y responde.
+
+## BLOQUEO REAL## BLOQUEO REAL: OpenClaw no puede escuchar en IPv6, y la red privada de Railway es IPv6-only
 
 Esto no es un problema de configuración ni de versión — es una incompatibilidad de diseño entre las dos piezas, demostrada con evidencia por ambos lados:
 
