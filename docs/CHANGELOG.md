@@ -7,6 +7,19 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-08-07 (tercera tanda — una sola Isabel de verdad: migración, cutover y contrato universal — D23…D33)
+
+- **Migración blue/green de `isabel-gateway`** al proyecto Railway de `isabel-api`. Railway no permite mover service+volume entre proyectos (confirmado contra su API GraphQL), así que: backup lógico verificado → servicio nuevo sin `TELEGRAM_BOT_TOKEN` (guard anti-409 estructural) → restore del estado → **el cron `sleep-check-0800-madrid` sobrevivió con su id original**.
+- **Cutover de Telegram** con ventana verificable de **cero pollers** (evidencia doble: hot-reload aplicado + el Gateway antiguo arrancando con 7 plugins, sin `telegram`). Cero 409. Test de reinicio superado: Telegram, cron, MCP, adaptador y `/v1/chat` sobreviven.
+- **`gateway-adapter`**: la red privada de Railway es IPv6-only y OpenClaw no sabe escuchar en IPv6 fuera de loopback (los tres modos probados; confirmado como diseño en su documentación vigente). Se evaluó device pairing remoto (viable, con evidencia del source) y se eligió un adaptador de **tres rutas** con token propio, porque un device aprobado daría el plano de control completo para lo que solo necesita dos operaciones. Threat model en `operations/GATEWAY_MIGRATION.md`.
+- **La pestaña Isabel de LIFEOS ya es la Isabel real** — mismo agente `main`, mismas tools, mismo Supabase. Una sola sesión `lifeos`; la superficie viaja como contexto estructurado. Cero secretos del Gateway en el bundle (verificado).
+- **Contrato universal de señales** (`core/signals.js`) con **relevancia temporal**: *existe* ≠ *merece atención ahora*. Corrige que `time_sensitive` fuera urgente para siempre — una bolsa pendiente mantenía VistaJet en rojo toda la rotación. Ahora una señal declara cuándo escala y cuándo caduca; el Core lo aplica sin conocer el dominio (test de invariante).
+- **VistaJet como segundo cerebro**: señales deterministas reales con severidad, dentro del **motor de prioridad global** (no uno paralelo). `informational` nunca genera aviso.
+- **Observabilidad de coste** mínima y auditable sobre `eventos`.
+- **`faithful-light` detenido** (reversible): Isabel Core huérfano, Online desde julio con dominio público y secretos de producción, redesplegándose con cada push a `isabel-api`, sin un solo consumidor.
+- **Cinco bugs reales corregidos, todos hallados verificando producción**: scope de inventario por avión (D28), carrera en la correlación de respuestas del chat, degradación silenciosa de señales migradas, fuga de jerga interna al texto de Isabel, y la falsa urgencia permanente.
+- **Bloqueante detectado al cerrar**: la cuenta de Anthropic se quedó **sin crédito**. Isabel no responde por ningún canal; la capa determinista sigue intacta.
+
 ## 2026-08-07 (segunda tanda — ON/OFF conectado, Core decide, contrato de las 4 pantallas — D21/D22/D23/D24)
 
 - **D21 — ON/OFF conectado al priority engine como contexto de desempate.** La usuaria corrigió el framing de D18 ("no estaba pendiente, estaba mal entendido"): `life_context.mode` es su ciclo laboral, nunca el estado del avión, y no se sincroniza causalmente con `vj_state`. `globalContext.js` lo expone como `life_mode` fuera de `classifyAttention()`; el prompt de `now.js` lo usa solo para desempatar dominios ya empatados. 8 tests nuevos verifican que la clasificación determinista es idéntica con ON, OFF y null. Verificado en producción: `life_mode:'ON'` y la prioridad sigue siendo JETMI (`reentry`) porque VistaJet está `clear` — el rango manda sobre el modo.
