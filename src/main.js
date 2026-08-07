@@ -2390,7 +2390,10 @@ function vjInventarioView(){
 
   <!-- Chat de inventario con Isabel -->
   <div style="background:var(--surface);border-radius:12px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)">
-    <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:12px">Isabel · Inventario</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3)">Contar inventario</div>
+      <button onclick="openChat()" style="margin-left:auto;background:none;border:none;padding:0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer">Hablar con Isabel →</button>
+    </div>
     <div id="inv-chat-msgs" style="min-height:60px;max-height:300px;overflow-y:auto;margin-bottom:12px">
       ${S.invChat.length===0 && !S.invChatLoading
         ? `<div style="font-size:13px;color:var(--t2);line-height:1.55">Dime qué has contado, qué usaste o qué falta. Ejemplo: <em>"he contado 13 Coca-Colas"</em> o <em>"usé 2 botellas de agua"</em>.</div>`
