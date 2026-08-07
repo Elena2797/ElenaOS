@@ -258,7 +258,7 @@ function render() {
   });
   const mp=document.getElementById('mp');
   mp.textContent=S.mode; mp.className='mode-pill '+(S.mode==='ON'?'m-on':'m-off');
-  const views={home:homeView,areas:areasView,area:areaView,global:globalView,project:projectView,avanzar:avanzarView,resultado_ia:resultadoIAView,dashboard:dashboardView,vj_hoto:vjHotoView,vj_inventario:vjInventarioView,vj_laundry_cleaning:vjLandingCleaningView,vj_fresh:vjFreshView,vj_status:vjStatusView};
+  const views={home:homeView,areas:areasView,area:areaView,global:globalView,project:projectView,avanzar:avanzarView,resultado_ia:resultadoIAView,vj_hoto:vjHotoView,vj_inventario:vjInventarioView,vj_laundry_cleaning:vjLandingCleaningView,vj_fresh:vjFreshView,vj_status:vjStatusView};
   document.getElementById('main').innerHTML=connectionBanner()+(views[S.view]||homeView)();
 }
 
@@ -771,23 +771,6 @@ function projectView() {
   </div>`;
 }
 
-// ────── Dashboard view ────────────────────────────────────────────────────────
-function dashboardView() {
-  const active=S.projects.filter(p=>p.status==='active');
-  const paused=S.projects.filter(p=>p.status==='paused');
-  const pending=S.tasks.filter(t=>t.status==='pending');
-  return `
-  <div class="ph"><span class="logo" style="font-size:16px">Dashboard</span></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-    ${[['📁',active.length,'proyectos activos'],['✓',pending.length,'tareas pendientes'],['❓',S.dec.length,'decisiones abiertas'],['⏳',S.wf.length,'esperas activas']].map(([ic,n,lb])=>`<div style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center"><div style="font-size:22px;font-weight:700">${n}</div><div style="font-size:11px;color:var(--t2);margin-top:2px">${lb}</div></div>`).join('')}
-  </div>
-  ${section('📁','Proyectos activos',active.map(p=>{const a=S.areas.find(x=>x.id===p.area_id);const dSince=Math.floor((Date.now()-new Date(p.last_activity_at||p.created_at))/864e5);return`<div onclick="goProject('${p.id}')" class="item" style="cursor:pointer;flex-direction:column;align-items:flex-start;gap:2px"><div style="display:flex;align-items:center;gap:8px;width:100%"><span style="font-size:14px;font-weight:600;flex:1">${p.title}</span>${p.ia_last_session?'<span style="font-size:10px;color:#534AB7;background:#EEEDFE;border-radius:5px;padding:1px 5px">IA</span>':''}${dSince>7?`<span style="font-size:10px;color:#854F0B;background:#FAEEDA;border-radius:5px;padding:1px 5px">${dSince}d</span>`:''}</div><div style="font-size:12px;color:var(--t2)">${a?.name||'Sin área'}${p.next_action?' · → '+p.next_action:' · Sin próxima acción'}</div></div>`;}).join('')||empty('Sin proyectos activos'))}
-  ${paused.length?section('⏸','Pausados',paused.map(p=>{const a=S.areas.find(x=>x.id===p.area_id);return`<div onclick="goProject('${p.id}')" class="item" style="cursor:pointer;opacity:0.6"><span class="item-txt">${p.title}</span><span class="pill p-gray">${a?.name||''}</span></div>`;}).join('')):''}
-  ${section('❓','Decisiones pendientes',S.dec.map(decEl).join('')||empty('Sin decisiones abiertas'))}
-  ${section('⏳','Esperando respuesta',S.wf.map(wfEl).join('')||empty('Sin elementos esperando'))}
-  <div style="margin-bottom:16px"></div>`;
-}
-
 // ────── Avanzar view ──────────────────────────────────────────────────────────
 function avanzarView() {
   // Misma cola que alimenta el bloque "Atención" de Home — una sola definición
@@ -1126,8 +1109,8 @@ function areaView() {
 
     <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:16px 0 8px">Administrativo y personal</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
-      ${adminCard('📚','eLearnings',elearSL,elearSC,elearSB,elearSummary,"openAddVjTask()")}
-      ${adminCard('🧾','Facturas',factSL,factSC,factSB,factSummary,"openAddVjTask()")}
+      ${adminCard('📚','eLearnings',elearSL,elearSC,elearSB,elearSummary,"openAddVjTask('eLearning')")}
+      ${adminCard('🧾','Facturas',factSL,factSC,factSB,factSummary,"openAddVjTask('Factura')")}
       ${adminCard('📄','Visas & Docs',visaSL,visaSC,visaSB,visaSummary,"openVjState()")}
       ${adminCard('🧳','Maleta',maletaSL,maletaSC,maletaSB,maletaSummary,"selectVjBag('standard')")}
     </div>
@@ -3385,12 +3368,15 @@ function saveVjStateForm() {
   closeModal();
 }
 
-function openAddVjTask() {
+// `prefill` diferencia las tarjetas que antes abrían todas el mismo
+// formulario genérico e indistinguible (eLearnings y Facturas llamaban
+// literalmente a la misma acción sin contexto).
+function openAddVjTask(prefill='') {
   const el=document.createElement('div');
   el.className='overlay'; el.id='modal';
   el.innerHTML=`<div class="modal">
-    <h3>Nueva tarea VJ</h3>
-    <input class="fi" id="vjt-title" placeholder="Título (ej. Enviar facturas)">
+    <h3>${prefill?'Nueva tarea · '+prefill:'Nueva tarea VJ'}</h3>
+    <input class="fi" id="vjt-title" placeholder="Título (ej. Enviar facturas)" value="${prefill?prefill+': ':''}">
     <input class="fi" id="vjt-due" type="date" placeholder="Fecha límite">
     <select class="fi" id="vjt-priority">
       <option value="normal">Prioridad normal</option>
