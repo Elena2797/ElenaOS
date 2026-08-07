@@ -164,7 +164,7 @@ function pinPress(v) {
   }
 }
 
-let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], pendingImage:null, transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'} };
+let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'} };
 
 async function initApp() {
   db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -3514,7 +3514,7 @@ function openChat() {
   const ctxName = S.areaId ? (S.areas.find(a=>a.id===S.areaId)?.name||'Área') :
     S.view==='home'?'Inicio':S.view==='global'?'Vista global':'Life OS';
   const welcome = S.chatHistory.length===0 ?
-    `<div class="msg-a">Hola Estefanía 👋 Soy Isabel.\n\nPuedo añadir tareas, actualizar métricas, cambiar el modo... ¿en qué te ayudo?</div>` : '';
+    `<div class="msg-a">Hola Estefanía 👋 Soy Isabel.\n\nPuedo consultar y actualizar tu estado real: VistaJet, tareas, salud... ¿en qué te ayudo?</div>` : '';
   const msgs = S.chatHistory.map(m=>`<div class="${m.role==='user'?'msg-u':'msg-a'}">${m.content}</div>`).join('');
   const ov=document.createElement('div');
   ov.className='chat-overlay'; ov.id='chat-overlay';
@@ -3529,8 +3529,11 @@ function openChat() {
     </div>
     <div class="chat-msgs" id="chat-msgs">${welcome}${msgs}</div>
     <div class="chat-input-row">
-      <label for="chat-file" class="chat-attach"><i class="ti ti-paperclip" style="font-size:18px"></i></label>
-      <input type="file" id="chat-file" accept="image/*,application/pdf" style="display:none" onchange="handleFile(this)">
+      <!-- Adjuntar archivo retirado al migrar al canal único (D27): la ruta
+           nueva (isabel-api → adaptador → chat.send) todavía no transporta
+           adjuntos. Se prefiere no ofrecer el botón antes que aceptar un
+           archivo y descartarlo en silencio. Reponer cuando el adaptador
+           soporte adjuntos. -->
       <input class="fi" id="chat-in" placeholder="Escribe algo..." autocomplete="off" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}" style="margin:0;flex:1">
       <button class="btn btn-p" onclick="sendMsg()" style="flex:0;padding:11px 14px;min-width:46px"><i class="ti ti-send" style="font-size:15px"></i></button>
     </div>
@@ -3545,9 +3548,9 @@ function closeChat() { const el=document.getElementById('chat-overlay'); if(el) 
 async function sendMsg() {
   const input=document.getElementById('chat-in');
   const msg=input?.value.trim();
-  if(!msg&&!S.pendingImage) return;
+  if(!msg) return;
   if(input) input.value='';
-  const userText=msg||(S.pendingImage?`📎 ${S.pendingImage.name}`:'');
+  const userText=msg;
   S.chatHistory.push({role:'user',content:userText});
   const msgs=document.getElementById('chat-msgs');
   if(msgs){
@@ -3555,39 +3558,56 @@ async function sendMsg() {
     const ld=document.createElement('div'); ld.className='msg-loading'; ld.id='chat-ld'; ld.textContent='Isabel está pensando...'; msgs.appendChild(ld);
     scrollChat();
   }
-  const ctx=S.areaId?(S.areas.find(a=>a.id===S.areaId)?.name||''):S.view;
-  if(!isabelSvc.isAvailable()){
-    const unavail='Isabel no está conectada. Abre "Arrancar Isabel.bat" en el escritorio.';
-    S.chatHistory.push({role:'assistant',content:unavail});
-    document.getElementById('chat-ld')?.remove();
-    if(msgs){const a=document.createElement('div');a.className='msg-a';a.textContent=unavail;msgs.appendChild(a);}
-    scrollChat(); return;
-  }
+  const surfaceCtx = currentSurfaceContext();
   try {
-    const image=S.pendingImage||null; if(S.pendingImage) S.pendingImage=null;
-    const {reply,actions}=await isabelSvc.sendMessage({message:msg,history:S.chatHistory.slice(0,-1),context:ctx,image});
-    S.chatHistory.push({role:'assistant',content:reply});
+    // Una sola Isabel: la misma que atiende Telegram, vía isabel-api →
+    // red privada → adaptador → agente `main`. El navegador nunca ve
+    // ningún secreto del Gateway. Ver docs/DECISIONS.md D26/D27.
+    const res = await fetch(`${ISABEL_API}/v1/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': ISABEL_KEY },
+      body: JSON.stringify({ message: msg, surface: surfaceCtx.surface, context: surfaceCtx }),
+    });
+    const data = await res.json();
+    const reply = data.ok ? data.reply : (data.error || 'Isabel no pudo responder ahora mismo.');
+    S.chatHistory.push({ role: 'assistant', content: reply });
     document.getElementById('chat-ld')?.remove();
-    if(msgs){const a=document.createElement('div');a.className='msg-a';a.textContent=reply;msgs.appendChild(a);}
-    if(actions?.length){await reload();render();}
+    if (msgs) { const a=document.createElement('div'); a.className='msg-a'; a.textContent=reply; msgs.appendChild(a); }
+    // Isabel puede haber escrito en Supabase vía sus tools MCP — se refresca
+    // el estado para que la UI no quede desincronizada con lo que acaba de pasar.
+    if (data.ok) { await reload(); if (S.view === 'home' || S.areaId) render(); }
   } catch(e) {
     document.getElementById('chat-ld')?.remove();
-    const errMsg='Error de conexión.';
+    const errMsg='No pude contactar con Isabel. Inténtalo otra vez.';
     S.chatHistory.push({role:'assistant',content:errMsg});
     if(msgs){const a=document.createElement('div');a.className='msg-a';a.textContent=errMsg;msgs.appendChild(a);}
   }
   scrollChat();
 }
 
-function handleFile(input) {
-  const file=input.files[0]; if(!file) return; input.value='';
-  const reader=new FileReader();
-  reader.onload=e=>{
-    S.pendingImage={data:e.target.result.split(',')[1],mediaType:file.type,name:file.name};
-    const msgs=document.getElementById('chat-msgs');
-    if(msgs){const el=document.createElement('div');el.className='msg-u';el.textContent=`📎 ${file.name} — escribe tu pregunta y envía`;msgs.appendChild(el);scrollChat();}
-  };
-  reader.readAsDataURL(file);
+// Contexto estructurado de la pantalla actual. NO se convierte a texto aquí:
+// se envía tal cual a isabel-api, que lo formatea en un único sitio
+// (composeMessage). Ver docs/core/ISABEL_SURFACES.md.
+// No crea agentes ni sesiones por módulo: es la MISMA Isabel `main` con una
+// pista de dónde está mirando Estefanía.
+function currentSurfaceContext() {
+  const areaName = S.areaId ? (S.areas.find(a => a.id === S.areaId)?.name || null) : null;
+  const aircraft = (S.vjState && S.vjState.aircraft) || null;
+
+  if (S.view === 'vj_inventario') {
+    return { domain:'vistajet', surface:'inventory', aircraft, inventory_session_id: S.invSession?.id || null };
+  }
+  if (S.view === 'vj_hoto') {
+    return { domain:'vistajet', surface:'hoto', aircraft, hoto_id: S.hoto?.id || null };
+  }
+  if (S.view === 'vj_laundry_cleaning') return { domain:'vistajet', surface:'laundry', aircraft };
+  if (S.view === 'vj_fresh') return { domain:'vistajet', surface:'fresh', aircraft };
+  if (S.view === 'vj_status') return { domain:'vistajet', surface:'aircraft_status', aircraft };
+  if (areaName === 'VistaJet') return { domain:'vistajet', surface:'vistajet', aircraft };
+  if (areaName === 'Gym') return { domain:'health', surface:'gym' };
+  if (areaName === 'Salud') return { domain:'health', surface:'salud' };
+  if (areaName) return { domain: areaName.toLowerCase().replace(/\s+/g,'_'), surface: areaName.toLowerCase().replace(/\s+/g,'_') };
+  return { surface: 'global' };
 }
 
 function scrollChat() {
@@ -4120,7 +4140,7 @@ async function invCloseSession() {
 // Expose functions to global scope for inline onclick handlers (required in ES module context)
 Object.assign(window, {
   showPin, pinPress,
-  go, toggleMode, openAdd, openChat, closeChat, sendMsg, handleFile,
+  go, toggleMode, openAdd, openChat, closeChat, sendMsg,
   retryLoad,
   done, closeModal,
   checkinSueno, checkinDolor, checkinVJ, completeCheckin,

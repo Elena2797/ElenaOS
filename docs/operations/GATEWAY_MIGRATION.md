@@ -107,7 +107,41 @@ El Gateway vería esas conexiones con origen `127.0.0.1`, es decir, como **loopb
 
 Hoy ese proyecto (`laudable-consideration`) contiene `isabel-api`, el propio Gateway y **`faithful-light`** — un servicio que nadie usa (ver auditoría abajo). Recomendación: **parar `faithful-light` primero**; con eso, la frontera pasa a ser efectivamente "solo isabel-api", que es justo lo que se quiere. La alternativa más estricta, si el proyecto llegara a alojar servicios menos confiables, es device pairing explícito para `isabel-api` (`device.pair.*`) — pero eso no elimina el ensanchamiento, solo deja de depender de él.
 
-## Auditoría read-only de `faithful-light` → **ORPHANED**
+## Decisión A vs B — evaluadas con evidencia del source, no por preferencia
+
+**A) Device pairing remoto explícito: técnicamente VIABLE.** El source de OpenClaw (`dist/auth-*.js`) contiene el mecanismo exacto que haría falta:
+```js
+function isLocalDirectRequest(req, trustedProxies, allowRealIpFallback) {
+  if (!hasForwardedRequestHeaders(req)) return isLoopbackAddress(req.socket?.remoteAddress);
+  return false;   // cualquier `forwarded`, `x-real-ip` o `x-forwarded-*` anula la confianza local
+}
+```
+Es decir: **un adaptador que reenvíe cabeceras `X-Forwarded-*` conserva semántica de cliente remoto**, y `gateway.trustedProxies` permite además resolver la IP real del cliente (`resolveClientIp({remoteAddr, forwardedFor, trustedProxies})` en `message-handler-*.js`). No está bloqueado.
+
+**Por qué NO se eligió A.** Dos razones concretas, ninguna de gusto:
+1. **`isabel-api` no tiene volumen** (el único del proyecto es el del Gateway, comprobado). Una identidad de device es un par de claves + token que hay que persistir; habría que meterlo en variables de entorno o en Supabase, con un bootstrap multi-paso (generar → solicitar pairing → aprobar → capturar token → redesplegar).
+2. **El privilegio resultante es mucho mayor del necesario.** Un device aprobado se conecta al **WebSocket completo del plano de control**: `chat.*`, pero también `config.*`, `cron.*`, `devices.*`, `plugins.*`, `sessions.*`… Cualquiera que obtuviera ese token tendría el Gateway entero. Para dos operaciones de chat, es privilegio desproporcionado.
+
+**B) Adaptador autenticado de superficie mínima: elegido.** `isabel-gateway/gateway-adapter.mjs` corre en el mismo contenedor que el Gateway y expone en la red privada **exactamente tres rutas**: `POST /chat/send`, `GET /chat/history`, `GET /healthz`. Nada más — no es un proxy del protocolo. Hacia dentro habla por loopback como `gateway-client`/`backend`, que es **legítimamente lo que es**: un helper backend del mismo host, justo el caso para el que OpenClaw reserva ese camino. No se subvierte ninguna frontera, a diferencia de un port-forward ciego.
+
+### Threat model del adaptador
+
+| Pregunta | Respuesta |
+|---|---|
+| ¿Qué servicios pueden conectarse? | Solo los del proyecto `laudable-consideration` con acceso a la red privada IPv6. Hoy: `isabel-api` (y `faithful-light`, ya **detenido**). Sin dominio público, internet no llega. |
+| ¿Qué privilegios reciben? | Enviar un mensaje de chat y leer el historial de una sesión. **No** config, **no** cron, **no** devices/pairing, **no** plugins, **no** el WebSocket, **no** otros canales. |
+| ¿Qué secreto sigue siendo obligatorio? | `GATEWAY_ADAPTER_TOKEN`, distinto de `OPENCLAW_GATEWAY_TOKEN`. Comparación en tiempo constante (`crypto.timingSafeEqual`). Sin él → `401`. **Alcanzar la red privada NO basta.** |
+| ¿Se sigue validando el token del Gateway? | Sí. El adaptador presenta `OPENCLAW_GATEWAY_TOKEN` en su `connect`; el camino loopback no exime de auth, solo de *device pairing*. Son dos comprobaciones, no una. |
+| ¿Qué scopes se conceden por origen local? | `operator.read` + `operator.write` — los mínimos (`chat.send` es write, `chat.history` es read). **`operator.admin` NO es necesario** ni se solicita (confirmado en `gateway/operator-scopes.md` y verificado en el handshake real). |
+| ¿Qué puede hacer un servicio comprometido del proyecto? | Sin el token del adaptador: nada. Con él: hablar con Isabel y leer ese historial — no administrar el Gateway. Ese es justo el objetivo del diseño. |
+| ¿Cómo se restringe el listener al máximo? | Solo 3 rutas; cuerpo limitado a 256 KB; timeout propio; `404` a todo lo demás; fail-closed al arrancar si falta el token. |
+| ¿Autenticación propia antes de reenviar? | Sí — es la diferencia central frente al port-forward: el token se valida **antes** de abrir ninguna conexión al Gateway. |
+| ¿Rotación/revocación? | Cambiar `GATEWAY_ADAPTER_TOKEN` en los dos servicios y redesplegar. Sin estado persistente que migrar, sin registros de pairing que limpiar (a diferencia de A, donde habría que revocar el device con `device.token.revoke`). |
+| ¿Se convierte private-network access en operator access? | **No.** Ese es precisamente el fallo que este diseño evita y que un `[::]:8081 → 127.0.0.1:8080` ciego habría introducido. |
+
+**Queda registrado como limitación conocida:** el adaptador confía en un secreto compartido, no en identidad criptográfica por servicio. Si algún día el proyecto Railway aloja servicios de menor confianza, la vía de endurecimiento es A (device pairing con identidad propia por servicio) — sigue disponible, y este documento deja probado que el mecanismo existe.
+
+## Auditoría read-only de `faithful-light` → **ORPHANED** (detenido el 2026-08-07)
 
 | Aspecto | Hallazgo |
 |---|---|
