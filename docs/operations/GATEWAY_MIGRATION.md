@@ -1,4 +1,4 @@
-Estado: en ejecución — chat de LIFEOS ya sobre el Gateway nuevo; cutover de Telegram NO realizado todavía
+Estado: cutover COMPLETADO — Telegram y LIFEOS sobre el Gateway nuevo; Gateway antiguo detenido-reversible, pendiente de eliminación autorizada
 Última verificación: 2026-08-07
 Verificado en: `railway ssh` contra el contenedor real de `isabel-gateway`, `railway api` (GraphQL), backup lógico extraído y verificado localmente
 Fuente de verdad de datos: ninguna
@@ -71,9 +71,9 @@ Dos Gateways haciendo long-polling del mismo bot provocan `409 Conflict` y pérd
 - [x] Gateway de vuelta en `bind: loopback` — solo el adaptador escucha en la red privada
 - [x] **Cadena end-to-end demostrada en producción** (ver evidencia abajo)
 - [x] Pestaña Isabel de LIFEOS migrada a `POST /v1/chat`; bridge local fuera del runtime
-- [ ] **Cutover de Telegram** (quitar token del viejo → añadir al nuevo) ← siguiente paso
-- [ ] Restart completo del nuevo y verificación de supervivencia
-- [ ] Apagado del Gateway antiguo ← requiere autorización explícita
+- [x] **Cutover de Telegram completado** (ver abajo)
+- [x] Restart completo del nuevo: Telegram, cron, MCP, adaptador y `/v1/chat` sobreviven
+- [ ] Apagado/eliminación del Gateway antiguo ← requiere autorización explícita
 
 ## Evidencia de la cadena completa (2026-08-07, producción real)
 
@@ -194,3 +194,41 @@ El adapter conecta con el path reservado de backend (`client.id: "gateway-client
 
 ## Rollback
 Mientras el Gateway antiguo siga con su token y su volumen intactos, el rollback es inmediato: basta con no completar el cutover (o devolver el token al viejo). El volumen antiguo **no se toca ni se borra** hasta que la usuaria lo autorice explícitamente.
+
+
+## Cutover de Telegram (2026-08-07) — completado
+
+### Secuencia ejecutada, con ventana verificable de 0 pollers
+1. **Antes:** las 7 verificaciones previas OK (Gateway nuevo healthy, cron enabled, MCP ok, `/v1/chat` ok, sesión única `lifeos`, nuevo sin Telegram, antiguo como único poller).
+2. Telegram desactivado **también en la config del Gateway nuevo**, para que ni un reinicio accidental pudiera arrancarlo antes de tiempo.
+3. `TELEGRAM_BOT_TOKEN` copiado del antiguo al nuevo **sin imprimirlo** y con `--skip-deploys` (variable guardada, contenedor sin reiniciar → sigue sin poder pollear).
+4. **Corte en el antiguo:** `openclaw config set channels.telegram.enabled false`. Evidencia doble de que dejó de pollear:
+   - `[reload] config hot reload applied (channels.telegram.enabled)`
+   - tras reiniciar, arranca con **7 plugins sin `telegram`** (antes eran 8 con `telegram`), y cero actividad de Telegram posterior.
+5. **Activación en el nuevo:** `channels.telegram.enabled true` + **redeploy**.
+6. Verificado: `configured:true`, `running:true`, `connected:true`, `tokenSource:"env"`, `mode:"polling"`, `reconnectAttempts:0`, `lastError:null`, allowlist `5827330016` preservada, **0 coincidencias de `409`/`conflict`**.
+
+### Trampa encontrada (para no repetirla)
+`railway variables --set ... --skip-deploys` guarda la variable pero **no la aplica al contenedor en marcha**, y `railway restart` **tampoco** la inyecta: reinicia el mismo deployment con su entorno ya construido. El canal seguía en `tokenSource:"none"` pese a estar la variable en Railway. Hace falta **`railway redeploy`** (o un deploy nuevo) para que una variable nueva llegue al proceso. Diagnosticado con `printenv` dentro del contenedor, no por prueba y error.
+
+### Interrupción de servicio
+El corte se aplicó a las 11:39Z y la activación en el nuevo se completó a las ~17:26Z: **Telegram estuvo sin servicio ~5h47m**, porque la sesión de trabajo quedó pausada entre ambos pasos. Los mensajes enviados durante ese hueco no se perdieron — Telegram los mantiene en cola y el Gateway nuevo los recibió al conectar (`lastInboundAt` inmediatamente posterior al arranque). Lección: los dos pasos del cutover deben ejecutarse seguidos.
+
+## Modelo de sesión real (verificado, sin hacks)
+
+`openclaw sessions list` sobre el Gateway nuevo:
+
+| Canal | sessionKey real | Notas |
+|---|---|---|
+| **Telegram** | `agent:main:main` | con binding `policy:agent:main:telegram:default:direct:5827330016` |
+| **LIFEOS** | `agent:main:lifeos` | la sesión única de todas las pantallas |
+
+**Son transcripts distintos sobre el MISMO agente `main`.** Hay que distinguir dos cosas que se confunden con facilidad:
+
+- **Memoria de transcript (NO compartida):** lo dicho por Telegram no aparece en el historial de LIFEOS ni al revés. Es una consecuencia del modelo de sesiones de OpenClaw, no un defecto de esta migración.
+- **Memoria operacional (SÍ compartida):** ambos canales usan el mismo agente, las mismas tools MCP y la misma Supabase. Verificado: LIFEOS responde *"Avión D-AFBS, en rotación"* leyendo el estado real que Telegram también ve y escribe.
+
+**No se ha forzado un transcript compartido a propósito.** Podría lograrse haciendo que LIFEOS escribiera en `agent:main:main`, pero esa sesión lleva un binding de canal a Telegram: las respuestas podrían enrutarse por Telegram en vez de a la pantalla. Sería un hack frágil con un efecto secundario real, justo lo que se pidió evitar. El objetivo arquitectónico —**una Isabel, un agente, unas tools, una fuente de verdad**— se cumple con transcripts separados por transporte.
+
+### Restos de sesiones de prueba
+`agent:main:lifeos-global`, `agent:main:lifeos-vistajet` (de antes de unificar la sesión) y `agent:main:probe-lifeos` (de la validación del protocolo) quedan en el store como histórico inerte. No se borran: no molestan y borrar sesiones es destructivo.
