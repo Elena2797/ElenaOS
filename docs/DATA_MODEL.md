@@ -18,12 +18,12 @@ Estado global de energía/modo. Migración: `setup.sql`.
 | Columna | Tipo | Notas |
 |---|---|---|
 | id | uuid PK | |
-| mode | text | `ON` \| `OFF`, default `OFF` |
+| mode | text | `ON` \| `OFF`, default `OFF`. **Semántica canónica: ciclo laboral de la usuaria** — `ON` = días de trabajo/rotación, `OFF` = días libres. NO es "hay avión asignado" ni "HOTO activo" ni el estado operacional del avión (eso es `vj_state.status`); los dos campos son independientes y NO se sincronizan causalmente. Ver `PRINCIPLES.md` #12 |
 | energy_level | text | default `medium` |
 | main_constraint | text | frase libre |
 | created_at | timestamptz | se inserta una fila nueva por cambio, no se actualiza in-place |
 
-Lee/escribe: `life-os-app/src/services/db.js`.
+Lee/escribe: `life-os-app/src/services/db.js` (`getMode`/`setMode`, botón del topbar). Lee también `isabel-api/src/core/globalContext.js` (`collectGlobalSignals` → `life_mode`), que lo expone a `GET /v1/now` como **contexto** para desempatar prioridades — nunca como evidence ni como entrada de `classifyAttention`.
 
 ### `areas`
 Las 7 áreas de vida. Migración: `setup.sql` (+ `ia_context` añadida en `migration_v1.sql`).

@@ -1,5 +1,10 @@
 // isabel.js — único punto de contacto con el bridge de Isabel
 // main.js no sabe nada sobre URLs, puertos ni tokens.
+//
+// LEGACY / FROZEN (2026-08-07, docs/DECISIONS.md D18): habla con el bridge
+// local (isabel-bridge.js), no con isabel-gateway/Telegram — es una Isabel
+// distinta de la real. No añadir features aquí ni crear otro chat paralelo.
+// Ver docs/core/ISABEL_CHANNELS.md.
 
 const DEFAULT_TOKEN = 'isabel-bridge-2026';
 const UNAVAILABLE_MSG = 'Isabel no está conectada. Abre "Arrancar Isabel.bat" en el escritorio.';

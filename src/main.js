@@ -468,51 +468,93 @@ function isabelEvidenceLabel(e) {
   }
 }
 
-// Decide UNA prioridad para Home. Usa /v1/now (evidence determinista +
-// redacción de Isabel) cuando está disponible; si no, cae al heurístico de
-// cliente (que sigue siendo instantáneo — no depende de red).
-function resolveHomePriority(fallback) {
-  const iN = S.isabelNow;
+// CORE DECIDE, FRONTEND REPRESENTA (DECISIONS.md D19 — corregido tras
+// revisión: la versión anterior de esta función tenía un heurístico de
+// cliente que podía elegir un dominio DISTINTO al de /v1/now cuando este
+// fallaba — eso seguía siendo un segundo motor de decisión, solo que menos
+// visible. resolveHomePriority() ya NO calcula ninguna prioridad propia.
+// Cuando /v1/now no responde, lo único permitido es: reutilizar el último
+// resultado válido que Isabel Core ya calculó (cacheado, marcado como no
+// fresco), o mostrar un estado neutral explícito. Nunca recalcular.
+const ISABEL_NOW_CACHE_KEY = 'lifeos_isabel_now_cache_v1';
 
-  if (iN && iN.status === 'no_signal') {
-    return { source: 'now', status: 'no_signal', area: null };
-  }
-  if (iN && (iN.status === 'ok' || iN.status === 'llm_error')) {
-    const domainArea = iN.priority_domain ? S.areas.find(a => a.name === iN.priority_domain) : null;
-    return {
-      source: 'now', status: iN.status, area: domainArea || fallback.area,
-      mode: iN.attention_mode, reliable: iN.attention_mode_reliable,
-      headline: iN.headline, recommendation: iN.recommendation,
-      evidence: iN.evidence, canIgnore: iN.can_ignore,
-    };
-  }
-  // 'loading' | 'unreachable' | 'data_unavailable' | undefined todavía
+function cacheIsabelNow(iN) {
+  try {
+    localStorage.setItem(ISABEL_NOW_CACHE_KEY, JSON.stringify({
+      status: iN.status, priority_domain: iN.priority_domain, attention_mode: iN.attention_mode,
+      attention_mode_reliable: iN.attention_mode_reliable, headline: iN.headline,
+      recommendation: iN.recommendation, evidence: iN.evidence, can_ignore: iN.can_ignore,
+      cachedAt: Date.now(),
+    }));
+  } catch (e) { /* localStorage no disponible — la tarjeta sigue funcionando sin caché */ }
+}
+
+function readCachedIsabelNow() {
+  try { return JSON.parse(localStorage.getItem(ISABEL_NOW_CACHE_KEY) || 'null'); }
+  catch (e) { return null; }
+}
+
+function priorityFromIsabelNow(iN, source) {
+  const domainArea = iN.priority_domain ? S.areas.find(a => a.name === iN.priority_domain) : null;
   return {
-    source: 'fallback', status: iN ? iN.status : 'loading',
-    unavailableSources: iN ? iN.unavailable_sources : null,
-    area: fallback.area, reason: fallback.reason, secondary: fallback.secondary,
+    source, status: iN.status, area: domainArea,
+    mode: iN.attention_mode, reliable: iN.attention_mode_reliable,
+    headline: iN.headline, recommendation: iN.recommendation,
+    evidence: iN.evidence, canIgnore: iN.can_ignore,
   };
 }
 
+function resolveHomePriority() {
+  const iN = S.isabelNow;
+
+  if (iN && (iN.status === 'no_signal' || iN.status === 'ok' || iN.status === 'llm_error')) {
+    cacheIsabelNow(iN);
+    return priorityFromIsabelNow(iN, 'now');
+  }
+
+  // iN es 'loading' | 'unreachable' | 'data_unavailable' | undefined todavía.
+  // Isabel Core no respondió — se reutiliza su último resultado válido
+  // conocido (nunca se inventa uno nuevo aquí).
+  const cached = readCachedIsabelNow();
+  if (cached) {
+    const priority = priorityFromIsabelNow(
+      { status: cached.status, priority_domain: cached.priority_domain, attention_mode: cached.attention_mode,
+        attention_mode_reliable: cached.attention_mode_reliable, headline: cached.headline,
+        recommendation: cached.recommendation, evidence: cached.evidence, can_ignore: cached.can_ignore },
+      'cached'
+    );
+    priority.ageMin = Math.max(0, Math.round((Date.now() - cached.cachedAt) / 60000));
+    return priority;
+  }
+
+  return { source: 'neutral', status: iN ? iN.status : 'loading', area: null };
+}
+
 function isabelHomeCard(priority, greeting) {
-  const header = `<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:10px">Isabel${priority.source === 'now' ? ' <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--t3)">· beta</span>' : ''}</div>`;
+  const showBeta = priority.source === 'now' || priority.source === 'cached';
+  const header = `<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:10px">Isabel${showBeta ? ' <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--t3)">· beta</span>' : ''}</div>`;
+  const staleNote = priority.source === 'cached'
+    ? `<div style="font-size:11px;color:var(--t3);margin-bottom:8px">Última evaluación disponible — hace ${priority.ageMin < 1 ? 'un momento' : priority.ageMin + ' min'}. Isabel no responde ahora mismo.</div>`
+    : '';
 
   if (priority.status === 'no_signal') {
     return `<div class="brief-card" style="margin-bottom:10px;border:0.5px solid var(--border)">
       ${header}
       <div style="font-size:15px;color:var(--text);line-height:1.7;margin-bottom:6px">${greeting}</div>
+      ${staleNote}
       <div style="font-size:14px;font-weight:600;color:var(--ok)">✓ Nada requiere tu atención ahora.</div>
       <button onclick="openChat()" style="background:none;border:none;padding:6px 0 0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer;display:block;margin-top:4px">Hablar con Isabel →</button>
     </div>`;
   }
 
-  if (priority.source === 'now') {
+  if (priority.source === 'now' || priority.source === 'cached') {
     const style = isabelAttentionStyle(priority.mode);
     const top3 = (priority.evidence || []).filter(e => e.signal !== 'no_signal').slice(0, 3);
     const canIgnoreCount = (priority.canIgnore || []).length;
-    return `<div class="brief-card" style="margin-bottom:10px;border-left:3px solid ${style.fg}">
+    return `<div class="brief-card" style="margin-bottom:10px;border-left:3px solid ${style.fg}${priority.source === 'cached' ? ';opacity:.75' : ''}">
       ${header}
       <div style="font-size:15px;color:var(--text);line-height:1.7;margin-bottom:8px">${greeting}</div>
+      ${staleNote}
       ${priority.reliable === false ? `<div style="font-size:11px;color:var(--warn);background:var(--warn-bg);border-radius:8px;padding:6px 8px;margin-bottom:8px">⚠ Evaluación parcial — algunas fuentes no respondieron; puede haber señales que Isabel no vio.</div>` : ''}
       <div style="display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${style.fg};background:${style.bg};border-radius:999px;padding:3px 9px;margin-bottom:8px">${style.label}</div>
       ${priority.status === 'llm_error'
@@ -528,14 +570,16 @@ function isabelHomeCard(priority, greeting) {
     </div>`;
   }
 
-  // source === 'fallback' — /v1/now cargando, caído, o parcial. El heurístico
-  // de cliente (instantáneo) sostiene la tarjeta para que nunca esté vacía.
+  // source === 'neutral' — /v1/now todavía no ha respondido nunca (ni en
+  // vivo ni en caché). Ningún dominio se resalta: no hay prioridad que
+  // representar todavía, y no se inventa una.
   return `<div class="brief-card" style="margin-bottom:10px;border:0.5px solid var(--border)">
     ${header}
-    <div style="font-size:15px;color:var(--text);line-height:1.7;margin-bottom:4px">${greeting} ${priority.reason || ''}${priority.secondary ? ` ${priority.secondary.name} también merece un momento hoy.` : ''}</div>
+    <div style="font-size:15px;color:var(--text);line-height:1.7;margin-bottom:4px">${greeting}</div>
     <button onclick="openChat()" style="background:none;border:none;padding:6px 0 0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer;display:block;margin-top:4px">Hablar con Isabel →</button>
-    ${priority.status === 'data_unavailable' ? `<div style="font-size:11px;color:var(--t3);margin-top:8px">⚠ Evaluación parcial — ${(priority.unavailableSources || []).join(', ') || 'una fuente'} no respondió. No se puede confirmar que no haya algo urgente.</div>` : ''}
-    ${priority.status === 'unreachable' ? `<div style="font-size:11px;color:var(--t3);margin-top:8px">No disponible ahora mismo — el resto de Life OS funciona con normalidad.</div>` : ''}
+    ${priority.status === 'loading' ? `<div style="font-size:11px;color:var(--t3);margin-top:8px">Revisando tus dominios…</div>` : ''}
+    ${priority.status === 'data_unavailable' ? `<div style="font-size:11px;color:var(--t3);margin-top:8px">⚠ Isabel no está disponible ahora mismo — evaluación parcial, no se puede confirmar que no haya algo urgente.</div>` : ''}
+    ${priority.status === 'unreachable' ? `<div style="font-size:11px;color:var(--t3);margin-top:8px">Isabel no está disponible ahora mismo — el resto de Life OS funciona con normalidad.</div>` : ''}
   </div>`;
 }
 
@@ -547,39 +591,9 @@ function homeView() {
   const daysSinceOpen = lastOpen ? Math.floor((now - lastOpen) / 864e5) : 0;
   if (!lastOpen || now - lastOpen > 3600000) localStorage.setItem(LOK, String(now));
 
-  // ── Lógica de prioridad (igual que antes) ────────────────────────────
   const visdoms = visibleDomains();
-  const vjArea = visdoms.find(a => a.name === 'VistaJet');
-  const jetmiArea = visdoms.find(a => a.name === 'JETMI');
-  const vjHealth = vjArea ? areaHealth(vjArea.id) : 'gris';
-  const jetmiHealth = jetmiArea ? areaHealth(jetmiArea.id) : 'gris';
-  const vjCritTasks = S.vjTasks.filter(t => t.status !== 'done' && t.due_date && Math.ceil((new Date(t.due_date) - new Date()) / 864e5) <= 0);
-  const oldDecJetmi = jetmiArea ? S.dec.filter(d => d.area_id === jetmiArea.id && Math.floor((now - new Date(d.created_at)) / 864e5) > 7) : [];
-  const critAlerts = S.alertas.filter(a => a.urgencia === 'critica');
-  const vjUrgent = vjHealth === 'rojo' || vjCritTasks.length > 0 || critAlerts.some(a => a.area_id === vjArea?.id);
-  const jetmiUrgent = jetmiHealth === 'rojo' || oldDecJetmi.length > 1;
-  let primaryArea = null, primaryReason = '', secondaryArea = null;
-  if (vjUrgent && jetmiUrgent) {
-    primaryArea = vjArea; primaryReason = 'Hay urgencias operativas en VistaJet. Empieza ahí.'; secondaryArea = jetmiArea;
-  } else if (vjUrgent) {
-    primaryArea = vjArea;
-    primaryReason = vjCritTasks.length > 0 ? 'Hay tareas del avión que vencieron hoy.' : 'VistaJet necesita atención antes de continuar.';
-    if (jetmiHealth !== 'gris') secondaryArea = jetmiArea;
-  } else if (S.vjState.status === 'rotacion') {
-    primaryArea = vjArea;
-    primaryReason = `Rotación activa — día ${S.vjState.rotation_day || '?'}. El avión primero.`;
-    if (jetmiUrgent) secondaryArea = jetmiArea;
-  } else if (jetmiUrgent) {
-    primaryArea = jetmiArea;
-    primaryReason = oldDecJetmi.length > 0
-      ? `${oldDecJetmi.length} decisión${oldDecJetmi.length > 1 ? 'es llevan' : ' lleva'} más de 7 días sin respuesta en JETMI.`
-      : 'JETMI necesita tu atención hoy.';
-  } else {
-    primaryArea = jetmiArea;
-    primaryReason = 'Sin urgencias operativas. Buen momento para avanzar en JETMI.';
-  }
 
-  // ── Saludo (siempre instantáneo, sin depender de red) ────────────────
+  // ── Saludo (presentación pura — nunca decide un dominio prioritario) ──
   const greetParts = [];
   if (daysSinceOpen >= 3) greetParts.push('Bienvenida de vuelta, Estefanía.');
   else if (hour < 13) greetParts.push('Buenos días, Estefanía.');
@@ -592,7 +606,7 @@ function homeView() {
   const greeting = greetParts.join(' ');
 
   // ── Una sola prioridad para toda la vista (tarjeta Isabel + dominio resaltado) ──
-  const priority = resolveHomePriority({ area: primaryArea, reason: primaryReason, secondary: secondaryArea });
+  const priority = resolveHomePriority();
 
   // ── Atención ─────────────────────────────────────────────────────────
   const atItems = attentionItems();
