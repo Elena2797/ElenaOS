@@ -1,12 +1,12 @@
-Estado: en construcción — Gateway real desplegado en Railway, un turno de agente real ya completa de extremo a extremo; todavía sin cron diario ni Telegram activos
-Última verificación: 2026-08-06
-Verificado en: despliegue real de `isabel-gateway` en Railway (proyecto dedicado, separado de `isabel-api`), repro completo cron→runner→claude-cli→MCP→tool→respuesta en WSL/Linux (ver `KNOWN_PROBLEMS.md`), MCP `lifeos` autenticado y verificado con `openclaw mcp doctor --probe`, turno de agente real verificado en producción vía `railway ssh` (`openclaw agent --agent main --message ...` → `OK`, log `stopReason=stop`, sin error) tras aplicar `DECISIONS.md` D11
+Estado: implementado — Telegram activo 24/7 sobre isabel-gateway (Railway); cron diario todavía sin activar
+Última verificación: 2026-08-07
+Verificado en: `isabel-gateway/openclaw.default.json` (`channels.telegram.enabled:true`), commits `4fcebf5`/`4e43414`/`a4364ea` (2026-08-06 16:27-16:55, posteriores a la verificación anterior de este documento), `CURRENT_STATE.md` ("Isabel sigue real y funcionando 24/7 por Telegram"), bug real de D14 (Isabel confirmó por Telegram un cambio de avión que invocó `vistajet_update_status`)
 Fuente de verdad de datos: ninguna
 
 # core/AUTOMATIONS.md — Qué corre solo, y qué no
 
-## Verificado: un turno de agente real ya completa en producción; todavía no hay ninguna automatización disparándose sola
-El Gateway de OpenClaw (`isabel-gateway`, Railway) está desplegado, persistente, y arranca correctamente. El bloqueo de auth que impedía completar turnos (`FailoverError: Not logged in`) quedó resuelto el 2026-08-06 — no arreglando el login de `claude-cli`, sino abandonándolo: se confirmó que ese backend no está pensado para contenedores efímeros (ver D11 abajo) y se cambió a auth de API key, ya configurada. Un turno de agente real completa correctamente ahora mismo, verificado vía `railway ssh`. Lo que sigue faltando para tener algo "disparándose solo": el cron diario y Telegram siguen sin activar (instrucción explícita de la usuaria, no bloqueo técnico) — ver `NEXT_SESSION.md`. Ver `DECISIONS.md` D10 para la decisión de arquitectura ya aprobada y D11 para el cambio de backend de auth.
+## Verificado: Telegram está activo 24/7; el cron diario sigue sin activar
+El Gateway de OpenClaw (`isabel-gateway`, Railway) está desplegado, persistente, y arranca correctamente. El bloqueo de auth que impedía completar turnos (`FailoverError: Not logged in`) quedó resuelto el 2026-08-06 — no arreglando el login de `claude-cli`, sino abandonándolo: se confirmó que ese backend no está pensado para contenedores efímeros (ver D11 abajo) y se cambió a auth de API key, ya configurada. **Corrección sobre la verificación anterior de este documento (2026-08-06, misma tarde):** decía "todavía sin Telegram activo" — eso cambió horas después, el mismo día, cuando se activó `channels.telegram` (commits 16:27-16:55). Desde entonces Telegram es el canal conversacional real de Isabel, usado a diario (ver `core/ISABEL_CHANNELS.md`). Lo que sigue faltando para automatización disparada sola (sin que la usuaria escriba primero): el cron diario (sueño 08:00) — ver `NEXT_SESSION.md`. Ver `DECISIONS.md` D10 para la decisión de arquitectura ya aprobada y D11 para el cambio de backend de auth.
 
 ## Lo que quedó resuelto desde la última verificación (2026-08-05 → 2026-08-06)
 
@@ -35,8 +35,7 @@ Todo turno de agente real fallaba con `FailoverError: Not logged in · Please ru
 ### Hallazgo colateral: `railway.exe ssh` no re-escapa argumentos con espacios
 Detalle completo en `KNOWN_PROBLEMS.md`. Resumen: `railway ssh -- su node -c "comando con espacios"` llega al contenedor partido en tokens sueltos (bug del cliente `railway.exe`, no de OpenClaw). Workaround: `su node -c \'comando\ con\ espacios\'` (comillas literales escapadas dentro de un único token local).
 
-## Todavía sin tocar esta sesión (según instrucción explícita)
-- Telegram (ni bot nuevo ni configuración).
-- Cron diario de las 08:00.
-- `isabel-bridge.js` (sigue congelado, sin retirarse).
-- Perfil real de OpenClaw del portátil.
+## Qué sigue pendiente
+- Cron diario de las 08:00 (sueño) — creado y disparado una vez en pruebas, pero el turno de agente aislado no llegó a arrancar; causa no investigada (ver `KNOWN_PROBLEMS.md`).
+- `isabel-bridge.js` (sigue congelado, sin retirarse — ver `core/ISABEL_CHANNELS.md` § 2, requiere exponer el Gateway públicamente antes de poder retirarlo, decisión no tomada).
+- Perfil real de OpenClaw del portátil, sin cambios.
