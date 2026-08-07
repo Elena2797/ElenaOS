@@ -294,6 +294,20 @@ function fmtLastActivity(value) {
   return 'hace '+d+' días';
 }
 
+// Estado de un dominio: lo decide Isabel Core (`/v1/now` clasifica cada dominio
+// con la misma escalera determinista que usa para la prioridad). `areaHealth()`
+// solo se usa mientras el Core no ha respondido — y entonces se muestra
+// deliberadamente neutro ("—") en vez de una etiqueta que pueda contradecirlo:
+// antes, VistaJet podía leerse "en reposo" (areaHealth solo mira proyectos
+// genéricos, y VistaJet no tiene) junto a "Rotación activa" en la misma tarjeta.
+const ATTENTION_LABEL = { urgent: 'necesita atención', reentry: 'para retomar', maintain: 'en seguimiento', clear: 'al día' };
+
+function domainStatusLabel(area, health) {
+  const fromCore = S.isabelNow?.domains?.[area.name]?.attention_mode;
+  if (fromCore && ATTENTION_LABEL[fromCore]) return ATTENTION_LABEL[fromCore];
+  return { rojo: 'necesita atención', naranja: 'en seguimiento', verde: 'en progreso' }[health] || '—';
+}
+
 function domainStats(area) {
   const projects=S.projects.filter(p=>p.area_id===area.id&&['active','paused'].includes(p.status));
   const activeProjects=projects.filter(p=>p.status==='active');
@@ -310,7 +324,7 @@ function domainStats(area) {
   const withIa=activeProjects.filter(p=>p.ia_last_session).length;
   const progress=activeProjects.length?Math.min(96,Math.round(((withNext*0.55+withIa*0.35)/activeProjects.length)*100)+10):Math.min(35,tasks.length*8+events.length*5);
   const health=areaHealth(area.id);
-  const statusLabel={rojo:'necesita atención',naranja:'en seguimiento',verde:'en progreso',gris:'en reposo'}[health]||'en progreso';
+  const statusLabel=domainStatusLabel(area,health);
   const vjTaskCount=area.name==='VistaJet'?(S.vjTasks||[]).filter(t=>t.status!=='done').length:0;
   const score=activeProjects.length*4+events.length*3+(tasks.length+vjTaskCount)+waits.length+decisions.length;
   return {projects,activeProjects,tasks,waits,decisions,events,lastAt,progress,statusLabel,score,vjTaskCount};
@@ -318,14 +332,17 @@ function domainStats(area) {
 
 function domainCard(a) {
   const bp=domainBlueprint(a.name), st=domainStats(a);
-  const prdClass=bp.prd.toLowerCase().includes('sin')?'muted':'';
+  // Dominios responde "¿cómo está cada área?" — estado real, no metadatos del
+  // sistema. Las etiquetas de PRD y "especialista" se retiraron: eran texto
+  // estático que nunca cambiaba, no navegaban a ninguna parte, y llegaron a
+  // desincronizarse del proyecto real (la tarjeta decía "PRD Semilla v0.3"
+  // cuando el documento real ya iba por v0.4).
   return `<button class="domain-card" onclick="go('area','${a.id}')" style="--domain:${bp.tone}">
     <div class="domain-top"><span class="domain-icon">${bp.icon}</span><span class="domain-state">${st.statusLabel}</span></div>
     <div class="domain-name">${a.name}</div>
-    <div class="domain-purpose">${bp.purpose}</div>
+    <div class="domain-purpose">${domainSignal(a)}</div>
     <div class="domain-progress"><span style="width:${st.progress}%"></span></div>
     <div class="domain-meta"><span>${st.activeProjects.length} proyectos activos</span><span>${fmtLastActivity(st.lastAt)}</span></div>
-    <div class="domain-tags"><span class="domain-tag ${prdClass}">${bp.prd}</span><span class="domain-tag">${bp.specialist}</span></div>
   </button>`;
 }
 
@@ -401,12 +418,47 @@ function domainSignal(area) {
   return 'Todo bajo control';
 }
 
-function attentionItems() {
-  const todayish=S.tasks.filter(t=>t.status!=='done'&&(t.horizon==='today'||t.priority==='critical'||t.status==='avoiding'||(t.due_date&&new Date(t.due_date)<=new Date(Date.now()+3*864e5))));
-  const taskItems=todayish.map(t=>({kind:t.status==='avoiding'?'bloqueo':'tarea',title:t.title,meta:t.due_date?fmtDate(t.due_date):(t.areas?.name||''),weight:t.status==='avoiding'?4:t.priority==='critical'?5:3}));
-  const decisionItems=S.dec.slice(0,2).map(d=>({kind:'decisión',title:d.title,meta:d.areas?.name||'',weight:3}));
-  const waitItems=S.wf.slice(0,1).map(w=>({kind:'espera',title:w.title,meta:w.waiting_on||'',weight:2}));
-  return [...taskItems,...decisionItems,...waitItems].sort((a,b)=>b.weight-a.weight).slice(0,3);
+// Cola de trabajo — ÚNICA definición de "qué merece mi tiempo", en el orden en
+// que merece atenderse. Antes existían dos cálculos distintos sobre los mismos
+// datos (attentionItems() para el bloque "Atención" de Home, y un bloque propio
+// dentro de avanzarView()), que podían ordenar los mismos elementos de forma
+// distinta. Ahora Avanzar muestra la cola entera y Home un preview de los 3
+// primeros — una sola computación, dos representaciones.
+function workQueue() {
+  const now = Date.now();
+  const items = [];
+  const areaName = id => S.areas.find(x => x.id === id)?.name || '';
+
+  S.tasks.filter(t => t.status === 'pending' && t.due_date && Math.ceil((new Date(t.due_date) - new Date()) / 864e5) <= 1)
+    .forEach(t => {
+      const days = Math.ceil((new Date(t.due_date) - new Date()) / 864e5);
+      items.push({ id: 'task_' + t.id, title: t.title, impact: 'crítico', weight: 5, time: '~15-30 min',
+        reason: days < 0 ? 'Vencida' : days === 0 ? 'Vence hoy' : 'Vence mañana',
+        area: areaName(t.area_id), areaId: t.area_id, type: 'task', ref: t.id });
+    });
+
+  S.tasks.filter(t => t.status === 'avoiding')
+    .forEach(t => items.push({ id: 'task_' + t.id, title: t.title, impact: 'alto', weight: 4, time: '~15 min',
+      reason: 'Bloqueada — la estás evitando', area: areaName(t.area_id), areaId: t.area_id, type: 'task', ref: t.id }));
+
+  S.projects.filter(p => p.status === 'active' && p.ia_last_session)
+    .forEach(p => items.push({ id: 'proj_ia_' + p.id, title: 'Revisar resultado IA: ' + p.title, impact: 'alto', weight: 4,
+      time: '~20 min', reason: p.ia_last_session, area: areaName(p.area_id), areaId: p.area_id, type: 'project_ia', ref: p.id }));
+
+  S.dec.filter(d => Math.floor((now - new Date(d.created_at)) / 864e5) > 7)
+    .forEach(d => items.push({ id: 'dec_' + d.id, title: 'Cerrar decisión: ' + d.title, impact: 'estratégico', weight: 3,
+      time: '~10 min', reason: `Abierta hace ${Math.floor((now - new Date(d.created_at)) / 864e5)} días`,
+      area: areaName(d.area_id), areaId: d.area_id, type: 'decision', ref: d.id }));
+
+  S.wf.filter(w => w.follow_up_date && new Date(w.follow_up_date) < new Date())
+    .forEach(w => items.push({ id: 'wf_' + w.id, title: w.title, impact: 'medio', weight: 3, time: '~5 min',
+      reason: `Esperando a ${w.waiting_on || 'alguien'} — seguimiento vencido`, area: areaName(w.area_id), areaId: w.area_id, type: 'waiting', ref: w.id }));
+
+  S.projects.filter(p => p.status === 'active' && !p.next_action)
+    .forEach(p => items.push({ id: 'proj_next_' + p.id, title: 'Definir próxima acción: ' + p.title, impact: 'medio', weight: 2,
+      time: '~5 min', reason: 'Sin próxima acción definida', area: areaName(p.area_id), areaId: p.area_id, type: 'project_next', ref: p.id }));
+
+  return items.sort((a, b) => b.weight - a.weight);
 }
 
 function isabelContributions(areaId=null, limit=4) {
@@ -608,8 +660,8 @@ function homeView() {
   // ── Una sola prioridad para toda la vista (tarjeta Isabel + dominio resaltado) ──
   const priority = resolveHomePriority();
 
-  // ── Atención ─────────────────────────────────────────────────────────
-  const atItems = attentionItems();
+  // ── Atención — preview de los 3 primeros de la cola de Avanzar ───────
+  const atItems = workQueue().slice(0, 3);
 
   return `
   <div style="padding:0 0 80px">
@@ -624,10 +676,10 @@ function homeView() {
             <span style="color:var(--t3);font-size:12px;margin-top:2px;flex-shrink:0">→</span>
             <div style="flex:1;min-width:0">
               <div style="font-size:13px;font-weight:500;color:var(--text);line-height:1.4">${it.title}</div>
-              ${it.meta ? `<div style="font-size:11px;color:var(--t3);margin-top:2px">${it.meta}</div>` : ''}
+              <div style="font-size:11px;color:var(--t3);margin-top:2px">${it.reason}${it.area ? ' · ' + it.area : ''}</div>
             </div>
           </div>`).join('')
-        : `<div style="font-size:13px;color:var(--t2)">Nada urgente hoy.</div>`}
+        : `<div style="font-size:13px;color:var(--t2)">Nada pendiente ahora.</div>`}
     </div>
 
     <!-- Dominios — puertas -->
@@ -738,24 +790,10 @@ function dashboardView() {
 
 // ────── Avanzar view ──────────────────────────────────────────────────────────
 function avanzarView() {
-  const now=Date.now();
-  const proposals=[];
-
-  const critTasks=S.tasks.filter(t=>t.status==='pending'&&t.due_date&&Math.ceil((new Date(t.due_date)-new Date())/864e5)<=1);
-  critTasks.slice(0,2).forEach(t=>{
-    const days=Math.ceil((new Date(t.due_date)-new Date())/864e5);
-    proposals.push({id:'task_'+t.id,title:t.title,impact:'crítico',time:'~15-30 min',reason:days<=0?'Vencida hoy':days===1?'Vence mañana':'Vence hoy',area:S.areas.find(x=>x.id===t.area_id)?.name||'',type:'task',ref:t.id});
-  });
-  S.projects.filter(p=>p.status==='active'&&p.ia_last_session).slice(0,2).forEach(p=>{
-    proposals.push({id:'proj_ia_'+p.id,title:'Revisar resultado IA: '+p.title,impact:'alto',time:'~20 min',reason:p.ia_last_session,area:S.areas.find(x=>x.id===p.area_id)?.name||'',type:'project_ia',ref:p.id});
-  });
-  S.dec.filter(d=>Math.floor((now-new Date(d.created_at))/864e5)>7).slice(0,2).forEach(d=>{
-    const days=Math.floor((now-new Date(d.created_at))/864e5);
-    proposals.push({id:'dec_'+d.id,title:'Cerrar decisión: '+d.title,impact:'estratégico',time:'~10 min',reason:`Abierta hace ${days} días`,area:S.areas.find(x=>x.id===d.area_id)?.name||'',type:'decision',ref:d.id});
-  });
-  S.projects.filter(p=>p.status==='active'&&!p.next_action).slice(0,2).forEach(p=>{
-    proposals.push({id:'proj_next_'+p.id,title:'Definir próxima acción: '+p.title,impact:'medio',time:'~5 min',reason:'Sin próxima acción — Isabel no puede priorizar este proyecto',area:S.areas.find(x=>x.id===p.area_id)?.name||'',type:'project_next',ref:p.id});
-  });
+  // Misma cola que alimenta el bloque "Atención" de Home — una sola definición
+  // de "qué merece mi tiempo" (ver workQueue()). Aquí se muestra entera;
+  // en Home, solo los 3 primeros.
+  const proposals=workQueue();
 
   const iCol={crítico:'#A32D2D',alto:'#534AB7',medio:'#854F0B',estratégico:'#0F6E56'};
   const iBg={crítico:'#FCEBEB',alto:'#EEEDFE',medio:'#FAEEDA',estratégico:'#E1F5EE'};
@@ -764,10 +802,6 @@ function avanzarView() {
 
   return `
   <div class="ph"><span class="logo" style="font-size:15px">⚡ Avanzar</span><span style="font-size:11px;color:var(--t2)">${ctxLabel}</span></div>
-  <div style="background:#0f0f1a;border-radius:14px;padding:13px 15px;margin-bottom:10px">
-    <div style="font-size:10px;font-weight:600;color:#a5b4fc;letter-spacing:.5px;margin-bottom:6px">ISABEL · ANÁLISIS</div>
-    <p style="font-size:13px;line-height:1.6;color:#d8d8f0;margin:0">${proposals.length?`${proposals.length} propuesta${proposals.length!==1?'s':''} ordenadas por impacto.${critTasks.length?` <span style="color:#f87171">${critTasks.length} urgencia${critTasks.length>1?'s':''}.</span>`:''}`:' Todo al día — sin urgencias detectadas.'}</p>
-  </div>
   ${proposals.map((p,i)=>`
   <div id="ap_${p.id}" onclick="selectProposal('${p.id}')" style="border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
@@ -824,17 +858,8 @@ function resultadoIAView() {
 function domainDashboardIntro(a) {
   const bp=domainBlueprint(a.name), st=domainStats(a);
   const isStrategic=['VistaJet','JETMI'].includes(a.name);
-  const prdNotes={
-    'VistaJet':['Protocolo de rotación','Checklist de maleta','Estado operativo ON/OFF'],
-    'JETMI':['PRD Semilla v0.3','Proyectos derivados del dominio','Bloqueos y oportunidades de negocio'],
-    'Finanzas':['Control mensual','Presupuestos por categoría','Proyección anual'],
-    'Salud':['Seguimiento de dolor','Protocolo diario','Entrenamiento integrado'],
-    'Marca Personal':['Sistema de contenido','Captura en ON','Publicación en OFF'],
-    'Vida Personal':['Carga mental','Viajes y planes','Hábitos relevantes'],
-  }[a.name]||['Mapa del dominio'];
   const contribs=isabelContributions(a.id,3);
   const projects=st.activeProjects.length?st.activeProjects:S.projects.filter(p=>p.area_id===a.id).slice(0,3);
-  const activeCount=a.name==='VistaJet'?st.vjTaskCount:(st.activeProjects.length);
   const activeLabel=a.name==='VistaJet'
     ?(st.vjTaskCount>0?`${st.vjTaskCount} tarea${st.vjTaskCount!==1?'s':''} VJ activa${st.vjTaskCount!==1?'s':''}`:'sin tareas VJ pendientes')
     :`${st.activeProjects.length} proyecto${st.activeProjects.length!==1?'s':''} activo${st.activeProjects.length!==1?'s':''}`;
@@ -843,14 +868,10 @@ function domainDashboardIntro(a) {
       <div class="domain-hero-top"><span class="domain-hero-icon">${bp.icon}</span><span>${st.statusLabel}</span></div>
       <h2>${a.name}</h2>
       <p>${bp.purpose}</p>
-      <div class="domain-hero-meta"><span>${activeLabel}</span><span>${fmtLastActivity(st.lastAt)}</span><span>Especialista: ${bp.specialist}</span></div>
+      <div class="domain-hero-meta"><span>${activeLabel}</span><span>${fmtLastActivity(st.lastAt)}</span></div>
     </div>
     ${isStrategic&&contribs.length?`<div class="brief-card"><div class="brief-label">Contribuciones de Isabel</div>${contributionList(contribs)}</div>`:''}
     ${projects.length?`<div class="visual-projects"><div class="section-title-inline">Proyectos reales del dominio</div>${projects.slice(0,4).map(projectVisualCard).join('')}</div>`:''}
-    <details class="prd-card-collapsible">
-      <summary><span class="brief-label" style="display:inline">PRD / mapa del dominio</span> <span style="font-size:12px;color:var(--t2)">${bp.prd}</span></summary>
-      <div class="prd-notes" style="margin-top:8px">${prdNotes.map(x=>`<span>${x}</span>`).join('')}</div>
-    </details>
   </section>`;
 }
 
@@ -859,8 +880,7 @@ function areasView() {
   return `<div class="domains-page">
     <div class="page-intro">
       <div class="brief-kicker">Dominios</div>
-      <h2>Mapa visual de LIFEOS</h2>
-      <p>Cada dominio muestra estado, progreso, proyectos, PRD y modo del especialista.</p>
+      <h2>Cómo está cada área</h2>
     </div>
     <div class="domains-list">${domains.map(domainCard).join('')}</div>
   </div>`;
@@ -3935,8 +3955,13 @@ function selectProposal(id) {
 function empezarPropuesta() {
   if(!_selectedProposal) return;
   const id=_selectedProposal; _selectedProposal=null;
-  if(id.startsWith('proj_ia_')||id.startsWith('proj_next_')) goProject(id.replace('proj_ia_','').replace('proj_next_',''));
-  else if(id.startsWith('dec_')||id.startsWith('task_')) go('home');
+  if(id.startsWith('proj_ia_')||id.startsWith('proj_next_')) return goProject(id.replace('proj_ia_','').replace('proj_next_',''));
+  // Tareas, decisiones y esperas viven dentro de su área — llevar ahí, no a
+  // Home (antes caían en go('home'), que dejaba a la usuaria justo donde
+  // empezó, sin abrir nada).
+  const item=workQueue().find(p=>p.id===id);
+  if(item?.areaId) return go('area',item.areaId);
+  go('global');
 }
 
 // ─── Inventario VistaJet ─────────────────────────────────────────────────────
