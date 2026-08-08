@@ -7,26 +7,22 @@ export function setClient(client) { _db = client; }
 
 // ── Record activo ──────────────────────────────────────────────────────────
 //
-// Sin tailNumber: comportamiento histórico exacto (el active más reciente,
-// sin importar matrícula) — no rompe llamadores existentes que todavía no
-// pasan el avión actual.
+// El HOTO "actual" es el que corresponde al avión operativo actual
+// (vj_state.aircraft), no simplemente el active más reciente — mismo principio
+// aplicado en isabel-api/src/hoto/data.js (DECISIONS.md D13). Si hay más de un
+// active para esa matrícula, no se adivina cuál usar: se devuelve
+// { ambiguous: true, matches } igual que el backend.
 //
-// Con tailNumber: el HOTO "actual" es el que corresponde al avión operativo
-// actual (vj_state.aircraft), no simplemente el active más reciente — mismo
-// principio aplicado en isabel-api/src/hoto/data.js (DECISIONS.md D13). Si
-// hay más de un active para esa matrícula, no se adivina cuál usar: se
-// devuelve { ambiguous: true, matches } igual que el backend.
+// SIN matrícula devuelve null, NO "el más reciente de cualquier avión" (D34).
+// Ese fallback era la última puerta abierta de la familia D14/D15/D28: en el
+// momento en que Estefanía entrega el avión (`status: libre` → `aircraft:
+// null`), TODOS los llamadores pasaban `undefined` y Readiness volvía a
+// mostrar el HOTO, el inventario y la lavandería del avión anterior como si
+// fueran los de ahora — exactamente el síntoma que D15 corrigió por otras
+// rutas. Sin avión actual no hay dato actual: eso es la respuesta correcta,
+// no un vacío que haya que rellenar.
 export async function loadActiveHoto(tailNumber) {
-  if (!tailNumber) {
-    const { data, error } = await _db
-      .from('vj_hoto_records')
-      .select('*')
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(1);
-    if (error) throw error;
-    return data?.[0] ?? null;
-  }
+  if (!tailNumber) return null;
 
   const { data, error } = await _db
     .from('vj_hoto_records')

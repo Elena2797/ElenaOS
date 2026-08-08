@@ -13,17 +13,18 @@ import assert from 'node:assert/strict';
 import { collectSignals, assess } from '../readiness.js';
 import { getSessionStats } from '../inventory.js';
 
-// ── Fakes que imitan el contrato real (D13/D14/D15): sin tailNumber,
-// comportamiento histórico (el más reciente sin filtrar); con tailNumber,
-// correlacionan de verdad por matrícula — mismo patrón que
-// hoto.js/inventory.js/laundryCleaning.js reales.
+// ── Fakes que imitan el contrato real (D13/D14/D15/D34): SIN tailNumber
+// devuelven null (D34 — sin avión actual no hay dato actual); con tailNumber
+// correlacionan de verdad por matrícula. Mismo contrato que
+// hoto.js/inventory.js/laundryCleaning.js reales: si estos fakes se
+// adelantaran al código real, un test verde aquí no significaría nada.
 function makeFakeServices({ hotoRows = [], invSessions = [], llcRows = [] }) {
   const byRecency = (a, b) => (a.created_at < b.created_at ? 1 : -1);
 
   const hotoSvc = {
     loadActiveHoto: async (tail) => {
       const active = hotoRows.filter((r) => r.status === 'active');
-      if (!tail) return [...active].sort(byRecency)[0] || null;
+      if (!tail) return null;   // D34
       const matches = active.filter((r) => r.tail_number === tail);
       if (matches.length === 0) return null;
       if (matches.length > 1) return { ambiguous: true, matches };
@@ -34,7 +35,8 @@ function makeFakeServices({ hotoRows = [], invSessions = [], llcRows = [] }) {
 
   const invSvc = {
     loadLastSession: async (tail) => {
-      const rows = tail ? invSessions.filter((r) => r.aircraft_registration === tail) : invSessions;
+      if (!tail) return null;   // D34
+      const rows = invSessions.filter((r) => r.aircraft_registration === tail);
       return [...rows].sort(byRecency)[0] || null;
     },
     loadSessionItems: async (sessionId) => invSessions.find((s) => s.id === sessionId)?.items || [],
@@ -44,7 +46,7 @@ function makeFakeServices({ hotoRows = [], invSessions = [], llcRows = [] }) {
   const llcSvc = {
     loadActiveLaundryCleaning: async (tail) => {
       const active = llcRows.filter((r) => r.status === 'active');
-      if (!tail) return [...active].sort(byRecency)[0] || null;
+      if (!tail) return null;   // D34
       const matches = active.filter((r) => r.tail_number === tail);
       if (matches.length === 0) return null;
       if (matches.length > 1) return { ambiguous: true, matches };
@@ -132,7 +134,7 @@ describe('Bug real D15 — datos históricos de 9H-VCQ no deben alimentar el con
     assert.equal(llcRows.length, 1);
 
     // Y siguen siendo consultables explícitamente por su propia matrícula.
-    const status = await services.hotoSvc.loadActiveHoto(); // sin tailNumber = comportamiento histórico, deliberado
+    const status = await services.hotoSvc.loadActiveHoto('9H-VCQ'); // consulta explícita al histórico, por su matrícula
     // 'delivered' no es 'active', así que ni siquiera el histórico "más reciente" lo devuelve — comportamiento correcto, no se inventa un active.
     assert.equal(status, null);
     const invForVcq = await services.invSvc.loadLastSession('9H-VCQ');
@@ -160,5 +162,57 @@ describe('Bug real D15 — datos históricos de 9H-VCQ no deben alimentar el con
     // El histórico de 9H-VCQ, intacto y sin mezclarse en las cifras de arriba.
     assert.equal(hotoRowsWithDafbs.find((r) => r.tail_number === '9H-VCQ').status, 'delivered');
     assert.equal(invSessionsWithDafbs.find((s) => s.aircraft_registration === '9H-VCQ').items.length, 349);
+  });
+});
+
+// ── D34 — la puerta que quedaba abierta: `vj_state.aircraft` vacío ──────────
+//
+// D14/D15 corrigieron la correlación cuando HAY avión actual. Pero en cuanto
+// Estefanía entrega el avión (`status: libre` → `aircraft: null`), los cuatro
+// loaders recibían `undefined` y cada uno caía en su fallback histórico ("el
+// más reciente de cualquier avión"). Resultado: exactamente el síntoma de D15
+// — el HOTO y el inventario del avión ANTERIOR presentados como los de ahora —
+// resucitado por la vía más normal del mundo, terminar una rotación.
+describe('D34 — sin avión asignado no se evalúa el avión anterior', () => {
+  const hotoRows = [
+    { id: 'hoto-vcq', tail_number: '9H-VCQ', status: 'active', created_at: '2026-07-10', has_prior_hoto: true, aircraft_status: 'Good' },
+  ];
+  const invSessions = [
+    { id: 'inv-vcq', aircraft_registration: '9H-VCQ', status: 'open', created_at: '2026-07-10', session_date: '2026-07-10', items: makeVcqInventoryItems() },
+  ];
+  const llcRows = [
+    { id: 'llc-vcq', tail_number: '9H-VCQ', status: 'active', created_at: '2026-07-10', updated_at: daysAgoISO(30), items: {} },
+  ];
+  // El estado real justo después de "ya entregué el avión".
+  const vjStateLibre = { status: 'libre', aircraft: null };
+
+  test('collectSignals no trae NADA de 9H-VCQ cuando no hay avión actual', async () => {
+    const services = makeFakeServices({ hotoRows, invSessions, llcRows });
+    const s = await collectSignals({ ...services, vjTasks: [], vjState: vjStateLibre });
+
+    assert.equal(s.noAircraft, true);
+    assert.equal(s.aircraft, null);
+    assert.equal(s.hoto, null, 'el HOTO activo de 9H-VCQ no puede aparecer sin avión actual');
+    assert.equal(s.inventory, null, 'los 349 items de 9H-VCQ no pueden aparecer sin avión actual');
+    assert.equal(s.laundry, null, 'el formulario de 9H-VCQ no puede aparecer sin avión actual');
+  });
+
+  test('assess lo dice ("sin avión asignado"), no finge falta de evidencia ni evalúa una entrega', () => {
+    const r = assess({ now: new Date(), noAircraft: true, aircraft: null, rotationStatus: 'libre' });
+    assert.equal(r.readiness, 'unknown');
+    assert.equal(r.phase, 'sin avión asignado');
+    assert.deepEqual(r.warnings, []);
+    assert.deepEqual(r.blockers, []);
+    // Y sobre todo: ni una cifra del avión anterior en el texto visible.
+    assert.ok(!/9H-VCQ|349|61|215/.test(r.recommendation), 'la recomendación no puede citar datos del avión anterior');
+  });
+
+  test('el histórico de 9H-VCQ sigue intacto y consultable por su matrícula', async () => {
+    const services = makeFakeServices({ hotoRows, invSessions, llcRows });
+    await collectSignals({ ...services, vjTasks: [], vjState: vjStateLibre });
+    const hoto = await services.hotoSvc.loadActiveHoto('9H-VCQ');
+    assert.equal(hoto.id, 'hoto-vcq');
+    const inv = await services.invSvc.loadLastSession('9H-VCQ');
+    assert.equal(inv.items.length, 349);
   });
 });

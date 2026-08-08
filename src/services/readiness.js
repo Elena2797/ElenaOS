@@ -15,6 +15,16 @@
 export async function collectSignals({ hotoSvc, invSvc, llcSvc, vjTasks, vjState, now = new Date() }) {
   const signals = { now, rotationStatus: vjState?.status || null };
 
+  // Sin avión operativo actual no hay NADA que evaluar (D34). Antes esto no se
+  // declaraba: los cuatro loaders recibían `undefined` y cada uno caía en su
+  // fallback "el más reciente de cualquier avión", así que en cuanto Estefanía
+  // entregaba el avión, Readiness volvía a evaluar el HOTO y el inventario del
+  // avión ANTERIOR presentándolos como los de ahora. Los loaders ya devuelven
+  // null sin matrícula; esto además lo dice con nombre, para que el veredicto
+  // sea "no hay avión" y no "faltan datos".
+  signals.aircraft = vjState?.aircraft || null;
+  signals.noAircraft = !signals.aircraft;
+
   // HOTO (Supabase) — correlacionado con el avión operativo actual
   // (vj_state.aircraft), no simplemente "el active más reciente" (D13). Si
   // vjState.aircraft está vacío, loadActiveHoto cae en su comportamiento
@@ -125,6 +135,20 @@ export function assess(s) {
   const modules = [];
   const mod = (name, lines) => { if (lines.length) modules.push({ name, lines }); };
   const L = (level, text) => ({ level, text }); // ok | warn | block | missing
+
+  // Sin avión asignado no se evalúa una entrega: se dice. Cualquier otra cosa
+  // (evaluar "el último HOTO que haya") sería justo la fuga de D14/D15.
+  if (s.noAircraft) {
+    return {
+      readiness: 'unknown',
+      confidence: 'low',
+      phase: 'sin avión asignado',
+      strengths: [], warnings: [], blockers: [],
+      missingEvidence: ['No hay avión operativo asignado ahora mismo'],
+      recommendation: 'No hay ningún avión asignado, así que no hay entrega que evaluar. Cuando empieces rotación, dímelo y evalúo el avión nuevo — nunca el anterior.',
+      modules: [],
+    };
+  }
 
   const deliveryPhase = s.daysToDelivery != null && s.daysToDelivery <= 2;
   const phase =

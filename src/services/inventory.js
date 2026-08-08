@@ -32,37 +32,59 @@ export async function uploadTemplate(file, filename) {
   if (error) throw error;
 }
 
-// Sin tailNumber: comportamiento histórico exacto (la sesión open más
-// reciente, sin importar matrícula).
+// La sesión "activa" es la abierta para el avión operativo actual
+// (vj_state.aircraft) — nunca la de otro avión, aunque siga 'open'. Mismo
+// principio que HOTO/Laundry (D13/D14): sin sesión abierta para ese avión se
+// devuelve null (permite empezar una nueva), nunca se reutiliza en silencio la
+// de un avión distinto.
 //
-// Con tailNumber: la sesión "activa" es la abierta para el avión operativo
-// actual (vj_state.aircraft) — nunca la de otro avión, aunque siga 'open'.
-// Mismo principio que HOTO/Laundry (D13/D14): sin sesión abierta para ese
-// avión, se devuelve null (permite empezar una nueva), nunca se reutiliza en
-// silencio la de un avión distinto.
+// SIN matrícula devuelve null (D34): sin avión actual no hay sesión actual.
+// Ver el comentario largo en hoto.js — es la misma puerta cerrada.
 export async function loadActiveSession(tailNumber) {
-  let q = _db.from('vj_inventory_sessions').select('*').eq('status', 'open');
-  if (tailNumber) q = q.eq('aircraft_registration', tailNumber);
-  const { data, error } = await q.order('created_at', { ascending: false }).limit(1);
+  if (!tailNumber) return null;
+  const { data, error } = await _db
+    .from('vj_inventory_sessions')
+    .select('*')
+    .eq('status', 'open')
+    .eq('aircraft_registration', tailNumber)
+    .order('created_at', { ascending: false })
+    .limit(1);
   if (error) throw error;
   return data?.[0] ?? null;
+}
+
+// Sesiones abiertas que NO son del avión actual. No se cierran solas (cerrar es
+// irreversible): se muestran, para que dejen de ser un resto invisible. Espejo
+// de listOpenSessionsForOtherAircraft() en isabel-api (D34).
+export async function loadOpenSessionsForOtherAircraft(tailNumber) {
+  let q = _db.from('vj_inventory_sessions')
+    .select('id,aircraft_registration,session_date,created_at')
+    .eq('status', 'open');
+  if (tailNumber) q = q.neq('aircraft_registration', tailNumber);
+  const { data, error } = await q.order('created_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
 }
 
 // Última sesión en cualquier estado (open o closed). Solo lectura — la usa
 // Aircraft Readiness para evaluar la evidencia de inventario.
 //
-// Sin tailNumber: comportamiento histórico exacto (la última sesión global,
-// sin importar matrícula) — no rompe llamadores existentes.
+// La sesión "actual" es la del avión operativo actual (vj_state.aircraft), no
+// simplemente la última creada — mismo principio que HOTO (D13). Si no hay
+// ninguna sesión para esa matrícula, no se cae de vuelta a la de otro avión:
+// devuelve null (Readiness ya trata null como "sin evidencia").
 //
-// Con tailNumber: la sesión "actual" es la del avión operativo actual
-// (vj_state.aircraft), no simplemente la última creada — mismo principio que
-// HOTO (D13). Si no hay ninguna sesión para esa matrícula, no se cae de
-// vuelta a la de otro avión: devuelve null (Readiness ya trata null como
-// "sin evidencia", nunca inventa datos de otro avión).
+// SIN matrícula devuelve null (D34): antes devolvía la última sesión global,
+// que es como Readiness acababa citando "215 items sin verificar, 61
+// discrepancias" de 9H-VCQ en cuanto el avión actual quedaba vacío.
 export async function loadLastSession(tailNumber) {
-  let q = _db.from('vj_inventory_sessions').select('*');
-  if (tailNumber) q = q.eq('aircraft_registration', tailNumber);
-  const { data, error } = await q.order('created_at', { ascending: false }).limit(1);
+  if (!tailNumber) return null;
+  const { data, error } = await _db
+    .from('vj_inventory_sessions')
+    .select('*')
+    .eq('aircraft_registration', tailNumber)
+    .order('created_at', { ascending: false })
+    .limit(1);
   if (error) throw error;
   return data?.[0] ?? null;
 }

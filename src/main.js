@@ -944,11 +944,13 @@ function areaView() {
     const primaryCTA=hotoTasksExist?{label:'Ir al HOTO',view:'vj_hoto'}:status==='rotacion'?{label:'Ver Laundry & Cleaning Form',view:'vj_laundry_cleaning'}:null;
 
     // Fuente real = Supabase, correlacionada con el avión actual (D14/D15).
-    // Mientras carga, localStorage como placeholder transitorio; una vez
-    // sabemos la respuesta real (con avión o sin él), se usa solo esa — nunca
-    // se sigue mostrando el fallback local una vez confirmado el estado real.
+    // Mientras carga NO se muestra nada: el placeholder de `vj_hoto_checks` que
+    // había aquí es una clave SIN matrícula, así que enseñaba los ticks de la
+    // última rotación usada en este dispositivo — el dato exacto del bug de
+    // D15, solo que durante unos milisegundos. Un dato de otro avión no es un
+    // placeholder aceptable ni un instante (D34); vacío mientras carga, sí.
     triggerHotoSummaryLoad();
-    const hoToChecks=S._hotoSummaryLoaded?(S.hotoSummaryRec?.daily_duties||{}):JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
+    const hoToChecks=S._hotoSummaryLoaded?(S.hotoSummaryRec?.daily_duties||{}):{};
     const allHotoItems=VJ_HOTO_SECTIONS.flatMap(s=>s.items);
     const hotoCompleted=allHotoItems.filter(i=>hoToChecks[i.id]).length;
     const hotoTotal=allHotoItems.length;
@@ -1045,7 +1047,10 @@ function areaView() {
       ${vj.aircraft?`<div style="font-size:11px;color:var(--t3);margin-bottom:8px">${vj.aircraft}${status==='rotacion'&&vj.rotation_day&&vj.rotation_total?' · Día '+vj.rotation_day+'/'+vj.rotation_total:''}</div>`:''}`;
       if(!R) return `${head}<div style="font-size:13px;color:var(--t3);padding:4px 0">Evaluando el estado real de los módulos…</div>`;
       if(R.error) return `${head}<div style="font-size:13px;color:var(--t2)">No pude evaluar el estado: ${R.error}</div>`;
-      const rm={ready:{label:'Listo para entregar',color:'#0F6E56',bg:'#E1F5EE'},almost_ready:{label:'Casi listo',color:'#854F0B',bg:'#FAEEDA'},not_ready:{label:'No entregaría aún',color:'#A33636',bg:'#FBEAEA'}}[R.readiness];
+      // 'unknown' = no hay avión asignado (D34): no es un veredicto de entrega,
+      // es la ausencia de algo que evaluar. Sin esta entrada el lookup daba
+      // undefined y la tarjeta reventaba al leer rm.color.
+      const rm={ready:{label:'Listo para entregar',color:'#0F6E56',bg:'#E1F5EE'},almost_ready:{label:'Casi listo',color:'#854F0B',bg:'#FAEEDA'},not_ready:{label:'No entregaría aún',color:'#A33636',bg:'#FBEAEA'},unknown:{label:'Sin avión asignado',color:'#6B7280',bg:'#F5F5F5'}}[R.readiness];
       const cf={high:'alta',medium:'media',low:'baja'}[R.confidence];
       const lvlIcon={ok:'✓',warn:'⚠',block:'✗',missing:'?'};
       const lvlColor={ok:'#0F6E56',warn:'#B87A00',block:'#A33636',missing:'#9CA3AF'};
@@ -1058,7 +1063,7 @@ function areaView() {
       return `${head}
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:9px">
         <span style="font-size:11px;font-weight:700;color:${rm.color};background:${rm.bg};border-radius:999px;padding:3px 10px">${rm.label}</span>
-        <span style="font-size:10px;color:var(--t3)">confianza ${cf} · ${R.phase}</span>
+        <span style="font-size:10px;color:var(--t3)">${R.readiness==='unknown'?R.phase:`confianza ${cf} · ${R.phase}`}</span>
         <button onclick="readiRefresh()" title="Recalcular" style="border:none;background:none;color:var(--t3);cursor:pointer;font-size:13px;padding:0;margin-left:auto"><i class="ti ti-refresh"></i></button>
       </div>
       <div style="font-size:14px;font-weight:500;color:var(--text);line-height:1.55;margin-bottom:10px">${R.recommendation}</div>
@@ -1952,7 +1957,7 @@ function setVjTab(field,value){S[field]=value;render();}
 // Checklist de Daily Duties → Supabase (vj_hoto_records.daily_duties).
 // No-optimista: guarda primero, actualiza la UI solo tras éxito.
 async function toggleHotoCheck(itemId){
-  if(!S.hotoRec) return;
+  if(!assertCurrentAircraft(S.hotoRec,'HOTO')) return;
   const duties={...(S.hotoRec.daily_duties||{})};
   if(duties[itemId]) delete duties[itemId];   // ausente = vacío en el PDF
   else duties[itemId]=true;
@@ -1964,7 +1969,7 @@ async function toggleHotoCheck(itemId){
 }
 
 async function resetHotoChecks(){
-  if(!S.hotoRec) return;
+  if(!assertCurrentAircraft(S.hotoRec,'HOTO')) return;
   if(!confirm('¿Reiniciar el checklist de Daily Duties?\n\nSolo se desmarcan los ticks. Nada más.')) return;
   try{
     await hotoSvc.updateHoto(S.hotoRec.id,{daily_duties:{}});
@@ -1976,10 +1981,25 @@ async function resetHotoChecks(){
 // ═══ Laundry & Cleaning Form — módulo vivo ═══════════════════════════════════
 function llcBack(){ S._llcLoaded=false; S.llcErr=null; go('area',S.areaId); }
 
+// Crear un registro para una matrícula distinta de la actual está permitido
+// (puede ser deliberado), pero NUNCA en silencio: el registro no aparecería
+// como el actual —la correlación por matrícula lo excluiría— y desde fuera
+// sería indistinguible de "no se guardó". Se confirma explícitamente. Ver D34.
+function confirmTailMismatch(tail, label){
+  const current=S.vjState?.aircraft||null;
+  if(!current||!tail||tail===current) return true;
+  return confirm(`Vas a crear un ${label} para ${tail}, pero tu avión actual es ${current}.
+
+No aparecerá como el ${label} de ahora: solo se muestra el del avión actual.
+
+¿Seguro?`);
+}
+
 async function llcCreate(){
   const tail=(document.getElementById('llc-new-tail')?.value||'').trim().toUpperCase();
   const icao=(document.getElementById('llc-new-icao')?.value||'').trim().toUpperCase();
   if(!tail){ alert('Introduce la matrícula.'); return; }
+  if(!confirmTailMismatch(tail,'formulario de Laundry')) return;
   try{
     S.llcRec=await llcSvc.createLaundryCleaning({tail_number:tail,icao});
     render();
@@ -1989,7 +2009,7 @@ async function llcCreate(){
 // No-optimista: guarda en Supabase PRIMERO; la UI solo refleja el valor tras éxito.
 // Si falla, revierte (el estado no cambió) y muestra el error. Mismo patrón que hotoField.
 async function llcField(field,value){
-  if(!S.llcRec) return;
+  if(!assertCurrentAircraft(S.llcRec,'formulario de Laundry')) return;
   const val=value===''?null:value;
   try{
     await llcSvc.updateLaundryCleaning(S.llcRec.id,{[field]:val});
@@ -2004,7 +2024,7 @@ async function llcField(field,value){
 // No-optimista igual que hotoCareSave/hotoShopSet: reescribe el blob entero,
 // la UI solo lo asume tras confirmación de Supabase.
 async function llcItemField(itemId,key,value){
-  if(!S.llcRec) return;
+  if(!assertCurrentAircraft(S.llcRec,'formulario de Laundry')) return;
   const items={...(S.llcRec.items||{})};
   const current=items[itemId]||{};
   const val=key==='note'?(value===''?null:value):(value===''?null:Number(value));
@@ -2042,20 +2062,20 @@ function vjHotoView(){
       // Migración one-time del checklist: localStorage → Supabase (corre en ESTE
       // dispositivo). Solo si Supabase está vacío y hay ticks locales sin migrar.
       // Espera confirmación antes de marcar migrado y NO borra localStorage.
-      if(S.hotoRec){
-        try{
-          const local=JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
-          const ticks=Object.keys(local).filter(k=>local[k]);
-          const supaEmpty=!S.hotoRec.daily_duties||Object.keys(S.hotoRec.daily_duties).length===0;
-          if(ticks.length>0 && supaEmpty && !localStorage.getItem('vj_hoto_checks_migrated')){
-            const duties={}; ticks.forEach(k=>duties[k]=true);
-            await hotoSvc.updateHoto(S.hotoRec.id,{daily_duties:duties}); // sube y espera OK
-            S.hotoRec.daily_duties=duties;
-            localStorage.setItem('vj_hoto_checks_migrated','1');          // solo tras éxito
-            console.log('[hoto] checklist migrado a Supabase:',ticks.length,'ticks');
-          }
-        }catch(e){ console.error('[hoto] migración checklist falló (reintentará):',e.message); S.hotoMigrationErr=e.message; }
-      }
+      // RETIRADA la migración one-time localStorage → Supabase (D34).
+      //
+      // `vj_hoto_checks` es una clave SIN matrícula (D15). Esta migración
+      // copiaba esos ticks al HOTO del avión ACTUAL siempre que su checklist
+      // estuviera vacío — es decir, escribía los ticks de 9H-VCQ dentro del
+      // HOTO de D-AFBS, y de ahí al PDF oficial exportado. D15 corrigió las
+      // rutas que LEÍAN ese fallback, pero esta, que ESCRIBE, quedó viva: era
+      // la única fuga de entidad que llegaba a un documento oficial.
+      //
+      // No se sustituye por una migración "correlacionada" porque el dato no
+      // se puede correlacionar: nadie guardó nunca a qué avión pertenecían
+      // esos ticks, y adivinarlo sería inventar (PRINCIPLES.md #2). El
+      // localStorage no se borra — el dato local sigue ahí, simplemente deja
+      // de escribirse en el HOTO de un avión que no le corresponde.
       // Inventario: SOLO LECTURA, como referencia para Aircraft Shopping.
       // Si falla o no hay sesión abierta, la sección funciona igual en modo manual.
       try{
@@ -2584,7 +2604,7 @@ function vjStatusView(){
   // Fuente real = Supabase, correlacionada con el avión actual (D14/D15) —
   // ver triggerHotoSummaryLoad.
   triggerHotoSummaryLoad();
-  const hoToChecks=S._hotoSummaryLoaded?(S.hotoSummaryRec?.daily_duties||{}):JSON.parse(localStorage.getItem('vj_hoto_checks')||'{}');
+  const hoToChecks=S._hotoSummaryLoaded?(S.hotoSummaryRec?.daily_duties||{}):{};   // D34: nunca los ticks sin matrícula de localStorage
   const allHotoItems=VJ_HOTO_SECTIONS.flatMap(s=>s.items);
   const hotoDone=allHotoItems.filter(i=>hoToChecks[i.id]).length;
   const hotoTotal=allHotoItems.length;
@@ -2690,6 +2710,7 @@ async function hotoCreate(){
   const pattern=document.getElementById('hoto-new-pattern')?.value||null;
   const noPrior=document.getElementById('hoto-new-noprior')?.checked;
   if(!tail){ alert('Introduce la matrícula.'); return; }
+  if(!confirmTailMismatch(tail,'HOTO')) return;
   try{
     await hotoSvc.createHoto({ tail_number:tail, icao, pattern, has_prior_hoto:!noPrior });
     await hotoReload();
@@ -2769,7 +2790,7 @@ function hotoImportCancel(){
 // No-optimista: guarda en Supabase PRIMERO; la UI solo refleja el valor tras éxito.
 // Si falla, revierte (el estado no cambió) y muestra el error.
 async function hotoField(field,value){
-  if(!S.hotoRec) return;
+  if(!assertCurrentAircraft(S.hotoRec,'HOTO')) return;
   const val=value===''?null:value;
   try{
     await hotoSvc.updateHoto(S.hotoRec.id,{ [field]:val });
@@ -2783,7 +2804,8 @@ async function hotoField(field,value){
 async function hotoAddItem(section){
   const input=document.getElementById('hoto-add-'+section);
   const content=(input?.value||'').trim();
-  if(!content||!S.hotoRec) return;
+  if(!content) return;
+  if(!assertCurrentAircraft(S.hotoRec,'HOTO')) return;
   try{
     await hotoSvc.addItem(S.hotoRec.id,section,content);
     S.hotoItems=await hotoSvc.loadItems(S.hotoRec.id);
@@ -2892,6 +2914,7 @@ function hotoCareArr(){
 }
 
 async function hotoCareSave(arr){
+  if(!assertCurrentAircraft(S.hotoRec,'HOTO')) return;
   try{
     await hotoSvc.updateHoto(S.hotoRec.id,{cabin_care:arr});  // guarda primero
     S.hotoRec.cabin_care=arr;                                  // estado solo tras éxito
@@ -2976,7 +2999,7 @@ function hotoInvRef(item){
 function hotoShopToggle(i){ S.hotoShopOpen=S.hotoShopOpen===i?null:i; render(); }
 
 async function hotoShopSet(key,val){
-  if(!S.hotoRec) return;
+  if(!assertCurrentAircraft(S.hotoRec,'HOTO')) return;
   const shopping={...(S.hotoRec.shopping||{})};
   if(val==null||String(val).trim()==='') delete shopping[key];
   else shopping[key]=String(val).trim();
@@ -3035,7 +3058,7 @@ function hotoSecHead(text,kind){
 // Reset por sección: borra SOLO esa sección de ESTE HOTO, con confirmación.
 // Nunca toca el resto del HOTO, ni Inventario, ni ninguna otra tabla.
 async function hotoResetSection(kind){
-  if(!S.hotoRec) return;
+  if(!assertCurrentAircraft(S.hotoRec,'HOTO')) return;
   const names={shopping:'Fresh / Shopping',magazines:'Magazines',care:'Cabin Care (fechas)',defect:'Defects',comment:'Additional Comments',offload:'Offload'};
   if(!confirm(`¿Reiniciar la sección "${names[kind]||kind}"?\n\nSolo se borra esa sección de este HOTO. Nada más.`)) return;
   try{
@@ -3072,6 +3095,7 @@ async function hotoResetSection(kind){
 function hotoMagsList(){ return Array.isArray(S.hotoRec?.shopping?.magazines_list)?S.hotoRec.shopping.magazines_list:[]; }
 
 async function hotoMagsSave(list){
+  if(!assertCurrentAircraft(S.hotoRec,'HOTO')) return;
   const shopping={...(S.hotoRec.shopping||{}),magazines_list:list};
   try{
     await hotoSvc.updateHoto(S.hotoRec.id,{shopping});   // guarda primero
@@ -3116,6 +3140,7 @@ async function hotoMagDel(i){
 }
 
 async function hotoMagDropLegacy(){
+  if(!assertCurrentAircraft(S.hotoRec,'HOTO')) return;
   const shopping={...(S.hotoRec.shopping||{})};
   delete shopping.magazines;
   S.hotoRec.shopping=shopping;
@@ -3237,6 +3262,41 @@ async function refreshVjContext(){
 // consultar Supabase). Flag independiente de S._hotoLoaded (el de la pantalla
 // viva, que además dispara la migración local→Supabase una sola vez) para no
 // interferir con esa lógica.
+// ── Guarda de entidad para ESCRITURAS aircraft-scoped (D34) ─────────────────
+//
+// D14/D15 arreglaron la LECTURA: cada query correlaciona por matrícula y
+// refreshVjContext() invalida lo que ya estuviera en memoria al cambiar de
+// avión. Pero refreshVjContext() solo se dispara al NAVEGAR (`go()`), y las
+// escrituras del HOTO y de Laundry apuntan a `S.hotoRec.id` / `S.llcRec.id`,
+// un id que se resolvió cuando se abrió la pantalla.
+//
+// El hueco real: Estefanía está en la pantalla del HOTO, le dice a Isabel por
+// Telegram "ahora estoy en otro avión", vuelve a LIFEOS —sin navegar, la
+// pantalla ya estaba abierta— y sigue escribiendo. Cada tick, cada defecto,
+// cada campo se guarda en el HOTO del avión ANTERIOR. Ninguna corrección de
+// query lo impide, porque no hay ninguna query de por medio.
+//
+// Dos capas, ambas necesarias:
+//   1. esta guarda, que compara el sujeto del registro en memoria contra el
+//      avión actual ANTES de escribir, y se niega si no coinciden;
+//   2. el refresco al volver a la pestaña (abajo), que es lo que hace que el
+//      avión actual esté al día sin necesidad de navegar.
+function assertCurrentAircraft(rec, label){
+  const current=S.vjState?.aircraft||null;
+  const owner=rec?.tail_number||null;
+  if(!rec) return false;
+  if(current&&owner&&owner!==current){
+    alert(`No lo guardo: este ${label} es de ${owner} y tu avión actual es ${current}.\n\nRefresco la pantalla con el avión correcto.`);
+    S._hotoLoaded=false; S.hotoRec=null; S.hotoItems=null;
+    S._llcLoaded=false; S.llcRec=null;
+    S._hotoSummaryLoaded=false; S.hotoSummaryRec=null;
+    S._readiLoaded=false; S.vjReadiness=null;
+    refreshVjContext();
+    return false;
+  }
+  return true;
+}
+
 function triggerHotoSummaryLoad(){
   if(S._hotoSummaryLoaded) return;
   S._hotoSummaryLoaded=true;
@@ -4016,6 +4076,7 @@ async function invCreateSession() {
 
   if (!reg) { alert('Introduce la matrícula'); return; }
   if (!_invParsedItems.length) { alert('Sube un archivo Excel válido primero'); return; }
+  if (!confirmTailMismatch(reg,'inventario')) return;
 
   try {
     // Subir Excel original a Supabase Storage antes de crear la sesión
@@ -4163,3 +4224,15 @@ Object.assign(window, {
 });
 
 window.addEventListener('load', showPin);
+
+// Segunda capa de la guarda de entidad (D34): hasta ahora `vj_state` solo se
+// refrescaba al NAVEGAR a VistaJet (`go()`), así que una pantalla ya abierta
+// podía quedarse indefinidamente con el avión anterior. El caso real es
+// justo ese: responder a Isabel por Telegram y volver a la app sin navegar.
+// Volver a la pestaña es la señal natural de "puede haber pasado algo fuera".
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  const inVJ = (S.view === 'area' && S.areas.find(a => a.id === S.areaId)?.name === 'VistaJet')
+    || VJ_SUBVIEWS.includes(S.view);
+  if (inVJ) refreshVjContext();
+});
