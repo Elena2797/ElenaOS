@@ -1,78 +1,71 @@
-Estado: parcial (real ≠ objetivo, ver ambas secciones)
-Última verificación: 2026-07-10
-Verificado en: lectura de código en isabel-api/src/index.js, life-os-app/src/main.js, ARQUITECTURA_FUSION.md (raíz)
-Fuente de verdad de datos: DATA_MODEL.md
+Estado: implementado y verificado
+Última verificación: 2026-08-08
+Fuente de verdad de datos: `DATA_MODEL.md`
 
-# ARCHITECTURE.md — Cómo está construido, y cómo debería estar
+# Arquitectura real de LIFEOS
 
-Este documento tiene dos secciones deliberadamente separadas. No las mezcles: la primera es lo que existe hoy, verificado; la segunda es la dirección declarada, no implementada en su mayoría.
+LIFEOS es un sistema operativo personal con una sola Isabel, una memoria operacional compartida y especialistas de dominio. El modelo es infraestructura reemplazable; no es la identidad ni la fuente de verdad.
 
-Para la filosofía completa detrás de la arquitectura objetivo, ver `ISABEL_CORE.md` (raíz del proyecto, "la constitución") y `MASTER_PLAN.md` (raíz). Este documento no repite esa prosa — la traduce a estado verificable.
-
----
-
-## 1. Arquitectura REAL (verificada)
-
-```
-Estefanía
-   │
-   ├── life-os-app (Vercel)          ← frontend, Vite + vanilla JS, 3446 líneas en main.js
-   │      │
-   │      ├── lee/escribe Supabase directamente (services/db.js, inventory.js, hoto.js, readiness.js)
-   │      │      → NO pasa por ningún backend para el CRUD genérico ni para leer HOTO/Inventario
-   │      │
-   │      └── chat conversacional → bridge local (isabel.js) → agente Python en su PC
-   │             (requiere "Arrancar Isabel.bat"; ver core/ISABEL_CHANNELS.md)
-   │
-   └── isabel-api (Railway)          ← backend Express, usado SOLO para:
-          │                             - parseo de mensajes de inventario (/v1/message)
-          │                             - exportación Excel de inventario (/v1/session/:id/export)
-          │                             - exportación PDF de HOTO (/v1/hoto/:id/export)
-          │
-          └── lee/escribe Supabase con service_role key
-
-Supabase (cllubptdwydifomlnxds) — única base de datos, RLS desactivado
+```text
+Telegram ───────────────┐
+                       ├─> OpenClaw / agente main ──MCP──┐
+LIFEOS / pestaña Isabel┘                                │
+                                                        v
+LIFEOS UI ───────> isabel-api / Isabel Core ───────> Supabase
+   │                      │
+   └── CRUD directo ──────┘
+                          │
+                          └── Model Router ──> adapter Anthropic (hoy)
 ```
 
-**Puntos clave verificados:**
-- El frontend **no tiene un backend intermedio para su CRUD genérico** (áreas, tareas, decisiones, finanzas). Habla directamente con Supabase usando la anon key.
-- isabel-api es un **microservicio especializado**, no un backend general — solo entra en juego para inventario y HOTO, y específicamente para lo que requiere lógica de servidor (parseo de lenguaje natural, generación de Excel/PDF).
-- El "cerebro conversacional" real (`openChat()`) no pasa por isabel-api en absoluto hoy — pasa por un bridge que apunta a un proceso que corre en el ordenador local de Estefanía.
-- Hay código para una arquitectura de "Isabel Core como orquestador único" (`isabel-api/src/core/`), pero no está conectado (ver `core/ISABEL_CHANNELS.md`).
+## Responsabilidades
 
-## 2. Arquitectura OBJETIVO (declarada, mayormente no implementada)
+- `life-os-app`: representa estado y permite acciones. No decide prioridad, proveedor ni modelo.
+- `isabel-api`: reglas, Priority Engine global, especialistas, Interventions, delivery, herramientas MCP, exportaciones y llamadas directas a modelos.
+- `isabel-gateway`: OpenClaw, sesiones, canal Telegram, cron y conversación de Isabel. Se comunica con `isabel-api` por MCP y con la pestaña Isabel mediante un adaptador privado de superficie mínima.
+- Supabase: única memoria operacional compartida.
 
-Fuente: `ARQUITECTURA_FUSION.md` (raíz, 2026-07-07), `ISABEL_CORE.md` (raíz, "constitución").
+## Model Router de isabel-api
 
-```
-Usuario (lenguaje natural)
-        ↓
-LIFEOS UI (única superficie)
-        ↓
-🧠 Isabel Core — un solo Claude, memoria y contexto transversal
-        ↓
-Tool Router — detecta módulo destino
-        ↓
-┌──────────────┬──────────────┬──────────────┬──────────────┐
-│ VJ Inventory │ VJ HOTO      │ Finance      │ + futuros    │
-│ (isabel-api) │ (isabel-api) │ (LIFEOS db)  │              │
-└──────────────┴──────────────┴──────────────┴──────────────┘
-        ↓
-Supabase — única fuente de verdad, sin doble escritura
-```
+La interfaz separa cuatro conceptos:
 
-**Principios de esta arquitectura objetivo** (de `ISABEL_CORE.md`): Isabel Core coordina, no centraliza toda la inteligencia — la inteligencia de dominio pertenece a los especialistas (isabel-api para inventario/HOTO). Cada tabla tiene un único propietario que escribe en ella.
+1. el consumidor declara `task`;
+2. pide una `capability`;
+3. el router elige una ruta ordenada;
+4. un adapter traduce el contrato neutral al proveedor.
 
-**Plan de fases documentado en `ARQUITECTURA_FUSION.md`** (ninguna fase posterior a la 0 está completa, según verificación de esta auditoría):
-- Fase 0 (prerrequisitos): ✅ hecho — isabel-api en Railway, parser funcionando.
-- Fase 1 (`/v1/tools/invoke` en isabel-api): código de core/ existe pero **no montado**, no verificable como completa.
-- Fases 2-5: no hay evidencia de implementación.
+El contrato normalizado incluye mensajes, instrucciones, tools, salida estructurada y metadatos de sensibilidad; la respuesta incluye contenido, datos estructurados, tool calls, proveedor, modelo, tokens, caché, latencia, coste declarado/estimado, finish reason y metadatos de fallback. Si no hay ruta o fallan todas, lanza un error tipado y no fabrica contenido.
 
-## 3. Por qué existe la brecha
+### Consumidores activos
 
-No es negligencia — es orden de prioridades. Cada sesión de desarrollo reciente se centró en que un módulo concreto (Inventario, luego HOTO) funcionara de punta a punta con datos reales para una entrega real, en vez de en la orquestación general. Es una decisión implícita razonable, pero significa que la arquitectura objetivo lleva desde 2026-07-07 sin avanzar en su plan de fases.
+| Consumidor | Capability | Runtime | Modelo actual (sin cambio) |
+|---|---|---|---|
+| Conversación Isabel | `agent_conversation` | OpenClaw | Claude Sonnet 4.6 |
+| `/v1/now` | `structured_generation` | isabel-api | Claude Haiku 4.5 |
+| Inventario intent | `structured_extraction` | isabel-api | Claude Haiku 4.5 |
+| Gym ambiguity fallback | `structured_extraction` | isabel-api | Claude Haiku 4.5 |
 
-## 4. Qué NO está aquí
-- Columnas y relaciones exactas → [DATA_MODEL.md](DATA_MODEL.md)
-- Detalle de cada canal de Isabel → [core/ISABEL_CHANNELS.md](core/ISABEL_CHANNELS.md)
-- Detalle de cada módulo → [modules/](modules/)
+Los consumidores de isabel-api no contienen nombres de proveedor o modelo. La única configuración directa vive en `src/core/models/index.js`; el SDK está encapsulado en `src/core/models/providers/anthropic.js`.
+
+`src/core/intentRouter.js`, `src/core/generalHandler.js`, `life-os-app/api/chat.js` y `lifeos-agent` conservan integraciones históricas no activas. No se migraron porque no están montadas en el runtime productivo.
+
+## Fallback y coste
+
+Cada capability tiene una cadena ordenada de rutas. Hoy contiene una sola ruta real; el contrato ya representa intentos, motivo y uso de fallback. Añadir un proveedor futuro consiste en añadir un adapter y una entrada de configuración, sin tocar especialistas ni frontend.
+
+`aiUsage` registra proveedor, modelo, capability/task, tokens, caché, latencia, éxito/error y fallback. El coste reportado por el proveedor tiene prioridad; una estimación se marca como `estimated_price_table`; sin datos no se inventa coste.
+
+El guardarraíl de coste vive en el router: cada intento pasa por `countLlmCall()`. Por eso `runWithoutAI()` sigue bloqueando cualquier modelo durante un tick silencioso, incluso si en el futuro se registra otro proveedor.
+
+## OpenClaw: segundo plano de ejecución, no segundo cerebro
+
+OpenClaw conserva su propia configuración de modelo porque ejecuta conversación, sesiones y tools. LIFEOS no envuelve al agente dentro del router directo: ambos planos comparten política por capacidades y observabilidad, pero evitan dos routers anidados que puedan contradecirse.
+
+OpenClaw soporta referencias `provider/model` y fallbacks ordenados en `agents.defaults.model.fallbacks`; primero rota perfiles de autenticación y después avanza por la lista de modelos. Está documentado, pero no se ha activado ni cambiado en esta tanda:
+
+- https://docs.openclaw.ai/concepts/model-providers
+- https://docs.openclaw.ai/model-failover
+
+## Benchmark
+
+`isabel-api/benchmarks/model-router/` contiene un harness neutral y 15 fixtures anonimizados A–O. La validación por defecto cuesta $0 y no llama a ningún modelo. La comparación real de proveedores requiere inyectar de forma explícita un runner autorizado.

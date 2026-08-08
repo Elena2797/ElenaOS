@@ -14,8 +14,8 @@ Verificado el 2026-08-02: el proyecto `cllubptdwydifomlnxds` estuvo pausado, y e
 ### `loadAll()` solo trata `ctx`/`areas` como críticos — las otras 11 tablas se degradan a vacío en silencio
 `reload()` (`src/main.js`) dispara el banner de error solo si fallan `life_context` o `areas` — el resto (`tasks`, `waiting_for`, `decisions`, `metrics`, `operators`, `transactions`, `vj_state`, `vj_tasks`, `projects`, `eventos`, `alertas`) sigue coercionando `data:null` a `[]` sin avisar si fallan individualmente. Decisión consciente de alcance mínimo (esas dos son las que producían el síntoma reportado por la usuaria), no un descuido — pero significa que un fallo parcial en, por ejemplo, `alertas` seguiría siendo invisible.
 
-### "Gym" existía en la tabla `areas`, con `gymView()` completo, pero nunca aparecía en Dominios — RESUELTO 2026-08-07
-Confirmado el 2026-08-07 (auditoría de frontend, `DECISIONS.md` D18): no era una decisión de producto, era un bug — `visibleDomains()` (`src/main.js`) filtraba por una lista fija de 6 nombres sin "Gym", pese a que `gymView()` (sesiones, pesos de referencia, restricciones) ya estaba completamente implementado y `regSesion()` ya escribía en `metrics` correctamente. El dominio entero era inalcanzable desde la UI, código funcional pero muerto en la práctica. Corregido añadiendo `'Gym'` a `visibleDomains()`, `domainBlueprint()` y `domainSignal()`; verificado en navegador contra datos reales de producción (sesión real "1/2", tarea real de Gym visible, sin errores de consola).
+### Gym visible pero con dos fuentes de verdad — RESUELTO 2026-08-08
+La primera corrección hizo visible Gym, pero la tarjeta de Dominios siguió leyendo `metrics.sesiones_semana` y mostrando `/2`, mientras la vista Gym ya representaba `GET /v1/gym/state` y `metrics.target`. Corregido: Home/Dominios cargan el estado Core, usan `week.strength` + `target_sessions`, y declaran dato no disponible cuando Core no responde. `regSesion()` y su export global se retiraron después de demostrar que no tenían consumidores. Pruebas del frontend: 10/10; build Vite completo.
 
 ## Arquitectura
 
@@ -130,8 +130,8 @@ Anteriores al contrato universal de señales (D33): leen `vj_state`, `vj_tasks` 
 ### Dos claves de localStorage se leen pero nadie las escribe
 `life_budgets` (presupuestos de Finanzas) y `vj_bag_templates` (plantillas de maleta) se leen al arrancar y no tienen ningun punto de escritura en el codigo actual: en la practica los presupuestos siempre salen vacios y las plantillas son siempre las constantes por defecto. **No se han borrado a proposito**, a diferencia del write de `vj_hoto_checks` que si se retiro (D34): aquellas lecturas son inocuas —nunca muestran datos de otra entidad— y borrarlas podria descartar en silencio datos que una version anterior si escribiera. Deuda cosmetica, no un riesgo de correccion.
 
-### El ciclo de Interventions no tiene disparador periódico
-`POST /v1/interventions/cycle` funciona, es idempotente y está verificado de punta a punta, pero **hoy solo corre a mano**. La vía limpia ya está investigada: un cron de OpenClaw con **payload de comando** (`--command`), que ejecuta un script en el host del Gateway **sin turno de agente** y entrega su stdout por `announce`; un comando que imprime solo `NO_REPLY` no publica nada. Crear cron exige `operator.admin`, bloqueado por CLI pero alcanzable por `POST /tools/invoke` desde dentro del contenedor. No se ha creado porque es una automatización nueva que empezaría a escribir a Telegram sola — requiere autorización explícita.
+### El ciclo general de Interventions tiene disparador periódico — RESUELTO (D41)
+`proactive-tick-15m` corre en el Gateway productivo con payload de comando, `delivery:none` y `NO_REPLY`. No crea un turno de agente; el delivery es la única vía de notificación. El guardarraíl `runWithoutAI()` bloquea cualquier intento de modelo dentro del tick y las mediciones de producción confirman coste $0 en silencio.
 
 ### Restos abiertos de otro avión: se declaran, no se cierran solos
 Hoy hay **2 sesiones de inventario abiertas de 9H-VCQ** mientras el avión actual es D-AFBS. Desde D34 el sistema lo dice (señal `stale_open_context`, severidad `actionable`) en vez de callarlo — antes solo se manifestaban como trampas para las rutas que se olvidaban de correlacionar. **No se cierran automáticamente a propósito**: cerrar una sesión es irreversible en este modelo y hacerlo solo sería inferir que la rotación anterior terminó. Es una decisión de la usuaria.
@@ -154,8 +154,11 @@ No incluye `VITE_ISABEL_API_URL` ni `VITE_ISABEL_KEY`, que sí se usan en produc
 
 ## Infraestructura / deploy
 
-### Un quinto servicio desplegado y huérfano (`faithful-light`), redesplegándose con cada push a `isabel-api`
-Encontrado el 2026-08-07. Es Isabel Core standalone (`src/core/index.js`), Online desde 2026-07-07, con dominio público y secretos de producción, y **nada lo consume**. Comparte repo y rama con `isabel-api`, así que se redespliega solo cada vez que se pushea el backend. Detalle completo y veredicto (ORPHANED) en [operations/GATEWAY_MIGRATION.md](operations/GATEWAY_MIGRATION.md); riesgo en [SECURITY.md](SECURITY.md) #11. Impacto práctico para cualquier sesión futura: **al leer el proyecto Railway `laudable-consideration` no asumir que todo lo que hay ahí está en uso**, y tener presente que un push a `isabel-api` despliega dos servicios, no uno.
+### `faithful-light` huérfano — MITIGADO REVERSIBLEMENTE 2026-08-08
+Confirmado otra vez sin consumidores ni tráfico HTTP en los 7 días previos. Su source GitHub se desconectó y el deployment se detuvo; no tiene dominio público. El servicio, variables y configuración siguen presentes para rollback. Un push a `isabel-api` ya no puede resucitarlo.
+
+### Gateway antiguo conservado como rollback con cron de sueño duplicado pendiente
+Telegram está deshabilitado y ningún runtime productivo depende del Gateway antiguo, pero su copia de `sleep-check-0800-madrid` permanece habilitada. La operación oficial `openclaw cron disable` exige elevar el device CLI a `operator.admin`; el entorno no autorizó conceder ese scope sin aprobación expresa de la usuaria. No se tocó SQLite ni se usó un RPC no soportado. Hasta resolverlo existen dos copias activas del cron de sueño, aunque solo el Gateway nuevo hace polling de Telegram.
 
 ### La red privada de Railway (IPv6) y el bind de OpenClaw (IPv4) son incompatibles sin adaptador
 Encontrado el 2026-08-07 migrando el Gateway. `<servicio>.railway.internal` resuelve **solo a IPv6**, y OpenClaw no puede escuchar en IPv6 fuera de loopback: `bind:"custom"` exige explícitamente una IPv4 (`requires a valid IPv4 customBindHost (got ::)`) y `bind:"lan"` abre solo `0.0.0.0`. Confirmado también contra la documentación vigente de OpenClaw — es diseño, no un límite de la versión instalada, así que actualizar no lo resuelve. Consecuencia: cualquier comunicación entre servicios Railway y un Gateway de OpenClaw necesita un adaptador IPv6→loopback (hay uno construido en `isabel-gateway/private-net-forwarder.mjs`, sin desplegar). Ver `operations/GATEWAY_MIGRATION.md` para la implicación de seguridad, que no es trivial.
@@ -176,4 +179,4 @@ Encontrado el 2026-08-07: el commit `37b0bb1` (señales de VistaJet) quedó `FAI
 Encontrado el 2026-08-03: con la región ya corregida, Railway seguía sin recoger el commit más nuevo de `isabel-api` — ni "Redeploy" ni "Latest deploy" ni re-seleccionar la rama en el dropdown lo resolvían (todos reconstruían el mismo commit viejo). Solo un `Disconnect` + `Connect Repo` completo del Source forzó una resincronización real. Ver `operations/RAILWAY.md`.
 
 ## Seguridad
-Ver [SECURITY.md](SECURITY.md) — no se duplica aquí, pero cuenta como deuda técnica activa (PIN hardcodeado, API key con fallback expuesto en el bundle, RLS desactivado, token de GitHub en texto plano, token de Telegram comprometido presente también en el perfil real de OpenClaw, `ANTHROPIC_API_KEY` expuesta en texto plano en chat el 2026-08-06). El riesgo de MCP sin autenticación ya se resolvió (2026-08-06).
+Ver [SECURITY.md](SECURITY.md). Las URLs Git locales ya están limpias y `faithful-light` está detenido sin autodespliegue. Siguen abiertos el PIN/API key visible en el bundle, RLS desactivado, la exposición histórica de tokens y la rotación pendiente de `ANTHROPIC_API_KEY`. MCP sin autenticación ya se resolvió.

@@ -1,5 +1,5 @@
 Estado: implementado (documenta riesgos reales, no un plan de mitigación)
-Última verificación: 2026-08-06
+Última verificación: 2026-08-08
 Verificado en: grep directo sobre isabel-api/src y life-os-app/src, lectura de .git/config; riesgo #5 confirmado en la práctica el 2026-08-02; riesgos #7 y #8 confirmados el 2026-08-05 durante la auditoría de OpenClaw; riesgo #7 resuelto y verificado en producción el 2026-08-06; riesgo #9 encontrado el 2026-08-06 durante el despliegue de isabel-gateway
 Fuente de verdad de datos: ninguna
 
@@ -21,10 +21,12 @@ Confirmado explícitamente en las migraciones (`ALTER TABLE ... DISABLE ROW LEVE
 ### 4. Service role key en el backend
 `isabel-api/.env` → `SUPABASE_SERVICE_KEY`. Correcto en cuanto a que vive solo en el servidor (Railway), no en el cliente. Pero dado que RLS está desactivado, la distinción entre anon key y service key deja de aportar aislamiento real — ambas llegan a los mismos datos.
 
-### 5. Token de GitHub en texto plano en el remoto de `life-os-app`
+### 5. Token de GitHub en URLs locales de remotos — MITIGADO 2026-08-08
 `.git/config` de `life-os-app` tiene el remoto configurado como `https://ghp_...@github.com/Elena2797/ElenaOS.git` — el token de acceso personal está en la URL, en texto plano, en un archivo que puede copiarse o compartirse sin darse cuenta (por ejemplo, al hacer backup de la carpeta `.git`).
 
 **Confirmado en la práctica el 2026-08-02:** el token vigente hasta entonces había caducado/sido revocado (bloqueaba el push con 401 Unauthorized). La usuaria generó uno nuevo y lo pegó en texto plano en una conversación de chat para poder desbloquear el push — así que, además del riesgo estructural ya descrito, ese token concreto debe tratarse como potencialmente expuesto por ese canal, independientemente de si sigue siendo válido. No se ha decidido ninguna mitigación (ver "Medidas pendientes" abajo).
+
+**Mitigación aplicada el 2026-08-08:** `isabel-api`, `life-os-app` y `lifeos-agent` usan ahora URLs HTTPS limpias, sin credenciales. Se guardó una copia local `.git/config.pre-clean-20260808` antes del cambio; Git Credential Manager autentica correctamente y se verificó acceso remoto. La exposición histórica del token no desaparece y su revocación/rotación sigue siendo decisión de la usuaria, pero ya no se propaga en cada lectura o copia de `.git/config`.
 
 ### 6. Sin autenticación de usuario
 No hay login, no hay sesiones de usuario, no hay JWT propio del sistema. Todo el acceso se basa en "quien tiene la URL y las claves". Es coherente con ser una app estrictamente personal de un solo usuario — pero significa que no hay ninguna capa que impida acceso si las claves se filtran.
@@ -41,19 +43,24 @@ Encontrado el 2026-08-06 vía `openclaw mcp doctor --probe`, que avisa explícit
 ### 9. `ANTHROPIC_API_KEY` real expuesta en texto plano en la salida de esta sesión de chat
 Encontrado el 2026-08-06, autoidentificado (no reportado por la usuaria): durante el debugging del despliegue de `isabel-gateway`, el valor real de `ANTHROPIC_API_KEY` apareció en texto plano dos veces en la salida de comandos de este chat — una vez vía un `env | grep ANTHROPIC` de diagnóstico, y otra vez en el eco de un comando fallido ("command not found") que incluía la clave sin querer. La clave sigue siendo la misma usada en producción por `isabel-api` y ahora también por `isabel-gateway` — no se ha rotado. Candidata a rotación; no se ha hecho porque requiere generar una clave nueva desde el dashboard de Anthropic y decidir con la usuaria, no es una acción unilateral de un chat. **Urgencia aumentada el 2026-08-06:** tras `DECISIONS.md` D11, esta misma clave dejó de ser solo la auth de `isabel-api` — es ahora también la única vía de auth de `isabel-gateway` (se abandonó el backend `claude-cli`), así que una exposición futura comprometería ambos servicios, no solo uno. Ver `NEXT_SESSION.md`.
 
-### 11. `faithful-light`: un servicio huérfano, con dominio público y secretos de producción, redesplegándose solo
+Reconfirmado el 2026-08-08: una consulta de variables de infraestructura imprimió valores sensibles en la salida de herramienta pese a que la intención era revisar únicamente nombres/configuración. No se copiaron a archivos ni documentación y no se reproducen aquí. Esto refuerza, no sustituye, la acción pendiente de rotar la clave.
+
+### 11. `faithful-light`: servicio huérfano — MITIGADO REVERSIBLEMENTE 2026-08-08
 Encontrado el 2026-08-07 auditando la topología de Railway para la migración del Gateway. En el proyecto `laudable-consideration` (el de `isabel-api`) hay un segundo servicio **Online**, `faithful-light`, que ejecuta `isabel-api/src/core/index.js` — **Isabel Core como servicio independiente**, precisamente la arquitectura que `DECISIONS.md` D9 descartó. Riesgos concretos:
 - Tiene **dominio público** (`faithful-light-production-3384.up.railway.app`) con `/v1/chat` y `/v1/now` respondiendo `401` — superficie autenticada expuesta a internet, sin propósito.
 - Tiene variables con **secretos reales de producción**: `ANTHROPIC_API_KEY`, `SUPABASE_SERVICE_KEY`, `ISABEL_CORE_API_KEY`, `INVENTORY_API_KEY`.
 - Se despliega desde el **mismo repo y rama** que `isabel-api` (`Elena2797/isabel-api`, `main`), así que **cada push a isabel-api lo redespliega** — su último deploy es un commit de esta misma sesión. Nadie lo estaba mirando.
 - Su `ISABEL_CORE_API_KEY` tiene el mismo patrón de fallback hardcodeado que el riesgo #2 (`core/config.js`: `process.env.ISABEL_CORE_API_KEY || 'isabel-core-2026'`).
 
-**Nada lo referencia** (cero ocurrencias en `life-os-app`, `isabel-api`, la config del Gateway y `/docs`, salvo la propia documentación de este hallazgo) y sus logs solo contienen líneas de arranque, ninguna petición servida — veredicto **ORPHANED**, ver `operations/GATEWAY_MIGRATION.md` para la auditoría completa. Además es relevante para la decisión de red privada del Gateway: mientras siga vivo, estaría dentro de la frontera de confianza del adaptador IPv6. Mitigación propuesta y **no ejecutada** (apagar un servicio Online es destructivo): detenerlo y quitarle el dominio, sin borrarlo, con rollback por `railway redeploy`.
+**Nada lo referencia** (cero ocurrencias en `life-os-app`, `isabel-api`, la config del Gateway y `/docs`, salvo la propia documentación de este hallazgo) y sus logs solo contienen líneas de arranque, ninguna petición servida — veredicto **ORPHANED**, ver `operations/GATEWAY_MIGRATION.md` para la auditoría completa. Además era relevante para la frontera de confianza del adaptador IPv6 mientras permanecía vivo. El estado anterior a la mitigación se preservó en un snapshot antes de detenerlo.
+
+**Mitigación aplicada:** se confirmó otra vez que no tuvo tráfico HTTP en los 7 días anteriores, que no tenía dominio público y que nadie lo referenciaba. Se desconectó su source GitHub —causa de que reviviera en cada push— y se detuvo el deployment con `railway down`. No se borraron servicio, variables ni configuración. Estado verificado: cero deployments activos, cero dominios y source `repo:null`. El rollback está documentado en el snapshot privado de esta tanda.
 
 ## Lo que NO se encontró (positivo)
 - No hay contraseñas ni secretos de terceros hardcodeados más allá de lo anterior.
 - Los documentos `.md` de raíz no contienen valores reales de claves.
 - No hay inyección SQL evidente — todo el acceso a Supabase pasa por el cliente oficial (`@supabase/supabase-js`) o por PostgREST vía HTTP con parámetros escapados.
 
-## Medidas pendientes (no implementadas, solo constancia)
-Ninguna medida de mitigación del resto de riesgos está implementada a día de hoy (el #7 ya se resolvió, ver arriba). No se lista un "plan" porque no se ha decidido ninguno — si se decide abordar algo de esto, la decisión debe registrarse en [DECISIONS.md](DECISIONS.md). El riesgo #9 (`ANTHROPIC_API_KEY` expuesta en texto plano en este chat) es el único con una acción concreta recomendada y todavía no tomada: rotarla desde el dashboard de Anthropic.
+## Medidas pendientes
+
+Los riesgos #5 y #11 tienen mitigaciones locales/reversibles aplicadas; #7 está resuelto. La exposición histórica de credenciales no se revoca limpiando una URL: la usuaria debe decidir rotación de los tokens afectados. La acción prioritaria sigue siendo rotar `ANTHROPIC_API_KEY` con el runbook `operations/ROTAR_ANTHROPIC_KEY.md`.

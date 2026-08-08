@@ -1,87 +1,46 @@
-Estado: implementado
-Última verificación: 2026-07-10
-Verificado en: package.json de ambos repos, vercel.json, .env.example, git remote -v
-Fuente de verdad de datos: ninguna
+Estado: implementado; un bloqueo operativo explícito en el cron rollback
+Última verificación: 2026-08-08
+Fuente de verdad: Git local/remoto y Railway production
 
-# INFRASTRUCTURE.md — Repos, entornos, comandos
+# Infraestructura real
 
 ## Repositorios
 
-| Repo | Ruta local | Remoto | Rol |
-|---|---|---|---|
-| `life-os-app` | `life-os-app/` | `github.com/Elena2797/ElenaOS` | Frontend — la app que usa Estefanía |
-| `isabel-api` | `isabel-api/` | `github.com/elena2797/isabel-api` | Backend — parser de inventario, exportador HOTO/Excel |
-| `lifeos-agent` | `lifeos-agent/` | no consultado en la auditoría | Bot de Telegram, independiente — ver [core/ISABEL_CHANNELS.md](core/ISABEL_CHANNELS.md) |
-
-La carpeta raíz `LIFE OS/` (que contiene a los tres) **no es un repositorio git**. Los documentos de visión/producto (`VISION.md`, `MODEL.md`, `ISABEL_CORE.md`, etc.) viven ahí sin control de versiones — cualquier edición a esos archivos no queda respaldada por git.
-
-## Despliegue
-
-| Repo | Plataforma | Config |
+| Repo | Remoto limpio | Rol |
 |---|---|---|
-| `life-os-app` | Vercel | `vercel.json`: `buildCommand: vite build`, `outputDirectory: dist` |
-| `isabel-api` | Railway | sin archivo de config explícito en el repo (configuración vive en el dashboard de Railway) |
-| `lifeos-agent` | Desconocido/no verificado | tiene `Procfile` (`worker: python agent.py`), formato típico de Heroku/Railway, pero no se confirmó si hay un deploy activo |
+| `life-os-app` | `https://github.com/Elena2797/ElenaOS.git` | frontend Vercel + documentación canónica |
+| `isabel-api` | `https://github.com/Elena2797/isabel-api.git` | backend Railway, Core, MCP y Model Router |
+| `isabel-gateway` | ninguno demostrado | OpenClaw + adaptador privado; riesgo de backup/versionado |
+| `lifeos-agent` | remoto limpio configurado | bot histórico detenido; no reactivar |
 
-URL de producción de isabel-api: `https://isabel-api-production.up.railway.app` (usada como fallback en `life-os-app/src/main.js`).
+Las URLs de `isabel-api`, `life-os-app` y `lifeos-agent` ya no contienen credenciales. Antes del cambio se guardó `.git/config.pre-clean-20260808`; Git Credential Manager autentica y `ls-remote` funciona. No se inventó remoto para `isabel-gateway`: el candidato esperado no existe.
 
-## Variables de entorno
+## Producción
 
-**`life-os-app`** (`.env.local`, no versionado; `.env.example` sí):
-```
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-```
-`.env.example` está **incompleto**: no incluye `VITE_ISABEL_API_URL` ni `VITE_ISABEL_KEY`, que sí se usan en `main.js` con fallback a producción. Deuda técnica menor — ver [KNOWN_PROBLEMS.md](KNOWN_PROBLEMS.md).
+### Proyecto Railway `laudable-consideration`
 
-**`isabel-api`** (`.env`, no versionado):
-```
-SUPABASE_URL=
-SUPABASE_SERVICE_KEY=
-PORT=
-ANTHROPIC_API_KEY=
-```
-No hay `.env.example` en este repo.
+- `isabel-api`: servicio productivo, fuente `Elena2797/isabel-api`, rama `main`.
+- `isabel-gateway`: Gateway productivo nuevo, volumen persistente, sin dominio público. Telegram, MCP, adaptador, cron proactivo y cron de sueño viven aquí.
+- `faithful-light`: confirmado huérfano; sin dominio público, sin deployment activo y con la fuente Git desconectada. El servicio y sus variables se conservan para rollback. Un push futuro a `isabel-api` ya no puede redesplegarlo automáticamente.
 
-**`lifeos-agent`** (`.env.example`):
-```
-TELEGRAM_TOKEN=
-AUTHORIZED_TELEGRAM_ID=
-ANTHROPIC_API_KEY=
-SUPABASE_URL=
-SUPABASE_KEY=
-GITHUB_TOKEN=
-GITHUB_REPO=
-```
+### Proyecto Railway antiguo `isabel-gateway`
 
-## Dependencias clave
+Conserva el Gateway anterior y su volumen como rollback. Telegram está deshabilitado y no hace polling. El servicio no se elimina. Su copia de `sleep-check-0800-madrid` sigue pendiente de desactivar porque la operación oficial requiere aprobar una elevación `operator.admin`; no se modificó SQLite ni se usó un atajo no soportado.
 
-**`isabel-api`**: express, @supabase/supabase-js, @anthropic-ai/sdk, @modelcontextprotocol/sdk, exceljs, pdf-lib, cors, dotenv, zod.
+## Crons del Gateway productivo nuevo
 
-**`life-os-app`**: vite + vite-plugin-pwa (dev), @supabase/supabase-js, xlsx.
+- `proactive-tick-15m`: comando determinista, `delivery:none`, nunca crea turno de agente.
+- `sleep-check-0800-madrid`: 08:00 Europe/Madrid, turno aislado y entrega Telegram.
 
-**`lifeos-agent`**: python-telegram-bot, anthropic, supabase, requests.
+El Gateway rollback contiene además una copia duplicada del cron de sueño hasta resolver el permiso anterior. Por tanto, no afirmar “exactamente un sleep cron” mientras siga pendiente.
 
-## Comandos de arranque local
+## Despliegue y redes
 
-```bash
-# isabel-api
-cd isabel-api && npm install && npm run dev     # node --watch, puerto según .env (default histórico 3002)
+- `life-os-app`: Vercel, `vite build`, salida `dist`.
+- `isabel-api`: Railway, dominio público autenticado `https://isabel-api-production.up.railway.app`.
+- `isabel-gateway`: Railway private networking IPv6; OpenClaw permanece en loopback y `gateway-adapter.mjs` expone solo chat/history/message/health con token separado.
+- Supabase: base de datos y Storage compartidos; RLS desactivado por la arquitectura personal actual.
 
-# life-os-app
-cd life-os-app && npm install && npm run dev    # vite, http://localhost:5173
+## Secretos
 
-# lifeos-agent
-cd lifeos-agent && pip install -r requirements.txt && python agent.py
-```
-
-## Servicios externos usados
-
-- **Supabase** (`cllubptdwydifomlnxds`): base de datos + Storage (buckets `inventory-templates`, `hoto-templates`).
-- **Anthropic API**: usada por `isabel-api` (parser de intención con Haiku), por `life-os-app/api/chat.js` (no conectado, ver ISABEL_CHANNELS.md), y por `lifeos-agent`.
-- **Railway**: hosting de `isabel-api`.
-- **Vercel**: hosting de `life-os-app`, incluye funciones serverless en `life-os-app/api/` (`chat.js`, `gmail-auth.js`, `gmail-callback.js`).
-- **Google OAuth (Gmail)**: credenciales configurables (`GOOGLE_CLIENT_ID`) pero sin ningún consumidor en el frontend — código sin conectar.
-
-## Dependencias locales que todavía existen
-- El chat conversacional real de `life-os-app` depende de que Estefanía ejecute `Arrancar Isabel.bat` en su propio ordenador (bridge local, ver ISABEL_CHANNELS.md) — no es un servicio en la nube.
+Nunca guardar valores en Git ni documentación. `ANTHROPIC_API_KEY` no se cambió; su rotación sigue pendiente de la usuaria. El snapshot de rollback del saneamiento registra identificadores y nombres de variables, nunca valores.

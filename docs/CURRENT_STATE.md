@@ -1,49 +1,60 @@
-Estado: este documento ES el estado — se reescribe en cada "Cerrar sesión de desarrollo" si algo cambió globalmente
+Estado: fotografía operativa vigente
 Última verificación: 2026-08-08
-Verificado en: (2ª tanda) delivery de Interventions verificado de punta a punta en producción; auditoría sistemática de correlación de entidad en VistaJet (D34), bucle de evaluación proactiva (D35), instrumentación real del consumo del agente (D36) y coherence pass (D37) — todo verificado contra producción real (curl, navegador móvil), no solo en local
 
-# CURRENT_STATE.md — Fotografía del proyecto, ahora
+# Estado actual de LIFEOS
 
-Una página. Solo 5 campos. Detalle de un módulo → `modules/*.md`. Handoff de la última sesión → `NEXT_SESSION.md`.
+## Estado general
 
-## Estado general del proyecto
-**La correlación de entidad ya no depende de que nadie se olvide.** Es el cambio de fondo de esta sesión. Las tres fugas entre aviones anteriores (D14, D15, D28) se encontraron por accidente; esta vez se recorrieron **todos** los caminos de lectura y escritura del dominio y aparecieron 14 hallazgos, varios vivos en producción — entre ellos que `/v1/confirm` resolvía la sesión de inventario **sin matrícula** (D28 arregló la propuesta y dejó la confirmación intacta), que 7 de las 9 señales de VistaJet no declaraban `subject` —así que `dropStaleSignals()` no protegía casi nada—, que ese `dropStaleSignals()` no se llamaba en ningún sitio fuera de los tests, y que la migración del checklist copiaba ticks **sin matrícula** al HOTO del avión actual, con destino el PDF oficial. La corrección es estructural: **omitir la matrícula ya no devuelve "el más reciente de cualquier avión", lanza**; el wildcard sigue existiendo pero hay que nombrarlo. Mismo principio que el índice único de D14.
+LIFEOS mantiene una sola Isabel, un Priority Engine global, especialistas deterministas y memoria operacional en Supabase. La dependencia estructural de las llamadas directas a Anthropic ya está desacoplada: `isabel-api` tiene un Model Router neutral por capacidades, fallback representable y observabilidad común. No se conectó ningún proveedor nuevo ni se cambió ningún modelo.
 
-**Y la pregunta de qué caduca al cambiar de avión tiene respuesta:** caduca la *presentación*, no el dato. Cerrar una sesión es irreversible y hacerlo solo sería inferir que la rotación anterior terminó. Lo que faltaba es que el sistema lo **diga** — la señal nueva `stale_open_context` destapó al instante las 2 sesiones abiertas de 9H-VCQ que llevaban desde julio siendo invisibles.
+## Producción
 
-**Existe ≠ merece atención ≠ merece interrumpirme.** El evaluador proactivo (`core/proactive.js`) añade el segundo salto, que es más estricto que el de D33: `attention_mode` responde "¿qué miro primero al abrir LIFEOS?" y casi siempre tiene respuesta; interrumpir es otra pregunta y su respuesta por defecto es NO. La puerta es 100 % determinista y cada "no" trae su motivo. **No se ha creado ningún cron nuevo ni se ha tocado el de sueño.**
+- `isabel-api` sirve el commit `70785564bec14acbc15b076817e4e1042535d277` con deployment Railway `SUCCESS`/`RUNNING`.
+- `life-os-app` sirve el commit `f366ff7b762dcb7659b13346e2c87b7c46c2b1b8`; el deployment Vercel figura `success`. El alias productivo responde 200 y el bundle contiene `/v1/gym/state`/`target_sessions`, sin `regSesion` ni `sesiones_semana`.
+- Gateway nuevo: Telegram configurado/conectado en polling, adaptador `/healthz` OK, MCP `lifeos: ok`, cron proactivo OK y `NO_REPLY`.
+- `faithful-light`: source Git desconectado, sin deployments activos y sin dominios; servicio/variables conservados para rollback.
+- Gateway antiguo: RUNNING como rollback, Telegram deshabilitado, sin dependencias productivas. Conserva el cron de sueño duplicado hasta aprobar el scope oficial necesario para desactivarlo.
 
-**Ya se sabe cuánto cuesta Isabel, con datos.** Los turnos del agente en OpenClaw son el **97,8 % del gasto** (1,288 $ de 1,317 $ en 30 días) — la hipótesis de partida, ahora medida. Para llegar ahí hubo que corregir dos cosas que habrían hecho inútil la instrumentación: el coste ignoraba la caché (un turno real "costaba" 0,00004 $ en vez de 0,087 $) y el barrido buscaba un campo `id` que no existe, reportando cero sobre 63 turnos reales sin fallar.
+## Model Router
 
-## Último deploy relevante
-Todo desplegado y verificado en producción. `isabel-api`: `/v1/now`, `/v1/proactive/evaluate`, `/v1/usage/sweep`, `/v1/usage/summary` respondiendo; las 9 señales de VistaJet con `subject`; `stale_open_context` activa con datos reales. `life-os-app` (Vercel): HTTP 200 con la coherence pass. `isabel-gateway`: adaptador con `POST /message/send` y `ensure-proactive-cron.mjs`; **dos crons vivos** (`proactive-tick-15m` y `sleep-check-0800-madrid`), Telegram con polling.
+Consumidores activos:
 
-## Último commit importante
-`isabel-api` — auditoría de correlación de entidad (D34), bucle proactivo + instrumentación (D35/D36), y el fix de `responseId` que hacía que el barrido no viera ni un turno. `life-os-app` — correlación en el frontend (D34), coherence pass (D37) y la tarjeta de preguntas pendientes (D38). `isabel-gateway` — la primitiva de entrega.
+- conversación Isabel: `agent_conversation`, OpenClaw, Sonnet 4.6;
+- `/v1/now`: `structured_generation`, router directo, Haiku 4.5;
+- Inventario: `structured_extraction`, router directo, Haiku 4.5;
+- Gym ambiguo: `structured_extraction`, router directo, Haiku 4.5.
 
-## Bloqueos actuales
-**Ninguno.** El bloqueante de crédito de Anthropic **está resuelto**: verificado esta sesión — `/v1/now` responde `status: ok` y `/v1/chat` devuelve respuesta real del agente. No volver a diagnosticarlo sin comprobarlo.
+Los consumidores ya no conocen proveedor/modelo. Anthropic vive en un adapter. Cada respuesta normaliza contenido, JSON, tool calls, provider/model, usage/caché, latencia, coste y fallback. Ausencia o fallo de provider termina con error tipado y sin respuesta inventada. La llamada productiva de `/v1/now` verificó el registro nuevo con provider, capability, task, tokens, latencia, éxito, fallback y coste marcado como estimación.
 
-Pendientes de acción de la usuaria, **no bloqueantes**: rotar `ANTHROPIC_API_KEY` (runbook en `operations/ROTAR_ANTHROPIC_KEY.md`) y abrir una sesión de inventario real para D-AFBS — sin ella no se puede cerrar la prueba de escritura de Inventario por la ruta unificada, y fabricar conteos corrompería datos. Hoy hay además **2 sesiones abiertas de 9H-VCQ** que el sistema ya declara (`stale_open_context`); cerrarlas es decisión suya, no automática.
+OpenClaw permanece como plano separado: soporta multi-provider/fallback nativo, documentado pero no activado. Sonnet, Haiku, `cacheRetention` y presupuestos proactivos siguen sin cambios.
 
-## LIFEOS ya se observa solo, y observar no cuesta dinero
-`proactive-tick-15m` corre **cada 15 minutos** en producción. Su resultado normal es no hacer nada, y eso está **medido, no razonado**: el delta de un tick silencioso es 0 en todo — registros Anthropic, turnos de agente, `cache_write`, tokens de entrada y de salida, y coste. Un barrido de control antes y después de tres ticks confirma **0 turnos de agente nuevos**.
+## Gym
 
-La garantía no es una convención: `core/aiGuard.js` la **arma**. La evaluación corre dentro de `runWithoutAI()` y cualquier llamada al modelo ahí lanza, así que `llm_invoked:false` es un hecho medido. El cron usa payload `command` (sin turno de agente) con `delivery:{mode:'none'}` e imprime `NO_REPLY`: **el cron no habla** — la única vía de notificación sigue siendo Intervention → delivery → tool `message`.
+Core decide y el frontend representa. Home, Dominios y Gym cargan `GET /v1/gym/state`; la tarjeta usa `week.strength` y `target_sessions`. Eliminados el contador legacy, `/2`, la función `regSesion()` y su referencia global huérfana.
 
-Con presupuesto de autonomía que falla cerrado (6 entregas/día, 1/hora, 0,30 $/día, 3 turnos/día) y **como mucho una interrupción por tick**, elegida por el motor de prioridad global.
+## Verificación
 
-## La cadena proactiva, ya cerrada
-`domain signals → global priority → proactive gate → INTERVENTION persistente → DELIVERY → canal → respuesta → apply → reevaluación`. La decisión pertenece al Core y el transporte al runtime: Telegram no sabe nada de dominios, los dominios no saben nada de Telegram, y **la sesión conversacional no es la base de datos** — el estado vive en `interventions`, así que nada depende de que el modelo recuerde haber preguntado. Entrega exactamente una vez, con el índice único que ya existía como candado. Verificado de punta a punta en producción con una Intervention de prueba limpiable.
+- Backend: 455/455 pruebas, 143 suites.
+- Frontend: 10/10 pruebas, 2 suites.
+- Benchmark: 15 casos A–O validados; $0, sin llamadas a modelo.
+- Build Vite: completo; advertencia existente de chunk grande, sin fallo.
+- Producción: `/health`, `/v1/now`, `/v1/gym/state`, `/v1/proactive/budget` responden 200.
+- No se envió ninguna notificación de prueba.
 
-Y la distinción que lo hace usable: **existe ≠ merece atención ≠ merece interrumpirme**. Una pregunta real pero no urgente (los restos abiertos de 9H-VCQ) se registra, se deduplica y **se ve en Home**, sin empujar nada a Telegram.
+La inspección visual automatizada de Home/Dominios/Gym/Isabel no pudo completarse porque el controlador de navegador de Codex falla por permisos de Windows antes de abrir la app. La compilación, las pruebas de presentación y el bundle productivo sí están verificados; no declarar QA visual manual completo.
 
-## Gym: la prueba de que la arquitectura generaliza
-Gym se añadió **sin tocar** el Priority Engine, el bucle proactivo, el delivery, la deduplicación, el cost tracking ni el cron. Lo único que el Core necesitó saber es **una línea** en el registro de specialists. Cero `if (domain === 'gym')`.
+## Coste actual medido
 
-Su sujeto es la **semana**, no un avión — y la invariante de entidad y la ventana temporal le aplican igual sin que el Core sepa qué es una semana. La captura por lenguaje natural se resuelve de forma determinista en los casos reales (*"hice pierna"*, *"upper + 20 min de cinta"*, *"hoy descanso"*, *"fui al gym pero no hice cardio"*): el modelo solo entra cuando el parser no puede concluir.
+Últimos 30 días registrados: **$2.716060**, 100 llamadas. Conversación: **$2.549703 (93,9%)**; light AI: **$0.166357 (6,1%)**. Mediana de contexto conversacional: **25.833 tokens**. La siguiente optimización debe atacar conversación/contexto, no microoptimizar las llamadas Haiku minoritarias.
 
-El check-in proactivo está **deliberadamente sin activar**. Se probó que la escalada funciona (con 0/2 y un día restante el Core subió Gym a `urgent` él solo) y se desactivó para no producir un aviso que la usuaria no ha pedido: primero el dominio, después el diseño de cuándo preguntar.
+## Bloqueos reales
 
-## Siguiente objetivo
-Ver `NEXT_SESSION.md`. En corto: acumular uso real antes de tocar `cacheRetention` o el modelo; investigar de qué se compone el contexto de ~25.800 tokens por turno; y diseñar, con datos de varias semanas, cuándo tiene sentido que Gym pregunte. La infraestructura horizontal se considera cerrada salvo bugs reales.
+1. Exactamente un sleep cron: falta desactivar el duplicado del Gateway antiguo. La CLI oficial exige aprobar `operator.admin`; no se concedió sin aprobación expresa y no se usó ningún atajo de SQLite.
+2. QA visual automatizado: bloqueado por el controlador del navegador de Codex. Requiere recuperar esa conexión o validación manual en el dispositivo.
+3. El sleep cron productivo está habilitado e intacto, pero su última ejecución registrada falló durante el incidente de saldo bajo. La API de modelos funciona ahora (`/v1/now status:ok`), pero no se disparó el cron manualmente para evitar una notificación o gasto de prueba.
+4. Rotar `ANTHROPIC_API_KEY` sigue pendiente de la usuaria.
+5. `isabel-gateway` continúa sin remoto demostrado.
+
+## Siguiente paso
+
+Ver `NEXT_SESSION.md`. No conectar proveedores hasta revisar esta tanda.

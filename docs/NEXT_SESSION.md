@@ -1,53 +1,60 @@
-Última actualización: 2026-08-08 (cuarta tanda) — handoff corto, no histórico acumulativo
+Última actualización: 2026-08-08 — handoff posterior al saneamiento y Model Router
 
-# NEXT_SESSION.md
+# Próxima sesión
 
-## Qué se terminó en esta sesión
-**D34–D43.** En esta última tanda: **coherence pass cerrada** y **Gym construido entero sobre la infraestructura horizontal**.
+## Primero: cerrar esta tanda
 
-La deuda que de verdad bloqueaba dominios nuevos no era que el Core leyera `vj_state`: era que la INGESTA de señales vivía dentro de un `if (domains['VistaJet'])` y consumía una clave `vistajet_signals`. Ahora es un **bus genérico** — `specialistRegistry.js` es el único sitio que nombra dominios, y añadir uno es una línea. El guardarraíl de deuda bajó de 12 a 9 y no puede volver a subir.
+1. Con aprobación explícita de la usuaria, aprobar el scope `operator.admin` del device CLI del Gateway rollback y ejecutar únicamente `openclaw cron disable 99fd7a3b-b571-4a4f-91e4-142688ba4a5f`. Verificar después: cron antiguo disabled; Gateway nuevo conserva sus dos jobs; exactamente un `sleep-check-0800-madrid` activo en toda la infraestructura. No eliminar el Gateway antiguo.
+2. Repetir QA visual de Home, Dominios, Gym e Isabel cuando el controlador de navegador funcione, o validarlo manualmente en el dispositivo. Limpiar service worker si se sirve un bundle anterior.
+3. Tras el próximo horario real de las 08:00, confirmar que el sleep cron nuevo deja atrás el error histórico de saldo sin forzarlo manualmente ni enviar una notificación de prueba.
 
-**Gym demostró el criterio**: se añadió sin tocar Priority Engine, bucle proactivo, delivery, dedup, cost tracking ni cron. Su sujeto es la semana; la invariante de entidad y la ventana temporal le aplican sin que el Core sepa qué es una semana. Captura por lenguaje natural determinista; el modelo solo entra cuando el parser no concluye.
+## Después: fase de investigación de proveedores
 
-## Qué quedó pendiente
-1. **`cacheRetention` y modelo del agente.** Medido: ~0,29 $ de 1,49 $ se iban en escribir caché que nunca se lee. Config de OpenClaw con trade-off real (afecta a las ráfagas conversacionales; el TTL largo de Anthropic cuesta ×2 escribir). Datos en `GET /v1/usage/analysis`. **Decisión de la usuaria.**
-2. **Investigar de qué se compone el contexto de ~25.800 tokens por turno** (§17): qué carga OpenClaw siempre, si hay skills/docs/tools innecesarias, y si las conversaciones consecutivas sí aprovechan caché. Cualquier recorte debe medirse antes/después.
-3. **2 sesiones abiertas de 9H-VCQ.** El sistema lo pregunta en Home con `push:false`. Cerrarlas es irreversible y sigue siendo acción suya desde Inventario.
-4. **Sesión de inventario para D-AFBS** — sin ella no se cierra la prueba de escritura de Inventario. **No fabricar conteos.**
-5. **Rotar `ANTHROPIC_API_KEY`** (runbook en `operations/ROTAR_ANTHROPIC_KEY.md`).
-6. **Barrido de consumo periódico**: `POST /v1/usage/sweep` solo corre a mano y tras cada turno de `/v1/chat`. Los turnos de Telegram solo se registran cuando alguien barre — candidato natural para engancharlo al tick (es determinista y no gasta IA).
-7. **`rotation_day`/`rotation_total` sin registrar**: mientras falten, la ventana temporal de VistaJet es `unknown` y ninguna señal escala. Es correcto (sin dato no se afirma urgencia), pero significa que la escalada por proximidad de entrega no se activará.
-8. Gateway antiguo y `faithful-light`: detenidos, conservados como rollback.
+No conectar nada todavía. Evaluar, con documentación y precios vigentes:
 
-## Qué debe hacerse inmediatamente después
-1. **Observar el loop unos días.** `GET /v1/proactive/budget` da el gasto de autonomía de hoy; los ticks con algo que contar quedan en `eventos` (`proactive:tick`). Antes de tocar umbrales, mirar qué hace.
-2. **Diseñar cuándo tiene sentido que Gym pregunte**, con datos reales de varias semanas: objetivo, días restantes, si ya entrenó hoy, ON/OFF, descanso declarado. La señal y la escalada ya existen; lo que falta es la política, y esa es decisión de producto.
-3. **Enganchar el barrido de consumo al tick** (pendiente 6): es determinista y no gasta IA, así que cabe dentro del bucle sin coste.
+- Anthropic;
+- OpenAI;
+- Google Gemini;
+- Moonshot/Kimi;
+- DeepSeek;
+- Alibaba Qwen;
+- Mistral;
+- xAI;
+- OpenRouter como agregador, no como centro obligatorio;
+- cualquier alternativa seria adicional.
 
-## Qué no debe romperse
-- **OBSERVAR ≠ USAR IA.** La evaluación proactiva corre dentro de `runWithoutAI()`: cualquier llamada al modelo ahí **lanza**. `llm_invoked:false` es un hecho medido. Si algún día un tick necesita IA, eso es una decisión de producto, no un detalle de implementación.
-- **El cron no habla.** Payload `command`, `delivery:{mode:'none'}`, `NO_REPLY`. La única vía de notificación es `Intervention → delivery → tool message`. Nunca stdout, nunca dos sistemas de entrega.
-- **Como mucho UNA interrupción por tick**, elegida por el motor de prioridad global. El resto sigue pending.
-- **El presupuesto falla cerrado.** Silencio antes que gasto descontrolado; nunca "arreglarse" gastando más.
-- **La sesión conversacional NO es la base de datos.** Nada puede depender de que el LLM recuerde haber preguntado: se resuelve por `domain`+`kind` contra Supabase.
-- **`chat.send` conversa, `message` entrega.** No unificarlas.
-- **Entrega exactamente una vez.** El reclamo es un INSERT directo, nunca `createIntervention()` (esa converge a propósito).
-- **Responder no ejecuta.** `applied:false` significa que no se hizo.
-- **Nunca operar con datos de otra entidad**, y **omitir la matrícula falla en alto**. Toda señal declara `subject`.
-- **`existe` ≠ `merece atención` ≠ `merece interrumpirme`.** `time_sensitive` no es `interrupt-now`.
-- **El Core no conoce dominios** (test de invariante). Añadir Gym no debe exigir un `if (gym)` en el Priority Engine.
-- **No tocar `sleep-check-0800-madrid`.** Funciona, tiene semántica exacta y convive con el tick general.
-- Un solo poller de Telegram. Secretos solo como variables de entorno. No reactivar `lifeos-agent`.
+Para cada candidato: modelos concretos, precio input/output/cache, tool calling, structured output, contexto, rate limits, privacidad, residencia/disponibilidad europea, estabilidad, términos y compatibilidad con OpenClaw.
 
-## Qué documentos debe leer el siguiente chat
-`README.md` → este documento → `CURRENT_STATE.md` → `DECISIONS.md` **D34–D43** → los cuatro contratos: `core/signals.js`, `core/proactive.js`, `core/delivery.js`, `core/proactiveTick.js` → `KNOWN_PROBLEMS.md` → `PRINCIPLES.md` #11 y #12.
+## Cómo ejecutar el benchmark
 
-## Trampas aprendidas (ahorran horas)
-- **Arrancar no es funcionar.** Un símbolo no importado dentro del cuerpo de un handler no lo detecta ni `node --check` ni el arranque: solo falla al invocarlo. Lo cazó producción.
-- **`cron.create` no existe; el método es `cron.add`.** Y el esquema usa `schedule.expr`/`schedule.tz`, no `expression`/`timezone`. Leerlo de un job existente en vez de adivinarlo.
-- **La tool `cron` no está expuesta en `/tools/invoke`** (la política de tools la filtra). La vía que queda es el WS del Gateway por loopback como `gateway-client`/`backend`.
-- **Un instrumento que devuelve cero no dice "no hay nada".** El barrido reportó `seen:0` sobre 63 turnos reales porque buscaba un campo `id` que no existe (es `responseId`).
-- **Convergencia ≠ exclusión mutua.** `createIntervention()` devuelve la fila ganadora ante un duplicado: correcto para una pregunta, catastrófico para un candado.
-- **`\b` no funciona con acentos**: `/^s[ií]\b/` no casa con "sí".
-- **Ignorar la caché al calcular coste** es la diferencia entre 0,00004 $ y 0,087 $ en el mismo turno.
-- Vite **no lee `PORT`**. Railway: `--skip-deploys` + `restart` no inyecta variables nuevas, hace falta `redeploy`.
+Usar `isabel-api/benchmarks/model-router/`. Primero fijar modelos y presupuesto máximo; después crear runners explícitos y ejecutar el mismo corpus A–O. Guardar respuestas reales y comparar:
+
+- calidad y español;
+- schema/tool use;
+- no alucinación;
+- contexto largo;
+- latencia p50/p95;
+- errores/rate limits/timeouts;
+- coste real o estimación marcada;
+- comportamiento de fallback.
+
+No publicar rankings sin ejecutar. No usar datos personales ni secretos en fixtures.
+
+## Prioridad económica
+
+El 93,9% del coste medido de 30 días es conversación OpenClaw y el contexto mediano es 25.833 tokens. La investigación debe empezar por un reemplazo/fallback conversacional barato y por entender/reducir contexto; las llamadas directas Haiku son solo el 6,1%.
+
+No cambiar aún Sonnet, Haiku, `cacheRetention` ni límites del proactive loop. Primero benchmark y decisión de la usuaria.
+
+## Invariantes
+
+- Una sola Isabel; proveedores no son agentes ni dominios.
+- Specialists piden capabilities, nunca nombres de modelos.
+- Frontend no decide modelo.
+- `runWithoutAI()` bloquea todo provider dentro del tick.
+- Sin provider o con fallo total: error explícito, nunca contenido inventado.
+- Coste reportado > estimación explícita > null; nunca inventar.
+- OpenClaw y el router directo son dos planos coordinados, no routers anidados.
+- `faithful-light` no se reconecta ni despliega sin una decisión explícita.
+- Gateway antiguo se conserva como rollback; no borrarlo.
+- No reactivar `lifeos-agent`.

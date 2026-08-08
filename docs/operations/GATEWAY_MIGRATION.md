@@ -1,9 +1,17 @@
-Estado: cutover COMPLETADO — Telegram y LIFEOS sobre el Gateway nuevo; Gateway antiguo detenido-reversible, pendiente de eliminación autorizada
-Última verificación: 2026-08-07
+Estado: cutover COMPLETADO — Gateway nuevo productivo; Gateway antiguo encendido como rollback, Telegram deshabilitado
+Última verificación: 2026-08-08
 Verificado en: `railway ssh` contra el contenedor real de `isabel-gateway`, `railway api` (GraphQL), backup lógico extraído y verificado localmente
 Fuente de verdad de datos: ninguna
 
 # operations/GATEWAY_MIGRATION.md — Mover isabel-gateway al proyecto de isabel-api
+
+## Estado post-saneamiento (2026-08-08, manda sobre la cronología inferior)
+
+- Gateway nuevo: productivo, Telegram polling sano, MCP sano, adaptador sano, `proactive-tick-15m` y `sleep-check-0800-madrid` intactos.
+- Gateway antiguo: servicio y volumen conservados como rollback; sigue RUNNING, pero `channels.telegram.enabled=false` y no hace polling. Ningún componente productivo lo referencia.
+- El Gateway antiguo conserva una copia habilitada de `sleep-check-0800-madrid`. Se intentó desactivar solo ese job con la CLI oficial, pero requiere elevar el device CLI a `operator.admin`. Sin aprobación explícita no se concedió el scope y no se tocó SQLite. Hasta resolverlo existen dos sleep crons activos en infraestructura.
+- `faithful-light`: ORPHANED reconfirmado; source GitHub desconectado, cero deployments activos y cero dominios. Servicio/variables conservados para rollback. Ya no puede resucitar con un push a `isabel-api`.
+- Snapshot seguro de rollback creado antes del cambio; contiene IDs y nombres de configuración, nunca valores secretos.
 
 ## Por qué
 Para que la pestaña Isabel de LIFEOS hable con el **mismo** agente `main` que Telegram, `isabel-api` tiene que poder alcanzar al Gateway sin exponerlo a internet. La única vía es el private networking de Railway, que **solo funciona entre servicios del mismo proyecto y environment** — y hoy están separados. Ver `DECISIONS.md` D23/D25.
@@ -73,7 +81,8 @@ Dos Gateways haciendo long-polling del mismo bot provocan `409 Conflict` y pérd
 - [x] Pestaña Isabel de LIFEOS migrada a `POST /v1/chat`; bridge local fuera del runtime
 - [x] **Cutover de Telegram completado** (ver abajo)
 - [x] Restart completo del nuevo: Telegram, cron, MCP, adaptador y `/v1/chat` sobreviven
-- [ ] Apagado/eliminación del Gateway antiguo ← requiere autorización explícita
+- [ ] Deshabilitar solo el cron de sueño duplicado del Gateway antiguo ← requiere aprobación explícita del scope administrativo oficial
+- [ ] Apagado/eliminación del Gateway antiguo ← fuera de alcance; requiere decisión explícita posterior
 
 ## Evidencia de la cadena completa (2026-08-07, producción real)
 
@@ -170,7 +179,7 @@ Es decir: **un adaptador que reenvíe cabeceras `X-Forwarded-*` conserva semánt
 
 **Veredicto: ORPHANED.** Está vivo y redesplegándose, pero nada lo consume. Riesgo real: expone secretos de producción y una superficie autenticada a internet, sin propósito, y — relevante para la decisión de arriba — estaría dentro de la frontera de confianza del adaptador de red privada.
 
-**Propuesta (no ejecutada):** *detenerlo*, no borrarlo. En Railway, quitar el dominio público y hacer `railway down` deja el servicio y su configuración intactos; el rollback es un `railway redeploy`. No se ha hecho nada: apagar un servicio Online es destructivo y requiere autorización explícita.
+**Mitigación ejecutada el 2026-08-08:** no tenía ya dominio público y no mostró tráfico HTTP en los 7 días anteriores. Se desconectó su source GitHub y se ejecutó `railway down`. Estado verificado: source `repo:null`, cero deployments activos y cero dominios. No se borraron variables ni servicio; el rollback sigue siendo un deployment manual y una reconexión de source solo si se decide recuperarlo.
 
 ## Lo que bloqueaba antes: el bind del Gateway (resuelto en lo posible)
 
