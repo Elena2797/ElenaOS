@@ -179,6 +179,7 @@ async function initApp() {
   render();
   loadPendingQuestions();
   loadIsabelNow(); // no bloquea el resto de la app — la tarjeta Isabel ya se pinta con el heurístico de cliente mientras esto resuelve
+  loadGymState(); // Home y Dominios representan la misma semana que la vista Gym
 }
 
 // ────── Gym — el estado semanal lo calcula el Core, no la vista ──────────
@@ -563,13 +564,12 @@ function domainSignal(area) {
   }
 
   if (name === 'Gym') {
-    const m = S.metrics.filter(x => x.area_id === area.id);
-    const ses = m.find(x => x.key === 'sesiones_semana');
-    const lastSession = m.find(x => x.key === 'last_session_date');
-    const sesVal = ses ? parseInt(ses.value) : 0;
-    const diasSinGym = lastSession ? Math.floor((Date.now() - new Date(lastSession.value)) / 864e5) : null;
-    if (diasSinGym !== null && diasSinGym > 7) return `${diasSinGym} días sin entrenar`;
-    return `${sesVal}/2 sesiones esta semana`;
+    const gym = S.gym;
+    if (!gym) return 'Consultando tu semana…';
+    if (gym.error || gym.known === false || !gym.week) return 'Estado semanal no disponible';
+    const target = Number.isFinite(gym.target_sessions) ? gym.target_sessions : null;
+    const progress = target ? `${gym.week.strength}/${target}` : String(gym.week.strength);
+    return `${progress} sesiones de fuerza esta semana`;
   }
 
   // Marca Personal, Vida Personal y resto
@@ -3769,18 +3769,6 @@ async function resetCannabis() {
   render();
 }
 
-async function regSesion() {
-  const a=S.areas.find(x=>x.name==='Gym');
-  if(!a) return;
-  const today=new Date().toISOString().slice(0,10);
-  const ses=S.metrics.find(x=>x.area_id===a.id&&x.key==='sesiones_semana');
-  let lastSes=S.metrics.find(x=>x.area_id===a.id&&x.key==='last_session_date');
-  if(ses){await dbSvc.updateMetric(ses.id,parseInt(ses.value)+1);ses.value=String(parseInt(ses.value)+1);}
-  if(lastSes){await dbSvc.updateMetric(lastSes.id,today);lastSes.value=today;}
-  else{const data=await dbSvc.createMetric({area_id:a.id,key:'last_session_date',value:today,label:'Última sesión',unit:''});if(data)S.metrics.push(data);}
-  render();
-}
-
 async function updateDolor(n) {
   const a=S.areas.find(x=>x.name==='Salud');
   if(!a) return;
@@ -4438,7 +4426,7 @@ Object.assign(window, {
   saveVjState, openVjState, saveVjStateForm,
   openAddVjTask, saveVjTask, toggleVjTask, deleteVjTask, clearDoneVjTasks,
   selectVjBag, toggleVjBagItem, resetVjBag,
-  setSueno, resetCannabis, regSesion, updateDolor,
+  setSueno, resetCannabis, updateDolor,
   addTask,
   updateTxCat, openBudgetEdit, saveBudgetVal, deleteBudget,
   openIngresoModal, openAddIngreso, saveAddIngreso,
