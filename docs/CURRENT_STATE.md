@@ -10,10 +10,10 @@ LIFEOS mantiene una sola Isabel, un Priority Engine global, especialistas determ
 ## Producción
 
 - `isabel-api` sirve el commit `70785564bec14acbc15b076817e4e1042535d277` con deployment Railway `SUCCESS`/`RUNNING`.
-- `life-os-app` sirve el commit `f366ff7b762dcb7659b13346e2c87b7c46c2b1b8`; el deployment Vercel figura `success`. El alias productivo responde 200 y el bundle contiene `/v1/gym/state`/`target_sessions`, sin `regSesion` ni `sesiones_semana`.
+- `life-os-app` sirve el commit `ebcbb7e19e0954aba4c1df2a4ae35ee9b54dbc7e`; el deployment Vercel figura `success`. El alias productivo responde 200 y el bundle contiene `/v1/gym/state`/`target_sessions`, sin `regSesion` ni `sesiones_semana`.
 - Gateway nuevo: Telegram configurado/conectado en polling, adaptador `/healthz` OK, MCP `lifeos: ok`, cron proactivo OK y `NO_REPLY`.
 - `faithful-light`: source Git desconectado, sin deployments activos y sin dominios; servicio/variables conservados para rollback.
-- Gateway antiguo: RUNNING como rollback, Telegram deshabilitado, sin dependencias productivas. Conserva el cron de sueño duplicado hasta aprobar el scope oficial necesario para desactivarlo.
+- Gateway antiguo: RUNNING como rollback, Telegram deshabilitado, sin dependencias productivas. Su copia de `sleep-check-0800-madrid` permanece conservada pero está deshabilitada.
 
 ## Model Router
 
@@ -49,11 +49,10 @@ La inspección visual automatizada de Home/Dominios/Gym/Isabel no pudo completar
 
 ## Bloqueos reales
 
-1. Exactamente un sleep cron: falta desactivar el duplicado del Gateway antiguo. La CLI oficial exige aprobar `operator.admin`; no se concedió sin aprobación expresa y no se usó ningún atajo de SQLite.
-2. QA visual automatizado: bloqueado por el controlador del navegador de Codex. Requiere recuperar esa conexión o validación manual en el dispositivo.
-3. El sleep cron productivo está habilitado e intacto, pero su última ejecución registrada falló durante el incidente de saldo bajo. La API de modelos funciona ahora (`/v1/now status:ok`), pero no se disparó el cron manualmente para evitar una notificación o gasto de prueba.
-4. Rotar `ANTHROPIC_API_KEY` sigue pendiente de la usuaria.
-5. `isabel-gateway` continúa sin remoto demostrado.
+1. QA visual automatizado: bloqueado por el controlador del navegador de Codex. Requiere recuperar esa conexión o validación manual en el dispositivo.
+2. El sleep cron productivo está habilitado e intacto, pero su última ejecución registrada falló durante el incidente de saldo bajo. La API de modelos funciona ahora (`/v1/now status:ok`), pero no se disparó el cron manualmente para evitar una notificación o gasto de prueba.
+3. Rotar `ANTHROPIC_API_KEY` sigue pendiente de la usuaria.
+4. `isabel-gateway` continúa sin remoto demostrado.
 
 ## Siguiente paso
 

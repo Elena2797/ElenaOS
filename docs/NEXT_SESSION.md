@@ -4,9 +4,8 @@
 
 ## Primero: cerrar esta tanda
 
-1. Con aprobación explícita de la usuaria, aprobar el scope `operator.admin` del device CLI del Gateway rollback y ejecutar únicamente `openclaw cron disable 99fd7a3b-b571-4a4f-91e4-142688ba4a5f`. Verificar después: cron antiguo disabled; Gateway nuevo conserva sus dos jobs; exactamente un `sleep-check-0800-madrid` activo en toda la infraestructura. No eliminar el Gateway antiguo.
-2. Repetir QA visual de Home, Dominios, Gym e Isabel cuando el controlador de navegador funcione, o validarlo manualmente en el dispositivo. Limpiar service worker si se sirve un bundle anterior.
-3. Tras el próximo horario real de las 08:00, confirmar que el sleep cron nuevo deja atrás el error histórico de saldo sin forzarlo manualmente ni enviar una notificación de prueba.
+1. Repetir QA visual de Home, Dominios, Gym e Isabel cuando el controlador de navegador funcione, o validarlo manualmente en el dispositivo. Limpiar service worker si se sirve un bundle anterior.
+2. Tras el próximo horario real de las 08:00, confirmar que el único sleep cron activo (Gateway nuevo) deja atrás el error histórico de saldo sin forzarlo manualmente ni enviar una notificación de prueba.
 
 ## Después: fase de investigación de proveedores
 
@@ -57,4 +56,5 @@ No cambiar aún Sonnet, Haiku, `cacheRetention` ni límites del proactive loop. 
 - OpenClaw y el router directo son dos planos coordinados, no routers anidados.
 - `faithful-light` no se reconecta ni despliega sin una decisión explícita.
 - Gateway antiguo se conserva como rollback; no borrarlo.
+- La copia de `sleep-check-0800-madrid` del Gateway antiguo debe permanecer deshabilitada; exactamente una copia activa vive en el Gateway nuevo.
 - No reactivar `lifeos-agent`.

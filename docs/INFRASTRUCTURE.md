@@ -1,4 +1,4 @@
-Estado: implementado; un bloqueo operativo explícito en el cron rollback
+Estado: implementado; saneamiento operativo completado
 Última verificación: 2026-08-08
 Fuente de verdad: Git local/remoto y Railway production
 
@@ -25,14 +25,14 @@ Las URLs de `isabel-api`, `life-os-app` y `lifeos-agent` ya no contienen credenc
 
 ### Proyecto Railway antiguo `isabel-gateway`
 
-Conserva el Gateway anterior y su volumen como rollback. Telegram está deshabilitado y no hace polling. El servicio no se elimina. Su copia de `sleep-check-0800-madrid` sigue pendiente de desactivar porque la operación oficial requiere aprobar una elevación `operator.admin`; no se modificó SQLite ni se usó un atajo no soportado.
+Conserva el Gateway anterior y su volumen como rollback. Telegram está deshabilitado y no hace polling. El servicio no se elimina. Su copia de `sleep-check-0800-madrid` permanece en el volumen pero está deshabilitada. La operación se aplicó por el RPC WebSocket oficial `cron.update` desde loopback, con autorización administrativa explícita de la usuaria; no se modificó SQLite.
 
 ## Crons del Gateway productivo nuevo
 
 - `proactive-tick-15m`: comando determinista, `delivery:none`, nunca crea turno de agente.
 - `sleep-check-0800-madrid`: 08:00 Europe/Madrid, turno aislado y entrega Telegram.
 
-El Gateway rollback contiene además una copia duplicada del cron de sueño hasta resolver el permiso anterior. Por tanto, no afirmar “exactamente un sleep cron” mientras siga pendiente.
+El Gateway rollback conserva una copia deshabilitada del cron de sueño. En toda la infraestructura existe exactamente una copia activa: la del Gateway productivo nuevo.
 
 ## Despliegue y redes
 

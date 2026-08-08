@@ -9,7 +9,7 @@ Fuente de verdad de datos: ninguna
 
 - Gateway nuevo: productivo, Telegram polling sano, MCP sano, adaptador sano, `proactive-tick-15m` y `sleep-check-0800-madrid` intactos.
 - Gateway antiguo: servicio y volumen conservados como rollback; sigue RUNNING, pero `channels.telegram.enabled=false` y no hace polling. Ningún componente productivo lo referencia.
-- El Gateway antiguo conserva una copia habilitada de `sleep-check-0800-madrid`. Se intentó desactivar solo ese job con la CLI oficial, pero requiere elevar el device CLI a `operator.admin`. Sin aprobación explícita no se concedió el scope y no se tocó SQLite. Hasta resolverlo existen dos sleep crons activos en infraestructura.
+- El Gateway antiguo conserva una copia deshabilitada de `sleep-check-0800-madrid`. Con autorización administrativa explícita se aplicó `cron.update` por el WebSocket oficial de loopback; no se tocó SQLite. Existe exactamente un sleep cron activo: el del Gateway nuevo.
 - `faithful-light`: ORPHANED reconfirmado; source GitHub desconectado, cero deployments activos y cero dominios. Servicio/variables conservados para rollback. Ya no puede resucitar con un push a `isabel-api`.
 - Snapshot seguro de rollback creado antes del cambio; contiene IDs y nombres de configuración, nunca valores secretos.
 
@@ -81,7 +81,7 @@ Dos Gateways haciendo long-polling del mismo bot provocan `409 Conflict` y pérd
 - [x] Pestaña Isabel de LIFEOS migrada a `POST /v1/chat`; bridge local fuera del runtime
 - [x] **Cutover de Telegram completado** (ver abajo)
 - [x] Restart completo del nuevo: Telegram, cron, MCP, adaptador y `/v1/chat` sobreviven
-- [ ] Deshabilitar solo el cron de sueño duplicado del Gateway antiguo ← requiere aprobación explícita del scope administrativo oficial
+- [x] Deshabilitar solo el cron de sueño duplicado del Gateway antiguo — job conservado con `enabled:false`, verificado tras autorización explícita
 - [ ] Apagado/eliminación del Gateway antiguo ← fuera de alcance; requiere decisión explícita posterior
 
 ## Evidencia de la cadena completa (2026-08-07, producción real)

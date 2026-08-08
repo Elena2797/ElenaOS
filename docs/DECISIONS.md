@@ -413,6 +413,6 @@ Entregar por `chat.send` habría hecho que **cada notificación costara un turno
 
 ### D45 — Saneamiento reversible antes de ampliar proveedores
 **Fecha:** 2026-08-08
-**Decisión:** `faithful-light` se detiene y desconecta de Git sin borrarlo; los remotos Git pasan a URLs limpias con backup previo; el Gateway antiguo se conserva como rollback; no se inventa remoto para `isabel-gateway`. Solo debe deshabilitarse su cron de sueño duplicado cuando el scope administrativo oficial sea aprobado explícitamente.
+**Decisión:** `faithful-light` se detiene y desconecta de Git sin borrarlo; los remotos Git pasan a URLs limpias con backup previo; el Gateway antiguo se conserva como rollback; no se inventa remoto para `isabel-gateway`. Su cron de sueño duplicado se deshabilita únicamente con autorización administrativa explícita.
 **Razón:** una abstracción multi-modelo sobre infraestructura que duplica cron, resucita servicios y filtra credenciales solo multiplica riesgos. Cada acción aplicada es reversible y su snapshot excluye secretos.
-**Estado:** parcial por un único bloqueo: el cron duplicado antiguo sigue habilitado hasta aprobar `operator.admin`. `faithful-light` sí quedó sin source, dominio ni deployment activo; las URLs Git afectadas quedaron limpias y funcionales.
+**Estado:** completado. La usuaria autorizó la operación administrativa y la copia antigua se deshabilitó mediante `cron.update` por el WebSocket oficial de loopback; el job y el Gateway no se eliminaron y SQLite no se modificó. El Gateway nuevo conserva intactos sus dos jobs y existe exactamente un sleep cron activo. `faithful-light` quedó sin source, dominio ni deployment activo; las URLs Git afectadas quedaron limpias y funcionales.
