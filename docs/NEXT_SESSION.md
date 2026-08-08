@@ -5,7 +5,7 @@
 ## Qué se terminó en esta sesión
 **D34–D43.** En esta última tanda: **coherence pass cerrada** y **Gym construido entero sobre la infraestructura horizontal**.
 
-La deuda que de verdad bloqueaba dominios nuevos no era que el Core leyera : era que la INGESTA de señales vivía dentro de un . Ahora es un **bus genérico** —  es el único sitio que nombra dominios y añadir uno es una línea. El guardarraíl de deuda bajó de 12 a 9 y no puede volver a subir.
+La deuda que de verdad bloqueaba dominios nuevos no era que el Core leyera `vj_state`: era que la INGESTA de señales vivía dentro de un `if (domains['VistaJet'])` y consumía una clave `vistajet_signals`. Ahora es un **bus genérico** — `specialistRegistry.js` es el único sitio que nombra dominios, y añadir uno es una línea. El guardarraíl de deuda bajó de 12 a 9 y no puede volver a subir.
 
 **Gym demostró el criterio**: se añadió sin tocar Priority Engine, bucle proactivo, delivery, dedup, cost tracking ni cron. Su sujeto es la semana; la invariante de entidad y la ventana temporal le aplican sin que el Core sepa qué es una semana. Captura por lenguaje natural determinista; el modelo solo entra cuando el parser no concluye.
 
@@ -21,8 +21,8 @@ La deuda que de verdad bloqueaba dominios nuevos no era que el Core leyera : era
 
 ## Qué debe hacerse inmediatamente después
 1. **Observar el loop unos días.** `GET /v1/proactive/budget` da el gasto de autonomía de hoy; los ticks con algo que contar quedan en `eventos` (`proactive:tick`). Antes de tocar umbrales, mirar qué hace.
-2. **Migrar los bloques de VistaJet/JETMI que aún viven en `globalContext.js`** al contrato universal, solo cuando exista reemplazo limpio vía specialist → signals. El test que impide que esa deuda crezca debe mantenerse.
-3. **Gym será la prueba real de que la arquitectura generaliza**: debería bastar con datos → specialist → señales, sin reconstruir cron, prioridad, delivery, dedup ni cost tracking. **Todavía no empezar.**
+2. **Diseñar cuándo tiene sentido que Gym pregunte**, con datos reales de varias semanas: objetivo, días restantes, si ya entrenó hoy, ON/OFF, descanso declarado. La señal y la escalada ya existen; lo que falta es la política, y esa es decisión de producto.
+3. **Enganchar el barrido de consumo al tick** (pendiente 6): es determinista y no gasta IA, así que cabe dentro del bucle sin coste.
 
 ## Qué no debe romperse
 - **OBSERVAR ≠ USAR IA.** La evaluación proactiva corre dentro de `runWithoutAI()`: cualquier llamada al modelo ahí **lanza**. `llm_invoked:false` es un hecho medido. Si algún día un tick necesita IA, eso es una decisión de producto, no un detalle de implementación.
@@ -40,7 +40,7 @@ La deuda que de verdad bloqueaba dominios nuevos no era que el Core leyera : era
 - Un solo poller de Telegram. Secretos solo como variables de entorno. No reactivar `lifeos-agent`.
 
 ## Qué documentos debe leer el siguiente chat
-`README.md` → este documento → `CURRENT_STATE.md` → `DECISIONS.md` **D34–D41** → los cuatro contratos: `core/signals.js`, `core/proactive.js`, `core/delivery.js`, `core/proactiveTick.js` → `KNOWN_PROBLEMS.md` → `PRINCIPLES.md` #11 y #12.
+`README.md` → este documento → `CURRENT_STATE.md` → `DECISIONS.md` **D34–D43** → los cuatro contratos: `core/signals.js`, `core/proactive.js`, `core/delivery.js`, `core/proactiveTick.js` → `KNOWN_PROBLEMS.md` → `PRINCIPLES.md` #11 y #12.
 
 ## Trampas aprendidas (ahorran horas)
 - **Arrancar no es funcionar.** Un símbolo no importado dentro del cuerpo de un handler no lo detecta ni `node --check` ni el arranque: solo falla al invocarlo. Lo cazó producción.
