@@ -164,7 +164,7 @@ function pinPress(v) {
   }
 }
 
-let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'}, pendingQuestions:[] };
+let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'}, pendingQuestions:[], gym:null, _gymLoaded:false, _gymLoading:false, _gymSaving:false };
 
 async function initApp() {
   db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -179,6 +179,51 @@ async function initApp() {
   render();
   loadPendingQuestions();
   loadIsabelNow(); // no bloquea el resto de la app — la tarjeta Isabel ya se pinta con el heurístico de cliente mientras esto resuelve
+}
+
+// ────── Gym — el estado semanal lo calcula el Core, no la vista ──────────
+// Antes esta pantalla leia un contador `sesiones_semana` que nadie reseteaba
+// nunca y lo comparaba contra un "/2" escrito a mano. Ahora representa lo que
+// GET /v1/gym/state devuelve: semana real, objetivo real (metrics.target) e
+// historial. Misma regla que el resto: CORE DECIDE, FRONTEND REPRESENTA.
+async function loadGymState() {
+  if (S._gymLoading) return;
+  S._gymLoading = true;
+  try {
+    const res = await fetch(`${ISABEL_API}/v1/gym/state`, { headers: { 'x-api-key': ISABEL_KEY } });
+    if (!res.ok) throw new Error('gym ' + res.status);
+    S.gym = await res.json();
+  } catch (e) {
+    S.gym = { error: e.message };   // fallo de red: se dice, no se inventa
+  }
+  S._gymLoading = false;
+  render();
+}
+
+async function gymLogSession() {
+  const el = document.getElementById('gym-quick');
+  const text = (el && el.value || '').trim();
+  if (!text) return;
+  el.value = '';
+  S._gymSaving = true; render();
+  try {
+    const res = await fetch(`${ISABEL_API}/v1/gym/session`, {
+      method: 'POST',
+      headers: { 'x-api-key': ISABEL_KEY, 'content-type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      alert(data.error === 'could_not_interpret'
+        ? 'No he entendido qué entrenaste. Dilo de otra forma, o cuentaselo a Isabel.'
+        : 'No se pudo registrar: ' + (data.error || 'error'));
+    }
+  } catch (e) {
+    alert('No se pudo registrar: ' + e.message);
+  }
+  S._gymSaving = false;
+  S._gymLoaded = false;
+  loadGymState();
 }
 
 // ────── Preguntas pendientes — Interventions que NO se empujan a ningún canal ──
@@ -202,6 +247,35 @@ async function loadPendingQuestions() {
 // const LOCAL dentro de otras tres funciones, así que aquí no existe. Además
 // escapa solo comillas (vale para atributos, no para texto): este texto va a
 // innerHTML, así que necesita también < y &.
+// Fecha relativa corta y honesta: si no hay fecha, se dice.
+// Datos de entrenamiento de Estefania que todavia viven en codigo en vez de en
+// Supabase (ver KNOWN_PROBLEMS). Se mantienen aqui, fuera de la vista, para que
+// se vea que son DATOS y no logica de presentacion.
+const GYM_REFERENCIA = [
+  { name: 'Aductora', kg: '70', series: '3x10-15' },
+  { name: 'Prensa 45', kg: '120', series: '3x8' },
+  { name: 'Smith squat', kg: '25-30/lado', series: '3x8' },
+  { name: 'Extension cuadriceps', kg: '80-85', series: '3x7' },
+  { name: 'Curl inclinado 45', kg: '7', series: '2x7' },
+];
+const GYM_RESTRICCIONES = [
+  'Sin back squat con barra',
+  'Sin peso muerto convencional',
+  'Sin RDL sin validacion previa',
+  'Bulgaras solo con energia alta',
+];
+
+function fechaRelativa(iso) {
+  if (!iso) return 'sin fecha';
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const d = new Date(iso + 'T00:00:00'); d.setHours(0,0,0,0);
+  const dias = Math.round((hoy - d) / 864e5);
+  if (dias === 0) return 'hoy';
+  if (dias === 1) return 'ayer';
+  if (dias > 1 && dias < 7) return 'hace ' + dias + ' dias';
+  return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
 function escHtml(v) {
   return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -1620,56 +1694,93 @@ function areaView() {
   }:'';
 
   const gymView=isGym?()=>{
-    const m=S.metrics.filter(x=>x.area_id===a.id);
-    const get=k=>m.find(x=>x.key===k);
-    const ses=get('sesiones_semana');
-    const lastSession=get('last_session_date');
-    const prensa=get('prensa_kg');
-    const ext=get('extension_kg');
-    const sesVal=ses?parseInt(ses.value):0;
-    const diasSinGym=lastSession?Math.floor((Date.now()-new Date(lastSession.value))/(864e5)):null;
-    const ejercicios=[
-      {name:'Aductora',kg:'70',series:'3×10-15'},
-      {name:'Prensa 45°',kg:'120',series:'3×8'},
-      {name:'Smith squat',kg:'25-30/lado',series:'3×8'},
-      {name:'Extensión cuádriceps',kg:'80→85',series:'3×7'},
-      {name:'Curl inclinado 45°',kg:'7',series:'2×7'},
-    ];
-    const restricciones=['Sin back squat con barra','Sin peso muerto convencional','Sin RDL sin validación previa','Búlgaras solo con energía alta'];
-    return `
-    <div class="card" style="margin-bottom:10px">
-      <div class="card-head"><span class="ch-icon">📊</span><span class="ch-label">Esta semana</span></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)">
-        <div style="background:var(--surface);padding:14px 12px;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:${sesVal>=2?'#3B6D11':'#854F0B'}">${sesVal}<span style="font-size:14px;color:var(--t2);font-weight:400"> / 2</span></div>
-          <div style="font-size:10px;color:var(--t2);margin-top:2px">sesiones</div>
-          <div style="display:flex;gap:4px;justify-content:center;margin-top:6px">
-            ${[1,2].map(n=>`<div style="width:28px;height:6px;border-radius:3px;background:${sesVal>=n?'#3B6D11':'var(--border)'}"></div>`).join('')}
-          </div>
-        </div>
-        <div style="background:var(--surface);padding:14px 12px;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:${diasSinGym===null?'var(--t3)':diasSinGym>7?'#A32D2D':diasSinGym>4?'#854F0B':'#3B6D11'}">${diasSinGym===null?'—':diasSinGym}</div>
-          <div style="font-size:10px;color:var(--t2);margin-top:2px">días sin entrenar</div>
-          ${lastSession?`<div style="font-size:9px;color:var(--t3);margin-top:2px">última: ${new Date(lastSession.value).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</div>`:''}
-        </div>
-      </div>
-      <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px">
-        <button onclick="regSesion()" style="flex:1;padding:10px;border-radius:8px;background:#3B6D11;color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer">✓ Registrar sesión hoy</button>
-      </div>
-    </div>
-    <div class="card" style="margin-bottom:10px">
-      <div class="card-head"><span class="ch-icon">🏋️</span><span class="ch-label">Pesos de referencia</span></div>
-      ${ejercicios.map(e=>`
-      <div style="display:flex;align-items:center;padding:10px 14px;border-top:1px solid var(--border)">
-        <span style="flex:1;font-size:13px">${e.name}</span>
-        <span style="font-size:12px;color:var(--t2);margin-right:10px">${e.series}</span>
-        <span style="font-size:13px;font-weight:700">${e.kg} kg</span>
-      </div>`).join('')}
-    </div>
-    <div class="card" style="margin-bottom:10px">
-      <div class="card-head"><span class="ch-icon">⚠️</span><span class="ch-label">Restricciones</span></div>
-      ${restricciones.map(r=>`<div style="padding:9px 14px;border-top:1px solid var(--border);font-size:12px;color:#A32D2D;display:flex;gap:8px"><span>✗</span>${r}</div>`).join('')}
-    </div>`;
+    // Estado real del Core. La vista no cuenta sesiones ni decide la semana:
+    // solo representa lo que /v1/gym/state devuelve.
+    if (!S._gymLoaded) { S._gymLoaded = true; loadGymState(); }
+    const G = S.gym;
+    const wk = G && G.known ? G.week : null;
+    const target = G && G.known ? G.target_sessions : null;
+
+    const cargando = !G;
+    const fallo = G && (G.error || G.known === false);
+
+    const cab = (icono, etiqueta) => '<div class="card-head"><span class="ch-icon">' + icono + '</span><span class="ch-label">' + etiqueta + '</span></div>';
+
+    if (cargando) {
+      return '<div class="card" style="margin-bottom:10px">' + cab('&#128202;', 'Esta semana') +
+        '<div style="padding:18px 14px;font-size:13px;color:var(--t3)">Consultando tu semana…</div></div>';
+    }
+    if (fallo) {
+      return '<div class="card" style="margin-bottom:10px">' + cab('&#9888;&#65039;', 'Esta semana') +
+        '<div style="padding:18px 14px;font-size:13px;color:var(--t2)">No he podido leer tu estado de entrenamiento.' +
+        '<br><span style="font-size:12px;color:var(--t3)">' + escHtml(G.error || G.error_code || 'sin datos') + '</span></div></div>';
+    }
+
+    const objetivoTxt = target ? (' / ' + target) : '';
+    const cumple = target ? wk.strength >= target : wk.sessions > 0;
+    const ultima = wk.last_session;
+    const ultimaTxt = ultima
+      ? [ultima.session_type || (ultima.cardio && !ultima.strength ? 'cardio' : 'entrenamiento'), fechaRelativa(ultima.date)].filter(Boolean).join(' · ')
+      : 'sin sesiones esta semana';
+
+    const historial = (G.recent || []).slice(0, 6).map((r) => {
+      const et = r.rest_declared ? 'Descanso' : !r.training_done ? 'Sin entrenar'
+        : [r.session_type, r.strength ? 'fuerza' : null, r.cardio ? ('cardio' + (r.cardio_minutes ? " " + r.cardio_minutes + "'" : '')) : null].filter(Boolean).join(' · ');
+      return '<div style="display:flex;align-items:center;padding:9px 14px;border-top:1px solid var(--border)">' +
+        '<span style="flex:1;font-size:13px;color:var(--text)">' + escHtml(et || 'Sesion') + '</span>' +
+        '<span style="font-size:11px;color:var(--t3)">' + escHtml(fechaRelativa(r.date)) + '</span></div>';
+    }).join('');
+
+    return '<div class="card" style="margin-bottom:10px">' +
+      cab('&#128202;', 'Esta semana') +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border)">' +
+        '<div style="background:var(--surface);padding:14px 8px;text-align:center">' +
+          '<div style="font-size:26px;font-weight:700;color:' + (cumple ? '#3B6D11' : '#854F0B') + '">' + wk.days_trained + '</div>' +
+          '<div style="font-size:10px;color:var(--t2);margin-top:2px">dias entrenados</div></div>' +
+        '<div style="background:var(--surface);padding:14px 8px;text-align:center">' +
+          '<div style="font-size:26px;font-weight:700;color:var(--text)">' + wk.strength + '<span style="font-size:13px;color:var(--t2);font-weight:400">' + objetivoTxt + '</span></div>' +
+          '<div style="font-size:10px;color:var(--t2);margin-top:2px">fuerza</div></div>' +
+        '<div style="background:var(--surface);padding:14px 8px;text-align:center">' +
+          '<div style="font-size:26px;font-weight:700;color:var(--text)">' + wk.cardio + '</div>' +
+          '<div style="font-size:10px;color:var(--t2);margin-top:2px">cardio' + (wk.cardio_minutes ? " " + wk.cardio_minutes + "'" : '') + '</div></div>' +
+      '</div>' +
+      '<div style="padding:11px 14px;border-top:1px solid var(--border);font-size:12px;color:var(--t2)">' +
+        'Ultima sesion: <span style="color:var(--text);font-weight:600">' + escHtml(ultimaTxt) + '</span>' +
+        (target ? '' : '<br><span style="font-size:11px;color:var(--t3)">Sin objetivo semanal declarado — se muestra el historial, no se mide contra ningun numero.</span>') +
+      '</div>' +
+      // Captura: hablar con Isabel es la via principal; el campo rapido es un
+      // atajo que usa EXACTAMENTE el mismo parser, no una segunda logica.
+      '<div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px">' +
+        '<input id="gym-quick" class="fi" placeholder="Hice pierna, sin cardio..." autocomplete="off" style="margin:0;flex:1"' +
+        ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();gymLogSession()}">' +
+        '<button onclick="gymLogSession()" ' + (S._gymSaving ? 'disabled ' : '') +
+        'style="border:none;background:#3B6D11;color:#fff;border-radius:8px;padding:0 14px;font-size:13px;font-weight:600;cursor:pointer">' +
+        (S._gymSaving ? '...' : 'Registrar') + '</button>' +
+      '</div>' +
+      '<div style="padding:0 14px 12px">' +
+        '<button onclick="openChat()" style="background:none;border:none;padding:0;font-size:12px;font-weight:500;color:var(--t2);cursor:pointer">Hablar con Isabel &rarr;</button>' +
+      '</div>' +
+    '</div>' +
+    (historial
+      ? '<div class="card" style="margin-bottom:10px">' + cab('&#128197;', 'Historial reciente') + historial + '</div>'
+      : '') +
+    // Pesos de referencia y restricciones: siguen viviendo como constantes en
+    // el codigo, que es deuda real (deberian estar en Supabase como el resto).
+    // Pero son SUS datos — y las restricciones son limitaciones de
+    // entrenamiento con motivo medico. Borrarlas por ser "hardcoded" seria
+    // perder informacion, no reducir deuda. Se conservan y se documenta.
+    '<div class="card" style="margin-bottom:10px">' + cab('&#127947;&#65039;', 'Pesos de referencia') +
+      GYM_REFERENCIA.map((e) =>
+        '<div style="display:flex;align-items:center;padding:10px 14px;border-top:1px solid var(--border)">' +
+        '<span style="flex:1;font-size:13px">' + e.name + '</span>' +
+        '<span style="font-size:12px;color:var(--t2);margin-right:10px">' + e.series + '</span>' +
+        '<span style="font-size:13px;font-weight:700">' + e.kg + ' kg</span></div>').join('') +
+    '</div>' +
+    '<div class="card" style="margin-bottom:10px">' + cab('&#9888;&#65039;', 'Restricciones') +
+      GYM_RESTRICCIONES.map((r) =>
+        '<div style="padding:9px 14px;border-top:1px solid var(--border);font-size:12px;color:#A32D2D;display:flex;gap:8px">' +
+        '<span>&#10007;</span>' + r + '</div>').join('') +
+    '</div>';
   }:'';
 
   const saludView=isSalud?()=>{
@@ -4321,7 +4432,7 @@ async function invCloseSession() {
 Object.assign(window, {
   showPin, pinPress,
   go, toggleMode, openAdd, openChat, closeChat, sendMsg,
-  retryLoad,
+  retryLoad, gymLogSession,
   done, closeModal,
   checkinSueno, checkinDolor, checkinVJ, completeCheckin,
   saveVjState, openVjState, saveVjStateForm,
