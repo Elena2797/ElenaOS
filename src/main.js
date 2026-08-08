@@ -164,7 +164,7 @@ function pinPress(v) {
   }
 }
 
-let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'} };
+let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'}, pendingQuestions:[] };
 
 async function initApp() {
   db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -177,7 +177,50 @@ async function initApp() {
   document.getElementById('td').textContent = now.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
   await reload();
   render();
+  loadPendingQuestions();
   loadIsabelNow(); // no bloquea el resto de la app — la tarjeta Isabel ya se pinta con el heurístico de cliente mientras esto resuelve
+}
+
+// ────── Preguntas pendientes — Interventions que NO se empujan a ningún canal ──
+// Una Intervention con push:false es una pregunta real y deduplicada que NO
+// merece interrumpir (D35/D38): su sitio es la app, esperando a que ella la
+// abra. Si LIFEOS no la mostrara sería invisible, y una pregunta que nadie ve
+// es peor que no haberla hecho.
+async function loadPendingQuestions() {
+  try {
+    const res = await fetch(`${ISABEL_API}/v1/interventions/pending`, { headers: { 'x-api-key': ISABEL_KEY } });
+    if (!res.ok) throw new Error('pending ' + res.status);
+    const data = await res.json();
+    S.pendingQuestions = (data.interventions || []).filter(i => i.text);
+  } catch (e) {
+    S.pendingQuestions = [];   // fallo de red: no se inventa ninguna pregunta
+  }
+  render();
+}
+
+// Escapado propio: `esc` en este fichero no es un helper compartido sino una
+// const LOCAL dentro de otras tres funciones, así que aquí no existe. Además
+// escapa solo comillas (vale para atributos, no para texto): este texto va a
+// innerHTML, así que necesita también < y &.
+function escHtml(v) {
+  return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function pendingQuestionsCard() {
+  const qs = S.pendingQuestions || [];
+  if (!qs.length) return '';
+  const rows = qs.map((q, i) => {
+    const sep = i < qs.length - 1 ? 'padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--border)' : '';
+    return '<div style="' + sep + '">' +
+      '<div style="font-size:14px;color:var(--text);line-height:1.55">' + escHtml(q.text) + '</div>' +
+      '<div style="font-size:11px;color:var(--t3);margin-top:4px">' + escHtml(q.domain) + '</div>' +
+      '</div>';
+  }).join('');
+  return '<div style="background:var(--surface);border-radius:14px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)">' +
+    '<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:10px">Isabel te preguntó</div>' +
+    rows +
+    '<button onclick="openChat()" style="background:none;border:none;padding:8px 0 0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer">Responder a Isabel →</button>' +
+    '</div>';
 }
 
 // ────── Isabel · Ahora — consume GET /v1/now, alimenta la tarjeta Isabel de Home ───
@@ -721,6 +764,8 @@ function homeView() {
   <div style="padding:0 0 80px">
 
     ${isabelHomeCard(priority, greeting)}
+
+    ${pendingQuestionsCard()}
 
     <!-- ¿Qué merece mi atención ahora? -->
     <div style="background:var(--surface);border-radius:14px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)">
