@@ -113,6 +113,9 @@ Fue bloqueante durante un día: los logs del Gateway eran explícitos (*"Your cr
 ### `globalContext.js` todavía tiene bloques específicos de VistaJet y JETMI
 Anteriores al contrato universal de señales (D33): leen `vj_state`, `vj_tasks` y `operators` directamente dentro del Core. **No bloquean añadir un dominio nuevo** — las señales entran por la vía general (`resolveSignals`) y un specialist nuevo no necesita tocar el motor — pero son el resto de acoplamiento a migrar. Hay un test que mide ese acoplamiento y falla si crece (`signals.test.js`, máximo tolerado 12 referencias). Migrarlos consistiría en que VistaJet y JETMI emitan también su estado como señales del contrato, en vez de que el Core lo lea.
 
+### El ciclo de Interventions no tiene disparador periódico
+`POST /v1/interventions/cycle` funciona, es idempotente y está verificado de punta a punta, pero **hoy solo corre a mano**. La vía limpia ya está investigada: un cron de OpenClaw con **payload de comando** (`--command`), que ejecuta un script en el host del Gateway **sin turno de agente** y entrega su stdout por `announce`; un comando que imprime solo `NO_REPLY` no publica nada. Crear cron exige `operator.admin`, bloqueado por CLI pero alcanzable por `POST /tools/invoke` desde dentro del contenedor. No se ha creado porque es una automatización nueva que empezaría a escribir a Telegram sola — requiere autorización explícita.
+
 ### Restos abiertos de otro avión: se declaran, no se cierran solos
 Hoy hay **2 sesiones de inventario abiertas de 9H-VCQ** mientras el avión actual es D-AFBS. Desde D34 el sistema lo dice (señal `stale_open_context`, severidad `actionable`) en vez de callarlo — antes solo se manifestaban como trampas para las rutas que se olvidaban de correlacionar. **No se cierran automáticamente a propósito**: cerrar una sesión es irreversible en este modelo y hacerlo solo sería inferir que la rotación anterior terminó. Es una decisión de la usuaria.
 
