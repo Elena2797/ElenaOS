@@ -29,7 +29,7 @@ Pendientes de acción de la usuaria, **no bloqueantes**: rotar `ANTHROPIC_API_KE
 ## LIFEOS ya se observa solo, y observar no cuesta dinero
 `proactive-tick-15m` corre **cada 15 minutos** en producción. Su resultado normal es no hacer nada, y eso está **medido, no razonado**: el delta de un tick silencioso es 0 en todo — registros Anthropic, turnos de agente, `cache_write`, tokens de entrada y de salida, y coste. Un barrido de control antes y después de tres ticks confirma **0 turnos de agente nuevos**.
 
-La garantía no es una convención:  la **arma**. La evaluación corre dentro de `runWithoutAI()` y cualquier llamada al modelo ahí lanza, así que `llm_invoked:false` es un hecho medido. El cron usa payload `command` (sin turno de agente) con `delivery:{mode:'none'}` e imprime `NO_REPLY`: **el cron no habla** — la única vía de notificación sigue siendo Intervention → delivery → tool `message`.
+La garantía no es una convención: `core/aiGuard.js` la **arma**. La evaluación corre dentro de `runWithoutAI()` y cualquier llamada al modelo ahí lanza, así que `llm_invoked:false` es un hecho medido. El cron usa payload `command` (sin turno de agente) con `delivery:{mode:'none'}` e imprime `NO_REPLY`: **el cron no habla** — la única vía de notificación sigue siendo Intervention → delivery → tool `message`.
 
 Con presupuesto de autonomía que falla cerrado (6 entregas/día, 1/hora, 0,30 $/día, 3 turnos/día) y **como mucho una interrupción por tick**, elegida por el motor de prioridad global.
 
