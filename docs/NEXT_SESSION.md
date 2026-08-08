@@ -1,48 +1,53 @@
-Última actualización: 2026-08-08 (segunda tanda) — handoff corto, no histórico acumulativo
+Última actualización: 2026-08-08 (tercera tanda) — handoff corto, no histórico acumulativo
 
 # NEXT_SESSION.md
 
 ## Qué se terminó en esta sesión
-**D34–D40**, en dos tandas. La primera: auditoría sistemática de correlación de entidad (14 hallazgos, varios vivos), evaluador proactivo determinista, instrumentación real del consumo, y coherence pass.
+**D34–D41.** La pieza de esta última tanda: **el proactive loop general está vivo en producción**. `proactive-tick-15m` corre cada 15 minutos en Europe/Madrid y su resultado normal es no hacer nada — con evidencia medida, no razonada: el delta de un tick silencioso es **0 en todo** (registros Anthropic, turnos de agente, `cache_write`, tokens de entrada y salida, coste).
 
-La segunda cerró **el eslabón que faltaba, la ENTREGA**: `domain signals → global priority → proactive gate → INTERVENTION persistente → DELIVERY → canal → respuesta → apply → reevaluación`. Vía oficial de OpenClaw (tool `message` por `POST /tools/invoke`, `operator.write` — no admin), una ruta nueva y estrecha en el adaptador, entrega **exactamente una vez sin migración** (el candado es el índice único que ya existía), y **verificado de punta a punta en producción** con una Intervention de prueba limpiable: crear → entregar a Telegram (1 envío) → 2º y 3er ciclo sin reenvío → responder → resolver → reevaluar en silencio → limpiar.
+La cadena completa funciona sola: `domain data → specialists → signals → global priority → proactive gate → intervention → delivery → Telegram → response → apply → resolve → reevaluation`.
 
-Además: **stale operational context formalizado** (current / stale-open / histórico / superseded) con una sola pregunta deduplicada que ya se ve en Home, y **el análisis de por qué cuesta lo que cuesta**: el coste es el contexto (25.833 tokens de mediana por turno), no el mensaje (3 tokens).
+Verificado además: exactly-once **atravesando un reinicio de `isabel-api`** (el dedup vive en Supabase, no en RAM), `push:false` nunca interrumpe (2 Interventions pendientes y visibles → 0 candidatas a Telegram, 0 turnos), y ambos crons sobreviven al reinicio del Gateway sin duplicarse.
 
 ## Qué quedó pendiente
-1. **Disparador periódico del ciclo.** `POST /v1/interventions/cycle` funciona y es idempotente, pero **hoy solo corre a mano**. La vía limpia y ya investigada es un cron de OpenClaw con **payload de comando** (`--command`), que ejecuta un script en el host del Gateway **sin turno de agente** y entrega su stdout por `announce` (un comando que imprime solo `NO_REPLY` no publica nada). Crear cron exige `operator.admin`: bloqueado por CLI, alcanzable por `POST /tools/invoke` desde dentro del contenedor o por Control UI con túnel SSH. **No se ha creado: es una automatización nueva que empieza a escribir a Telegram sola.**
-2. **`cacheRetention` y modelo del agente.** Medido: ~0,29 $ de 1,49 $ se van en escribir caché que nunca se lee. Es config de OpenClaw con trade-off real (afecta a las ráfagas conversacionales; el TTL largo de Anthropic cuesta ×2 escribir). Decisión de la usuaria, con datos en `GET /v1/usage/analysis`.
-3. **2 sesiones abiertas de 9H-VCQ.** El sistema ya lo pregunta en Home. Cerrarlas es irreversible y sigue siendo acción suya desde Inventario.
+1. **`cacheRetention` y modelo del agente.** Medido: ~0,29 $ de 1,49 $ se iban en escribir caché que nunca se lee. Config de OpenClaw con trade-off real (afecta a las ráfagas conversacionales; el TTL largo de Anthropic cuesta ×2 escribir). Datos en `GET /v1/usage/analysis`. **Decisión de la usuaria.**
+2. **Investigar de qué se compone el contexto de ~25.800 tokens por turno** (§17): qué carga OpenClaw siempre, si hay skills/docs/tools innecesarias, y si las conversaciones consecutivas sí aprovechan caché. Cualquier recorte debe medirse antes/después.
+3. **2 sesiones abiertas de 9H-VCQ.** El sistema lo pregunta en Home con `push:false`. Cerrarlas es irreversible y sigue siendo acción suya desde Inventario.
 4. **Sesión de inventario para D-AFBS** — sin ella no se cierra la prueba de escritura de Inventario. **No fabricar conteos.**
 5. **Rotar `ANTHROPIC_API_KEY`** (runbook en `operations/ROTAR_ANTHROPIC_KEY.md`).
-6. **Barrido de consumo periódico**: `POST /v1/usage/sweep` solo corre a mano y tras cada turno de `/v1/chat`; los turnos de Telegram solo se registran cuando alguien barre.
-7. Gateway antiguo y `faithful-light`: detenidos, conservados como rollback.
+6. **Barrido de consumo periódico**: `POST /v1/usage/sweep` solo corre a mano y tras cada turno de `/v1/chat`. Los turnos de Telegram solo se registran cuando alguien barre — candidato natural para engancharlo al tick (es determinista y no gasta IA).
+7. **`rotation_day`/`rotation_total` sin registrar**: mientras falten, la ventana temporal de VistaJet es `unknown` y ninguna señal escala. Es correcto (sin dato no se afirma urgencia), pero significa que la escalada por proximidad de entrega no se activará.
+8. Gateway antiguo y `faithful-light`: detenidos, conservados como rollback.
 
 ## Qué debe hacerse inmediatamente después
-1. **Decidir el disparador** (punto 1 de arriba). Antes de automatizarlo, `GET /v1/proactive/evaluate` es dry-run y cada "no" trae su motivo: mirarlo unos días dice si el umbral es correcto.
-2. **Migrar los bloques de VistaJet/JETMI que aún viven en `globalContext.js`** al contrato universal. Hay un test que mide esa deuda y falla si crece.
-3. Siguiente dominio (Gym, Finanzas…) **solo cuando la usuaria lo elija**.
+1. **Observar el loop unos días.** `GET /v1/proactive/budget` da el gasto de autonomía de hoy; los ticks con algo que contar quedan en `eventos` (`proactive:tick`). Antes de tocar umbrales, mirar qué hace.
+2. **Migrar los bloques de VistaJet/JETMI que aún viven en `globalContext.js`** al contrato universal, solo cuando exista reemplazo limpio vía specialist → signals. El test que impide que esa deuda crezca debe mantenerse.
+3. **Gym será la prueba real de que la arquitectura generaliza**: debería bastar con datos → specialist → señales, sin reconstruir cron, prioridad, delivery, dedup ni cost tracking. **Todavía no empezar.**
 
 ## Qué no debe romperse
-- **Nunca operar con datos de otra entidad**, y **omitir la matrícula falla en alto**. El wildcard hay que nombrarlo (`getAnyOpenSessionUnscoped`/`getAnyActiveHotoUnscoped`).
-- **Toda señal declara `subject`** (hay test).
-- **`existe` ≠ `merece atención` ≠ `merece interrumpirme`.** Solo `urgent` interrumpe. La puerta es determinista y **nunca se despierta al modelo para decidir si hay que despertar al modelo**.
-- **La sesión conversacional NO es la base de datos.** El estado de una pregunta vive en `interventions`. Nada puede depender de que el LLM "recuerde que preguntó": se resuelve por `domain`+`kind` contra Supabase.
-- **La decisión es del Core; el transporte, del runtime.** Ninguna lógica de dominio dentro de Telegram, ninguna lógica de transporte dentro de un specialist. Un dominio nuevo registra un renderer.
-- **`chat.send` conversa, `message` entrega.** No unificarlas: entregar por chat convierte cada aviso en un turno de agente, que es el 94-98% del gasto.
-- **Entrega exactamente una vez.** El reclamo es un INSERT directo, nunca `createIntervention()` (esa converge a propósito y haría que dos procesos creyeran haber ganado).
-- **Responder no ejecuta.** `applied:false` significa que no se hizo; no decirle que sí.
-- **Un coste duplicado es un dato FALSO**; uno que falta es incompleto.
-- **ON/OFF es contexto, no evidencia** (`PRINCIPLES.md` #12). **No inventar reglas cuando falta el dato.**
-- Un solo poller de Telegram. Secretos solo como variables de entorno en Railway. No reactivar `lifeos-agent`.
+- **OBSERVAR ≠ USAR IA.** La evaluación proactiva corre dentro de `runWithoutAI()`: cualquier llamada al modelo ahí **lanza**. `llm_invoked:false` es un hecho medido. Si algún día un tick necesita IA, eso es una decisión de producto, no un detalle de implementación.
+- **El cron no habla.** Payload `command`, `delivery:{mode:'none'}`, `NO_REPLY`. La única vía de notificación es `Intervention → delivery → tool message`. Nunca stdout, nunca dos sistemas de entrega.
+- **Como mucho UNA interrupción por tick**, elegida por el motor de prioridad global. El resto sigue pending.
+- **El presupuesto falla cerrado.** Silencio antes que gasto descontrolado; nunca "arreglarse" gastando más.
+- **La sesión conversacional NO es la base de datos.** Nada puede depender de que el LLM recuerde haber preguntado: se resuelve por `domain`+`kind` contra Supabase.
+- **`chat.send` conversa, `message` entrega.** No unificarlas.
+- **Entrega exactamente una vez.** El reclamo es un INSERT directo, nunca `createIntervention()` (esa converge a propósito).
+- **Responder no ejecuta.** `applied:false` significa que no se hizo.
+- **Nunca operar con datos de otra entidad**, y **omitir la matrícula falla en alto**. Toda señal declara `subject`.
+- **`existe` ≠ `merece atención` ≠ `merece interrumpirme`.** `time_sensitive` no es `interrupt-now`.
+- **El Core no conoce dominios** (test de invariante). Añadir Gym no debe exigir un `if (gym)` en el Priority Engine.
+- **No tocar `sleep-check-0800-madrid`.** Funciona, tiene semántica exacta y convive con el tick general.
+- Un solo poller de Telegram. Secretos solo como variables de entorno. No reactivar `lifeos-agent`.
 
 ## Qué documentos debe leer el siguiente chat
-`README.md` → este documento → `CURRENT_STATE.md` → `DECISIONS.md` **D34–D40** (D14/D15/D28 para la historia de las fugas) → `core/signals.js`, `core/proactive.js`, `core/delivery.js` (los tres contratos) → `KNOWN_PROBLEMS.md` → `PRINCIPLES.md` #11 y #12.
+`README.md` → este documento → `CURRENT_STATE.md` → `DECISIONS.md` **D34–D41** → los cuatro contratos: `core/signals.js`, `core/proactive.js`, `core/delivery.js`, `core/proactiveTick.js` → `KNOWN_PROBLEMS.md` → `PRINCIPLES.md` #11 y #12.
 
 ## Trampas aprendidas (ahorran horas)
-- **Un instrumento que devuelve cero no dice "no hay nada".** El barrido de consumo reportó `seen: 0` sobre 63 turnos reales, sin error, porque buscaba un campo `id` que no existe (es `responseId`). Verificar la FORMA real del dato antes de creerse un cero.
-- **Convergencia ≠ exclusión mutua.** `createIntervention()` devuelve la fila ganadora ante un duplicado — correcto para una pregunta, catastrófico para un candado.
-- **`\b` no funciona con acentos.** `/^s[ií]\b/` no casa con "sí".
-- **Ignorar la caché al calcular coste de LLM** es la diferencia entre 0,00004 $ y 0,087 $ en el mismo turno.
-- **`esc` en `main.js` no es un helper compartido**: son tres consts locales distintas, y escapan solo comillas.
-- Vite **no lee `PORT`**. Railway: un deployment puede quedar `FAILED` sin logs mientras sirve el anterior; `--skip-deploys` + `restart` no inyecta variables nuevas, hace falta `redeploy`.
+- **Arrancar no es funcionar.** Un símbolo no importado dentro del cuerpo de un handler no lo detecta ni `node --check` ni el arranque: solo falla al invocarlo. Lo cazó producción.
+- **`cron.create` no existe; el método es `cron.add`.** Y el esquema usa `schedule.expr`/`schedule.tz`, no `expression`/`timezone`. Leerlo de un job existente en vez de adivinarlo.
+- **La tool `cron` no está expuesta en `/tools/invoke`** (la política de tools la filtra). La vía que queda es el WS del Gateway por loopback como `gateway-client`/`backend`.
+- **Un instrumento que devuelve cero no dice "no hay nada".** El barrido reportó `seen:0` sobre 63 turnos reales porque buscaba un campo `id` que no existe (es `responseId`).
+- **Convergencia ≠ exclusión mutua.** `createIntervention()` devuelve la fila ganadora ante un duplicado: correcto para una pregunta, catastrófico para un candado.
+- **`\b` no funciona con acentos**: `/^s[ií]\b/` no casa con "sí".
+- **Ignorar la caché al calcular coste** es la diferencia entre 0,00004 $ y 0,087 $ en el mismo turno.
+- Vite **no lee `PORT`**. Railway: `--skip-deploys` + `restart` no inyecta variables nuevas, hace falta `redeploy`.

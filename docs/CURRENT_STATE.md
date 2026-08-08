@@ -16,7 +16,7 @@ Una página. Solo 5 campos. Detalle de un módulo → `modules/*.md`. Handoff de
 **Ya se sabe cuánto cuesta Isabel, con datos.** Los turnos del agente en OpenClaw son el **97,8 % del gasto** (1,288 $ de 1,317 $ en 30 días) — la hipótesis de partida, ahora medida. Para llegar ahí hubo que corregir dos cosas que habrían hecho inútil la instrumentación: el coste ignoraba la caché (un turno real "costaba" 0,00004 $ en vez de 0,087 $) y el barrido buscaba un campo `id` que no existe, reportando cero sobre 63 turnos reales sin fallar.
 
 ## Último deploy relevante
-Todo desplegado y verificado en producción. `isabel-api`: `/v1/now`, `/v1/proactive/evaluate`, `/v1/usage/sweep`, `/v1/usage/summary` respondiendo; las 9 señales de VistaJet con `subject`; `stale_open_context` activa con datos reales. `life-os-app` (Vercel): HTTP 200 con la coherence pass. `isabel-gateway`: adaptador con una tercera ruta (`POST /message/send`), Telegram y cron intactos.
+Todo desplegado y verificado en producción. `isabel-api`: `/v1/now`, `/v1/proactive/evaluate`, `/v1/usage/sweep`, `/v1/usage/summary` respondiendo; las 9 señales de VistaJet con `subject`; `stale_open_context` activa con datos reales. `life-os-app` (Vercel): HTTP 200 con la coherence pass. `isabel-gateway`: adaptador con `POST /message/send` y `ensure-proactive-cron.mjs`; **dos crons vivos** (`proactive-tick-15m` y `sleep-check-0800-madrid`), Telegram con polling.
 
 ## Último commit importante
 `isabel-api` — auditoría de correlación de entidad (D34), bucle proactivo + instrumentación (D35/D36), y el fix de `responseId` que hacía que el barrido no viera ni un turno. `life-os-app` — correlación en el frontend (D34), coherence pass (D37) y la tarjeta de preguntas pendientes (D38). `isabel-gateway` — la primitiva de entrega.
@@ -25,6 +25,13 @@ Todo desplegado y verificado en producción. `isabel-api`: `/v1/now`, `/v1/proac
 **Ninguno.** El bloqueante de crédito de Anthropic **está resuelto**: verificado esta sesión — `/v1/now` responde `status: ok` y `/v1/chat` devuelve respuesta real del agente. No volver a diagnosticarlo sin comprobarlo.
 
 Pendientes de acción de la usuaria, **no bloqueantes**: rotar `ANTHROPIC_API_KEY` (runbook en `operations/ROTAR_ANTHROPIC_KEY.md`) y abrir una sesión de inventario real para D-AFBS — sin ella no se puede cerrar la prueba de escritura de Inventario por la ruta unificada, y fabricar conteos corrompería datos. Hoy hay además **2 sesiones abiertas de 9H-VCQ** que el sistema ya declara (`stale_open_context`); cerrarlas es decisión suya, no automática.
+
+## LIFEOS ya se observa solo, y observar no cuesta dinero
+`proactive-tick-15m` corre **cada 15 minutos** en producción. Su resultado normal es no hacer nada, y eso está **medido, no razonado**: el delta de un tick silencioso es 0 en todo — registros Anthropic, turnos de agente, `cache_write`, tokens de entrada y de salida, y coste. Un barrido de control antes y después de tres ticks confirma **0 turnos de agente nuevos**.
+
+La garantía no es una convención:  la **arma**. La evaluación corre dentro de `runWithoutAI()` y cualquier llamada al modelo ahí lanza, así que `llm_invoked:false` es un hecho medido. El cron usa payload `command` (sin turno de agente) con `delivery:{mode:'none'}` e imprime `NO_REPLY`: **el cron no habla** — la única vía de notificación sigue siendo Intervention → delivery → tool `message`.
+
+Con presupuesto de autonomía que falla cerrado (6 entregas/día, 1/hora, 0,30 $/día, 3 turnos/día) y **como mucho una interrupción por tick**, elegida por el motor de prioridad global.
 
 ## La cadena proactiva, ya cerrada
 `domain signals → global priority → proactive gate → INTERVENTION persistente → DELIVERY → canal → respuesta → apply → reevaluación`. La decisión pertenece al Core y el transporte al runtime: Telegram no sabe nada de dominios, los dominios no saben nada de Telegram, y **la sesión conversacional no es la base de datos** — el estado vive en `interventions`, así que nada depende de que el modelo recuerde haber preguntado. Entrega exactamente una vez, con el índice único que ya existía como candado. Verificado de punta a punta en producción con una Intervention de prueba limpiable.
