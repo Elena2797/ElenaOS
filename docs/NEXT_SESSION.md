@@ -1,13 +1,13 @@
-Última actualización: 2026-08-08 (tercera tanda) — handoff corto, no histórico acumulativo
+Última actualización: 2026-08-08 (cuarta tanda) — handoff corto, no histórico acumulativo
 
 # NEXT_SESSION.md
 
 ## Qué se terminó en esta sesión
-**D34–D41.** La pieza de esta última tanda: **el proactive loop general está vivo en producción**. `proactive-tick-15m` corre cada 15 minutos en Europe/Madrid y su resultado normal es no hacer nada — con evidencia medida, no razonada: el delta de un tick silencioso es **0 en todo** (registros Anthropic, turnos de agente, `cache_write`, tokens de entrada y salida, coste).
+**D34–D43.** En esta última tanda: **coherence pass cerrada** y **Gym construido entero sobre la infraestructura horizontal**.
 
-La cadena completa funciona sola: `domain data → specialists → signals → global priority → proactive gate → intervention → delivery → Telegram → response → apply → resolve → reevaluation`.
+La deuda que de verdad bloqueaba dominios nuevos no era que el Core leyera : era que la INGESTA de señales vivía dentro de un . Ahora es un **bus genérico** —  es el único sitio que nombra dominios y añadir uno es una línea. El guardarraíl de deuda bajó de 12 a 9 y no puede volver a subir.
 
-Verificado además: exactly-once **atravesando un reinicio de `isabel-api`** (el dedup vive en Supabase, no en RAM), `push:false` nunca interrumpe (2 Interventions pendientes y visibles → 0 candidatas a Telegram, 0 turnos), y ambos crons sobreviven al reinicio del Gateway sin duplicarse.
+**Gym demostró el criterio**: se añadió sin tocar Priority Engine, bucle proactivo, delivery, dedup, cost tracking ni cron. Su sujeto es la semana; la invariante de entidad y la ventana temporal le aplican sin que el Core sepa qué es una semana. Captura por lenguaje natural determinista; el modelo solo entra cuando el parser no concluye.
 
 ## Qué quedó pendiente
 1. **`cacheRetention` y modelo del agente.** Medido: ~0,29 $ de 1,49 $ se iban en escribir caché que nunca se lee. Config de OpenClaw con trade-off real (afecta a las ráfagas conversacionales; el TTL largo de Anthropic cuesta ×2 escribir). Datos en `GET /v1/usage/analysis`. **Decisión de la usuaria.**

@@ -39,11 +39,11 @@ Con presupuesto de autonomía que falla cerrado (6 entregas/día, 1/hora, 0,30 $
 Y la distinción que lo hace usable: **existe ≠ merece atención ≠ merece interrumpirme**. Una pregunta real pero no urgente (los restos abiertos de 9H-VCQ) se registra, se deduplica y **se ve en Home**, sin empujar nada a Telegram.
 
 ## Gym: la prueba de que la arquitectura generaliza
-Gym se anadio **sin tocar** el Priority Engine, el bucle proactivo, el delivery, la deduplicacion, el cost tracking ni el cron. Lo unico que el Core necesito saber es UNA linea en el registro de specialists. Cero `if (domain === gym)`.
+Gym se añadió **sin tocar** el Priority Engine, el bucle proactivo, el delivery, la deduplicación, el cost tracking ni el cron. Lo único que el Core necesitó saber es **una línea** en el registro de specialists. Cero `if (domain === 'gym')`.
 
-Su sujeto es la SEMANA, no un avion — y la invariante de entidad y la ventana temporal le aplican igual sin que el Core sepa que es una semana. Captura por lenguaje natural resuelta de forma determinista en los casos reales ("hice pierna", "upper + 20 min de cinta", "hoy descanso"): el modelo solo entra cuando el parser no puede concluir.
+Su sujeto es la **semana**, no un avión — y la invariante de entidad y la ventana temporal le aplican igual sin que el Core sepa qué es una semana. La captura por lenguaje natural se resuelve de forma determinista en los casos reales (*"hice pierna"*, *"upper + 20 min de cinta"*, *"hoy descanso"*, *"fui al gym pero no hice cardio"*): el modelo solo entra cuando el parser no puede concluir.
 
-El check-in proactivo esta **deliberadamente sin activar**: se probo que la escalada funciona, y se desactivo para no producir un aviso que la usuaria no ha pedido.
+El check-in proactivo está **deliberadamente sin activar**. Se probó que la escalada funciona (con 0/2 y un día restante el Core subió Gym a `urgent` él solo) y se desactivó para no producir un aviso que la usuaria no ha pedido: primero el dominio, después el diseño de cuándo preguntar.
 
 ## Siguiente objetivo
-Ver `NEXT_SESSION.md`. En corto: decidir el **disparador periódico** del ciclo (la vía limpia ya está investigada — un cron de OpenClaw con payload de comando, que no gasta turno de agente — pero crear una automatización que escribe sola a Telegram no se hace sin autorización), decidir `cacheRetention` con los datos ya medidos, migrar los bloques de VistaJet/JETMI que aún quedan dentro de `globalContext.js` al contrato universal de señales, y — solo cuando la usuaria lo elija — el siguiente dominio.
+Ver `NEXT_SESSION.md`. En corto: acumular uso real antes de tocar `cacheRetention` o el modelo; investigar de qué se compone el contexto de ~25.800 tokens por turno; y diseñar, con datos de varias semanas, cuándo tiene sentido que Gym pregunte. La infraestructura horizontal se considera cerrada salvo bugs reales.
