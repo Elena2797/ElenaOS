@@ -2,6 +2,11 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // Vite no lee PORT por su cuenta: elige otro puerto en silencio si el suyo
+  // está ocupado, y entonces quien lanzó el servidor abre el puerto equivocado.
+  // Honrarlo permite levantar varias instancias (p. ej. dos sesiones de trabajo
+  // a la vez) sin que ninguna se quede mirando una página en blanco.
+  server: { port: Number(process.env.PORT) || 5173 },
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',

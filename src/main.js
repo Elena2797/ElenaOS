@@ -193,7 +193,12 @@ async function loadIsabelNow() {
     // normalidad, la tarjeta Isabel cae al heurístico de cliente (ver resolveHomePriority()).
     S.isabelNow = { status: 'unreachable', error: e.message };
   }
-  if (S.view === 'home') render();
+  // Repinta siempre, no solo en Home: desde D24, el estado de CADA dominio
+  // (`domainStatusLabel`) sale del Core, así que Dominios y la vista de área
+  // también dependen de esta respuesta. Repintando solo Home, quien navegara
+  // antes de que `/v1/now` resolviera se quedaba con un "—" permanente que ya
+  // nunca se actualizaba.
+  render();
 }
 
 async function reload() {
@@ -260,23 +265,55 @@ function render() {
   mp.textContent=S.mode; mp.className='mode-pill '+(S.mode==='ON'?'m-on':'m-off');
   const views={home:homeView,areas:areasView,area:areaView,global:globalView,project:projectView,avanzar:avanzarView,resultado_ia:resultadoIAView,vj_hoto:vjHotoView,vj_inventario:vjInventarioView,vj_laundry_cleaning:vjLandingCleaningView,vj_fresh:vjFreshView,vj_status:vjStatusView};
   document.getElementById('main').innerHTML=connectionBanner()+(views[S.view]||homeView)();
+  renderFab();
+}
+
+// Un solo botón "+", global y siempre en el mismo sitio.
+//
+// D32 retiró el FAB duplicado y no quedó ninguno: `openAdd()` —el único modal
+// para crear una tarea en cualquier área— pasó a ser código inalcanzable desde
+// la UI, así que capturar algo fuera de VistaJet dejó de ser posible sin darse
+// cuenta. Se restaura UNO, no dos: la lección de D32 era la duplicación, no la
+// existencia del botón.
+//
+// No aparece en las pantallas de un módulo de VistaJet (HOTO, inventario,
+// laundry…), donde "añadir" significa otra cosa y cada una tiene ya su propia
+// acción: un "+" genérico ahí sería ambiguo, que es justo lo que D32 corrigió
+// en las tarjetas de eLearnings/Facturas.
+const FAB_HIDDEN_VIEWS = ['vj_hoto','vj_inventario','vj_laundry_cleaning','vj_fresh','vj_status'];
+function renderFab() {
+  const existing=document.getElementById('fab');
+  if(FAB_HIDDEN_VIEWS.includes(S.view)) { if(existing) existing.remove(); return; }
+  if(existing) return;
+  const b=document.createElement('button');
+  b.className='fab'; b.id='fab'; b.type='button';
+  b.setAttribute('aria-label','Añadir tarea');
+  b.innerHTML='<i class="ti ti-plus"></i>';
+  b.onclick=()=>openAdd();
+  document.body.appendChild(b);
 }
 
 function visibleDomains() {
   return S.areas.filter(a=>['VistaJet','JETMI','Finanzas','Salud','Gym','Marca Personal','Vida Personal'].includes(a.name));
 }
 
+// D24 retiró de la UI las etiquetas de PRD y de "especialista" por ser
+// metadatos del sistema, no estado — y además desincronizados del proyecto
+// real ("PRD Semilla v0.3" cuando el documento iba por la v0.4). Los campos
+// seguían aquí, sin que nada los leyera: exactamente la clase de dato que
+// vuelve a colarse en pantalla la próxima vez que alguien busque "algo que
+// poner en la tarjeta". Se eliminan.
 function domainBlueprint(name) {
   const data={
-    'VistaJet':{icon:'✈️',prd:'PRD operativo VistaJet',specialist:'acompañamiento',mode:'ON/OFF operativo',purpose:'Rotación, documentos y preparación sin carga mental.',tone:'#854F0B'},
-    'JETMI':{icon:'🚀',prd:'PRD Semilla v0.3',specialist:'producción',mode:'OFF construcción',purpose:'Negocio, operadores, web, contenido y decisiones estratégicas.',tone:'#534AB7'},
-    'Finanzas':{icon:'💰',prd:'Modelo financiero personal',specialist:'acompañamiento',mode:'control mensual',purpose:'Saber si el mes está bajo control y dónde actuar.',tone:'#185FA5'},
-    'Salud':{icon:'🩺',prd:'Protocolo salud + entrenamiento',specialist:'acompañamiento',mode:'seguimiento',purpose:'Dolor, síntomas y hábitos.',tone:'#0F6E56'},
-    'Gym':{icon:'🏋️',prd:'Plan de entrenamiento',specialist:'acompañamiento',mode:'seguimiento',purpose:'Sesiones, pesos de referencia y restricciones de entrenamiento.',tone:'#3B6D11'},
-    'Marca Personal':{icon:'📣',prd:'Sistema de contenido',specialist:'híbrido',mode:'captura/publicación',purpose:'Presencia pública sostenible según energía y modo.',tone:'#993556'},
-    'Vida Personal':{icon:'🌱',prd:'Mapa de vida personal',specialist:'acompañamiento',mode:'carga mental',purpose:'Viajes, hábitos y asuntos personales que no deben quedarse flotando.',tone:'#993C1D'},
+    'VistaJet':{icon:'✈️',purpose:'Rotación, documentos y preparación sin carga mental.',tone:'#854F0B'},
+    'JETMI':{icon:'🚀',purpose:'Negocio, operadores, web, contenido y decisiones estratégicas.',tone:'#534AB7'},
+    'Finanzas':{icon:'💰',purpose:'Saber si el mes está bajo control y dónde actuar.',tone:'#185FA5'},
+    'Salud':{icon:'🩺',purpose:'Dolor, síntomas y hábitos.',tone:'#0F6E56'},
+    'Gym':{icon:'🏋️',purpose:'Sesiones, pesos de referencia y restricciones de entrenamiento.',tone:'#3B6D11'},
+    'Marca Personal':{icon:'📣',purpose:'Presencia pública sostenible según energía y modo.',tone:'#993556'},
+    'Vida Personal':{icon:'🌱',purpose:'Viajes, hábitos y asuntos personales que no deben quedarse flotando.',tone:'#993C1D'},
   };
-  return data[name]||{icon:'•',prd:'Sin PRD visible',specialist:'acompañamiento',mode:'activo',purpose:'Dominio activo de LIFEOS.',tone:'#6b6b6b'};
+  return data[name]||{icon:'•',purpose:'Dominio activo de LIFEOS.',tone:'#6b6b6b'};
 }
 
 function daysSinceDate(value) {
@@ -316,7 +353,11 @@ function domainStats(area) {
   const decisions=S.dec.filter(d=>d.area_id===area.id);
   const events=S.eventos.filter(e=>e.area_id===area.id||projects.some(p=>p.id===e.project_id));
   // VistaJet: include vj_tasks and vj_state in activity signal
-  const vjExtra=area.name==='VistaJet'?{tasks:S.vjTasks||[],stateDates:[(S.vjState||[])[0]?.updated_at,(S.vjState||[])[0]?.created_at].filter(Boolean)}:{tasks:[],stateDates:[]};
+  // `vj_state` es el singleton (una fila, D14), y S.vjState guarda ESA FILA,
+  // no un array. Indexarlo con [0] daba siempre undefined, así que la señal de
+  // actividad de VistaJet ignoraba por completo el estado operativo: un avión
+  // en rotación actualizado hoy aparecía como "sin actividad registrada".
+  const vjExtra=area.name==='VistaJet'?{tasks:S.vjTasks||[],stateDates:[S.vjState?.updated_at,S.vjState?.created_at].filter(Boolean)}:{tasks:[],stateDates:[]};
   const allTaskDates=[...tasks.map(t=>t.updated_at||t.created_at),...vjExtra.tasks.map(t=>t.updated_at||t.created_at)];
   const dates=[...projects.map(p=>p.last_activity_at||p.created_at),...allTaskDates,...events.map(e=>e.created_at),...vjExtra.stateDates].filter(Boolean).map(x=>new Date(x).getTime()).filter(x=>!Number.isNaN(x));
   const lastAt=dates.length?new Date(Math.max(...dates)).toISOString():null;
@@ -328,6 +369,19 @@ function domainStats(area) {
   const vjTaskCount=area.name==='VistaJet'?(S.vjTasks||[]).filter(t=>t.status!=='done').length:0;
   const score=activeProjects.length*4+events.length*3+(tasks.length+vjTaskCount)+waits.length+decisions.length;
   return {projects,activeProjects,tasks,waits,decisions,events,lastAt,progress,statusLabel,score,vjTaskCount};
+}
+
+// "Qué hay activo" en la unidad que corresponde a cada dominio: VistaJet no
+// tiene proyectos (su carga son tareas de rotación), así que contarlos decía
+// siempre "0 proyectos activos". Una sola definición para la tarjeta de
+// Dominios y para la cabecera del área — antes divergían.
+function domainActiveLabel(a, st) {
+  if (a.name === 'VistaJet') {
+    return st.vjTaskCount > 0
+      ? `${st.vjTaskCount} tarea${st.vjTaskCount !== 1 ? 's' : ''} VJ activa${st.vjTaskCount !== 1 ? 's' : ''}`
+      : 'sin tareas VJ pendientes';
+  }
+  return `${st.activeProjects.length} proyecto${st.activeProjects.length !== 1 ? 's' : ''} activo${st.activeProjects.length !== 1 ? 's' : ''}`;
 }
 
 function domainCard(a) {
@@ -342,7 +396,7 @@ function domainCard(a) {
     <div class="domain-name">${a.name}</div>
     <div class="domain-purpose">${domainSignal(a)}</div>
     <div class="domain-progress"><span style="width:${st.progress}%"></span></div>
-    <div class="domain-meta"><span>${st.activeProjects.length} proyectos activos</span><span>${fmtLastActivity(st.lastAt)}</span></div>
+    <div class="domain-meta"><span>${domainActiveLabel(a,st)}</span><span>${fmtLastActivity(st.lastAt)}</span></div>
   </button>`;
 }
 
@@ -838,14 +892,17 @@ function resultadoIAView() {
   </div>`;
 }
 
-function domainDashboardIntro(a) {
+// `heroOnly` para los dominios que traen su propio panel operativo debajo
+// (VistaJet, JETMI): reciben la MISMA presentación de cabecera que el resto —
+// hasta ahora eran los dos únicos que no la tenían, y encima son los dos para
+// los que se escribió el bloque "estratégico" que nunca llegaban a ver— pero
+// sin repetir proyectos ni contribuciones que su propia vista ya muestra.
+function domainDashboardIntro(a, { heroOnly = false } = {}) {
   const bp=domainBlueprint(a.name), st=domainStats(a);
   const isStrategic=['VistaJet','JETMI'].includes(a.name);
   const contribs=isabelContributions(a.id,3);
   const projects=st.activeProjects.length?st.activeProjects:S.projects.filter(p=>p.area_id===a.id).slice(0,3);
-  const activeLabel=a.name==='VistaJet'
-    ?(st.vjTaskCount>0?`${st.vjTaskCount} tarea${st.vjTaskCount!==1?'s':''} VJ activa${st.vjTaskCount!==1?'s':''}`:'sin tareas VJ pendientes')
-    :`${st.activeProjects.length} proyecto${st.activeProjects.length!==1?'s':''} activo${st.activeProjects.length!==1?'s':''}`;
+  const activeLabel=domainActiveLabel(a,st);
   return `<section class="domain-dashboard" style="--domain:${bp.tone}">
     <div class="domain-hero-card">
       <div class="domain-hero-top"><span class="domain-hero-icon">${bp.icon}</span><span>${st.statusLabel}</span></div>
@@ -853,8 +910,8 @@ function domainDashboardIntro(a) {
       <p>${bp.purpose}</p>
       <div class="domain-hero-meta"><span>${activeLabel}</span><span>${fmtLastActivity(st.lastAt)}</span></div>
     </div>
-    ${isStrategic&&contribs.length?`<div class="brief-card"><div class="brief-label">Contribuciones de Isabel</div>${contributionList(contribs)}</div>`:''}
-    ${projects.length?`<div class="visual-projects"><div class="section-title-inline">Proyectos reales del dominio</div>${projects.slice(0,4).map(projectVisualCard).join('')}</div>`:''}
+    ${!heroOnly&&isStrategic&&contribs.length?`<div class="brief-card"><div class="brief-label">Contribuciones de Isabel</div>${contributionList(contribs)}</div>`:''}
+    ${!heroOnly&&projects.length?`<div class="visual-projects"><div class="section-title-inline">Proyectos reales del dominio</div>${projects.slice(0,4).map(projectVisualCard).join('')}</div>`:''}
   </section>`;
 }
 
@@ -883,7 +940,7 @@ function areaView() {
   const isGym=a.name==='Gym';
   const isMarca=a.name==='Marca Personal';
   const isVida=a.name==='Vida Personal';
-  const domainIntroHtml=domainDashboardIntro(a);
+  const domainIntroHtml=domainDashboardIntro(a,{heroOnly:isVJ||isJETMI});
 
   const vjView=isVJ?()=>{
     const vj=S.vjState;
@@ -896,6 +953,7 @@ function areaView() {
       (async()=>{
         try{
           const sig=await readiSvc.collectSignals({hotoSvc,invSvc,llcSvc,vjTasks:S.vjTasks,vjState:vj});
+          S.vjSignals=sig;                 // crudas: ya correlacionadas por avión
           S.vjReadiness=readiSvc.assess(sig);
         }catch(e){ console.error('readiness',e); S.vjReadiness={error:e.message}; }
         render();
@@ -1002,10 +1060,25 @@ function areaView() {
     const hotoSB=hotoCompleted===hotoTotal?'#E1F5EE':status!=='rotacion'?'#F5F5F5':hotoCompleted===0?'#FAEEDA':'#EEF4FD';
     const hotoSummary=status!=='rotacion'&&hotoCompleted===0?'Disponible durante rotación':hotoCompleted===0?(hotoTasks.length>0?hotoTasks.length+' tarea'+(hotoTasks.length>1?'s':'')+' pendiente'+(hotoTasks.length>1?'s':''):'Checklist no iniciado'):hotoCompleted+'/'+hotoTotal+' completado'+(hotoCompleted>1?'s':'');
 
-    const inventSL=inventTasks.length>0?'Revisar':'Al día';
-    const inventSC=inventTasks.length>0?'#854F0B':'#0F6E56';
-    const inventSB=inventTasks.length>0?'#FAEEDA':'#E1F5EE';
-    const inventSummary=inventTasks.length>0?inventTasks.length+' ítem'+(inventTasks.length>1?'s':'')+' pendiente'+(inventTasks.length>1?'s':''):'Sin novedades';
+    // La tarjeta de Inventario derivaba su estado SOLO de títulos de `vj_tasks`
+    // que contuvieran "inventar" — nunca de la sesión real del avión actual.
+    // Con D-AFBS sin ninguna sesión abierta decía "Al día · Sin novedades",
+    // que es justo lo contrario de la verdad. Misma clase de fallo que la
+    // señal de Laundry desconectada de su módulo (D15): una tarjeta que
+    // resume un módulo sin mirarlo. Ahora la fuente es la señal ya
+    // correlacionada por avión; las tareas solo matizan.
+    const invSig=S.vjSignals?.inventory;
+    const invUnknown=!S.vjSignals||invSig?.error;
+    const invNoSession=!!S.vjSignals&&!invSig;
+    const inventSL=invUnknown?'—':invNoSession?'Sin datos':inventTasks.length>0?'Revisar':invSig.status==='open'?'Abierto':'Al día';
+    const inventSC=invUnknown?'#9CA3AF':invNoSession?'#9CA3AF':inventTasks.length>0||invSig.discrepancies>0?'#854F0B':invSig.status==='open'?'#185FA5':'#0F6E56';
+    const inventSB=invUnknown?'#F5F5F5':invNoSession?'#F5F5F5':inventTasks.length>0||invSig.discrepancies>0?'#FAEEDA':invSig.status==='open'?'#EEF4FD':'#E1F5EE';
+    const inventSummary=
+      invUnknown?'Comprobando…':
+      invNoSession?`Sin inventario para ${vj.aircraft||'este avión'}`:
+      invSig.status==='open'?`${invSig.verified}/${invSig.total} verificados`+(invSig.discrepancies>0?` · ${invSig.discrepancies} discrepancias`:''):
+      inventTasks.length>0?inventTasks.length+' ítem'+(inventTasks.length>1?'s':'')+' pendiente'+(inventTasks.length>1?'s':''):
+      'Última sesión cerrada';
 
     const llcSL=!S.llcRec?(status==='rotacion'?'Hoy pendiente':'No activo'):(llcFilledCount>0?llcFilledCount+'/'+llcTotal:'En blanco');
     const llcSC=!S.llcRec&&status==='rotacion'?'#854F0B':!S.llcRec?'#9CA3AF':'#185FA5';
@@ -1087,12 +1160,20 @@ function areaView() {
       // bug real: esta tarjeta decía "Bajo control" para un avión que
       // todavía no tenía ni HOTO ni inventario cargados).
       const R0=S.vjReadiness;
-      const noCoreEvidence=status==='rotacion'&&R0&&!R0.error&&R0.confidence==='low';
+      // "Bajo control" exige evidencia real de AMBOS módulos core del avión
+      // actual. Con `confidence==='low'` solo (que exige que falten los DOS),
+      // un avión con HOTO pero SIN inventario seguía diciendo "HOTO,
+      // inventario y tareas al día" — afirmando de un módulo que no existe que
+      // está al día. Se comprueba sobre las señales crudas, ya correlacionadas.
+      const coreMissing=S.vjSignals
+        ? [!S.vjSignals.hoto||S.vjSignals.hoto.error?'HOTO':null, !S.vjSignals.inventory||S.vjSignals.inventory.error?'inventario':null].filter(Boolean)
+        : [];
+      const noCoreEvidence=status==='rotacion'&&R0&&!R0.error&&coreMissing.length>0;
       const hasProblems=allAircraftPend.length>0;
       const acSL=status!=='rotacion'?'Fuera de rotación':noCoreEvidence?'Sin evidencia':hasProblems?allAircraftPend.length+' pendiente'+(allAircraftPend.length>1?'s':''):'Bajo control';
       const acSC=status!=='rotacion'?'#9CA3AF':noCoreEvidence?'#9CA3AF':hasProblems?'#854F0B':'#0F6E56';
       const acSB=status!=='rotacion'?'#F5F5F5':noCoreEvidence?'#F5F5F5':hasProblems?'#FAEEDA':'#E1F5EE';
-      const acSummary=status!=='rotacion'?'Disponible durante rotación':noCoreEvidence?`HOTO e inventario sin cargar para ${vj.aircraft||'este avión'}`:hasProblems?allAircraftPend.slice(0,2).map(t=>t.title).join(' · ')+(allAircraftPend.length>2?' · …':''):'HOTO, inventario y tareas al día';
+      const acSummary=status!=='rotacion'?'Disponible durante rotación':noCoreEvidence?`Falta ${coreMissing.join(' y ')} para ${vj.aircraft||'este avión'}`:hasProblems?allAircraftPend.slice(0,2).map(t=>t.title).join(' · ')+(allAircraftPend.length>2?' · …':''):'HOTO, inventario y tareas al día';
       return `<button onclick="go('vj_status')" style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:10px">
           <span style="font-size:20px">✈️</span>
@@ -1858,7 +1939,7 @@ function areaView() {
     <span class="dot" style="background:${a.color};width:12px;height:12px"></span>
     <h2>${a.name}</h2>
   </div>
-  ${isVJ||isJETMI?'':domainIntroHtml}
+  ${domainIntroHtml}
   ${isVJ?vjView():''}
   ${isJETMI?jetmiView():''}
   ${isFin?finView():''}
@@ -2684,12 +2765,12 @@ async function invExport(){
 }
 
 // ═══ Aircraft Readiness ═══════════════════════════════════════════════════════
-function readiRefresh(){ S._readiLoaded=false; S.vjReadiness=null; render(); }
+function readiRefresh(){ S._readiLoaded=false; S.vjReadiness=null; S.vjSignals=null; render(); }
 function readiToggleDetail(){ S.readiDetail=!S.readiDetail; render(); }
 
 // ═══ HOTO — módulo vivo ═══════════════════════════════════════════════════════
 // Al salir del HOTO se invalida el readiness: se recalcula con los datos frescos.
-function hotoBack(){ S._hotoLoaded=false; S.hotoErr=null; S.hotoMigrationErr=null; S._readiLoaded=false; S.vjReadiness=null; go('area',S.areaId); }
+function hotoBack(){ S._hotoLoaded=false; S.hotoErr=null; S.hotoMigrationErr=null; S._readiLoaded=false; S.vjReadiness=null; S.vjSignals=null; go('area',S.areaId); }
 
 async function hotoReload(){
   try{
@@ -2769,7 +2850,7 @@ async function hotoImportChoose(mode){
     // invalidar todo lo que dependía del anterior, mismo principio que
     // refreshVjContext() al cambiar de avión (D14/D15): nunca dejar en
     // pantalla algo calculado sobre el HOTO viejo.
-    S._readiLoaded=false; S.vjReadiness=null;
+    S._readiLoaded=false; S.vjReadiness=null; S.vjSignals=null;
     S._hotoSummaryLoaded=false; S.hotoSummaryRec=null;
     S.hotoImportAnalysis=null; S.hotoImportErr=null;
     _hotoImportBytes=null; _hotoImportFilename='';
@@ -3242,7 +3323,7 @@ async function refreshVjContext(){
         S._hotoSummaryLoaded=false; S.hotoSummaryRec=null;
         S._llcLoaded=false; S.llcRec=null; S.llcErr=null;
         S._invLoaded=false; S.invSession=null; S.invItems=[]; S.invChat=[];
-        S._readiLoaded=false; S.vjReadiness=null;
+        S._readiLoaded=false; S.vjReadiness=null; S.vjSignals=null;
       }
       S.vjState=fresh;
     }
@@ -3290,7 +3371,7 @@ function assertCurrentAircraft(rec, label){
     S._hotoLoaded=false; S.hotoRec=null; S.hotoItems=null;
     S._llcLoaded=false; S.llcRec=null;
     S._hotoSummaryLoaded=false; S.hotoSummaryRec=null;
-    S._readiLoaded=false; S.vjReadiness=null;
+    S._readiLoaded=false; S.vjReadiness=null; S.vjSignals=null;
     refreshVjContext();
     return false;
   }
@@ -3319,8 +3400,12 @@ async function done(id) {
   await dbSvc.completeTask(id);
 }
 
+// Preselecciona el área en la que se está: añadir una tarea desde dentro de un
+// dominio y tener que volver a elegirlo en el desplegable es un paso que sobra
+// (PRINCIPLES.md #4, cero pasos innecesarios en el flujo real).
 function openAdd() {
-  const opts=S.areas.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
+  const ctxArea=(S.view==='area'||S.view==='project')?S.areaId:null;
+  const opts=S.areas.map(a=>`<option value="${a.id}"${a.id===ctxArea?' selected':''}>${a.name}</option>`).join('');
   const m=document.createElement('div');
   m.className='overlay'; m.id='modal';
   m.innerHTML=`<div class="modal">
