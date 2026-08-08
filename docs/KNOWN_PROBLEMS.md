@@ -1,5 +1,5 @@
 Estado: conocimiento vigente — lista viva, se actualiza con "Actualiza la documentación"
-Última verificación: 2026-08-06
+Última verificación: 2026-08-08
 Verificado en: auditorías de sesiones anteriores (HOTO, Inventario, arquitectura de Isabel, incidente de Supabase pausado) + incidentes de infraestructura reales del 2026-08-03 (Isabel Core Fase 1/2, Railway, Vercel) + spike de OpenClaw del 2026-08-05 + repro Windows-vs-Linux y despliegue real de `isabel-gateway` en Railway del 2026-08-06
 
 # KNOWN_PROBLEMS.md — Deuda técnica y grietas conocidas
@@ -78,6 +78,12 @@ Encontrado el 2026-08-06 (misma tarde que D13): Isabel confirmó por Telegram "a
 
 `vj_state_singleton_migration_v1.sql` (`CREATE UNIQUE INDEX ON vj_state ((true))`) — **ejecutada y verificada por la usuaria el 2026-08-06**: un `INSERT` de prueba fue rechazado con `duplicate key value violates unique constraint "idx_vj_state_singleton"`, confirmando que la garantía es real, no solo la reconciliación puntual. `hoto_migration_v4.sql` (D13) también se confirmó ya aplicada ese mismo día (verificado insertando y limpiando una fila de prueba). Ninguna migración pendiente de ejecución manual en Supabase.
 
+### Ni D14 ni D15 cubrían todos los caminos — RESUELTO (D34), y el patrón que lo explica
+
+El 2026-08-08, auditando **todos** los caminos del dominio (no solo los que ya habían fallado), aparecieron 14 hallazgos más de la misma familia. Los estructurales: `/v1/confirm` resolvía la sesión de inventario **sin matrícula** (D28 protegió la propuesta y dejó intacta su confirmación); `/v1/session/active` y `/v1/hoto/active`, igual; las propuestas no declaraban sujeto pese a tener 5 minutos de TTL; **7 de las 9 señales de VistaJet no declaraban `subject`**, así que `dropStaleSignals()` no protegía casi nada — y esa función **no se llamaba en ningún sitio** fuera de los tests; los cuatro loaders del frontend caían a "cualquier avión" en el momento exacto en que la usuaria entrega el avión; las escrituras del HOTO nunca revalidaban a qué avión pertenecía el registro que tenían en memoria; y la migración del checklist copiaba ticks **sin matrícula** al HOTO del avión actual, con destino el PDF oficial.
+
+**El patrón, que es lo aprovechable:** D13 corrigió una query, D14 corrigió las queries, D15 corrigió las presentaciones que las rodeaban, D28 corrigió una ruta de backend… y cada corrección dejó viva la siguiente omisión del mismo tipo, porque todas dependían de que **alguien se acordara** de pasar la matrícula. D34 cambia eso: **omitirla lanza**. El wildcard sigue existiendo pero hay que nombrarlo (`getAnyOpenSessionUnscoped`/`getAnyActiveHotoUnscoped`), lo que además lo hace greppable. Mismo movimiento que el índice único de D14, aplicado a la API en vez de al esquema.
+
 ### D14 no cubría todas las rutas de UI — RESUELTO (D15)
 
 El mismo día, minutos después de D14: la usuaria reportó que el bug seguía visible — la tarjeta HOTO del dashboard seguía en "12/47", el resumen de Readiness seguía citando el inventario de 9H-VCQ (215 sin verificar, 61 discrepancias), Inventario seguía mostrando la sesión de 9H-VCQ como "Activa", Laundry seguía diciendo "hace 30 días". Causa real: dos rutas de UI que nunca pasaban por la correlación por matrícula que D14 arregló. (1) El resumen del checklist HOTO (dashboard y "Estado del avión") caía a `localStorage.vj_hoto_checks` — sin ningún tag de avión — cada vez que la pantalla viva de HOTO no se había visitado antes en la sesión, mostrando ticks reales de la última rotación real usada en ese dispositivo. (2) La señal de Laundry en `readiness.js` nunca estuvo conectada al módulo real (`vj_laundry_cleaning_records`) — leía `localStorage.vj_laundry_date`/`vj_laundry_items`, claves sin ningún punto de escritura en el código actual (implementación anterior a la migración a Supabase).
@@ -91,26 +97,24 @@ Encontrado el 2026-08-07: `life_context.mode` se leía, se pintaba en la píldor
 
 **Resto abierto:** `tasks.suitable_modes` (array `{ON,OFF}`, pensado exactamente para filtrar tareas por modo) sigue sin usarse — `addTask()` lo hardcodea siempre a ambos modos y ningún filtro lo lee. No se conectó en D21 porque requeriría UI nueva para elegir el modo de una tarea al crearla, y no hay tarea real hoy que esté marcada para un solo modo.
 
-### Ninguna llamada a Anthropic registra tokens/modelo/coste
-Confirmado el 2026-08-07 auditando las 4 llamadas reales a Anthropic en `isabel-api` (`core/now.js`, `core/generalHandler.js`, `core/intentRouter.js`, `intentProvider.js`) — todas bien acotadas con filtros deterministas previos (ninguna es un caso del anti-patrón "preguntar al LLM si hay algo que hacer"), pero ninguna captura `response.usage` (tokens de entrada/salida) ni lo registra en `eventos` ni en ningún otro sitio. Hoy no hay forma de responder "¿cuánto ha costado Isabel este mes, y en qué dominio?" sin ir a mirar el dashboard de Anthropic directamente.
+### Ninguna llamada a Anthropic registraba tokens/modelo/coste — RESUELTO (D31, completado en D36)
+D31 instrumentó las llamadas de `isabel-api`. D36 cerró el punto ciego que quedaba —los turnos del agente en OpenClaw, que resultaron ser el **97,8 % del gasto**— leyendo el `usage` real de `chat.history`, sin tocar OpenClaw. `GET /v1/usage/summary` responde la pregunta con datos.
 
-## BLOQUEANTE ACTIVO
+**Resto abierto:** el barrido (`POST /v1/usage/sweep`) solo corre a mano y automáticamente tras cada turno de `/v1/chat`. Los turnos de **Telegram y del cron** solo quedan registrados cuando alguien barre — no hay disparador periódico todavía.
 
-### La cuenta de Anthropic se quedó sin crédito — Isabel no puede responder (2026-08-07)
-Detectado al cerrar la sesión, verificando producción. Los logs del Gateway son explícitos:
-`"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."`
-No es un bug del sistema: es saldo de la cuenta.
+## Resuelto: la cuenta de Anthropic se quedó sin crédito (2026-08-07 → 2026-08-08)
 
-**Qué está caído:** cualquier cosa que necesite el modelo — chat de LIFEOS (`/v1/chat` devuelve `gateway_timeout`), Isabel por Telegram, la redacción de `GET /v1/now`, y el cron de sueño de las 08:00 fallará mientras siga así.
+Fue bloqueante durante un día: los logs del Gateway eran explícitos (*"Your credit balance is too low…"*) y nada que necesitara el modelo funcionaba. **Verificado resuelto el 2026-08-08**: `GET /v1/now` responde `status: ok` y `POST /v1/chat` devuelve una respuesta real del agente.
 
-**Qué sigue funcionando (y esto valida el diseño):** toda la capa determinista. `/v1/now` responde `status: llm_error` pero conserva `attention_mode`, `evidence` y las 4 señales de VistaJet intactas; el frontend sigue mostrando prioridad real porque nunca dependió del LLM para decidirla (D9/D22). Supabase, el frontend, el adaptador y el Gateway están sanos.
-
-**Acción:** recargar crédito en `console.anthropic.com` → Plans & Billing. Conviene hacerlo **a la vez** que la rotación de clave pendiente (`operations/ROTAR_ANTHROPIC_KEY.md`), para no reiniciar servicios dos veces.
+**Lección que se conserva, porque es la parte reutilizable:** durante todo el corte la capa determinista siguió sana — `/v1/now` devolvía `llm_error` pero conservaba `attention_mode`, `evidence` y las señales de VistaJet intactas, y el frontend siguió mostrando prioridad real porque nunca dependió del LLM para decidirla (D9/D22). **Antes de diagnosticar cualquier "Isabel no responde", comprobar el saldo**: no es un fallo del sistema y se parece mucho a uno.
 
 ## Arquitectura de señales
 
 ### `globalContext.js` todavía tiene bloques específicos de VistaJet y JETMI
 Anteriores al contrato universal de señales (D33): leen `vj_state`, `vj_tasks` y `operators` directamente dentro del Core. **No bloquean añadir un dominio nuevo** — las señales entran por la vía general (`resolveSignals`) y un specialist nuevo no necesita tocar el motor — pero son el resto de acoplamiento a migrar. Hay un test que mide ese acoplamiento y falla si crece (`signals.test.js`, máximo tolerado 12 referencias). Migrarlos consistiría en que VistaJet y JETMI emitan también su estado como señales del contrato, en vez de que el Core lo lea.
+
+### Restos abiertos de otro avión: se declaran, no se cierran solos
+Hoy hay **2 sesiones de inventario abiertas de 9H-VCQ** mientras el avión actual es D-AFBS. Desde D34 el sistema lo dice (señal `stale_open_context`, severidad `actionable`) en vez de callarlo — antes solo se manifestaban como trampas para las rutas que se olvidaban de correlacionar. **No se cierran automáticamente a propósito**: cerrar una sesión es irreversible en este modelo y hacerlo solo sería inferir que la rotación anterior terminó. Es una decisión de la usuaria.
 
 ### Señales sin ventana operativa definida se quedan en `unknown`
 Hoy `vj_state` de D-AFBS está en `rotacion` **sin `rotation_day`/`rotation_total`**, así que la ventana es `unknown` y ninguna señal escala. Es el comportamiento correcto (sin dato no se afirma urgencia), pero significa que la escalada por proximidad de entrega **no se activará** hasta que la rotación tenga día y total registrados. No es un bug: es una dependencia de dato real.

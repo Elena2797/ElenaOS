@@ -1,11 +1,26 @@
 Estado: conocimiento vigente — se añade cronológicamente, nunca se reescribe
-Última verificación: 2026-08-06
+Última verificación: 2026-08-08
 Verificado en: git log de isabel-api, life-os-app e isabel-gateway
 Fuente de verdad de datos: ninguna
 
 # CHANGELOG.md — Historial relevante
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
+
+## 2026-08-08 (correlación de entidad cerrada, evaluador proactivo y el coste real de Isabel — D34…D37)
+
+- **Auditoría sistemática de correlación de entidad en VistaJet (D34).** Las tres fugas anteriores (D14/D15/D28) se encontraron por accidente; esta vez se recorrieron TODOS los caminos. 14 hallazgos, varios vivos en producción. Los que importan: **`/v1/confirm` resolvía la sesión de inventario sin matrícula** — D28 protegió la propuesta y dejó su confirmación intacta, así que confirmar un conteo escribía el chat (y en batch, la cola de excepciones y el resumen final) contra la sesión de otro avión; **7 de las 9 señales no declaraban `subject`**, verificado en producción, con lo que `dropStaleSignals()` no protegía casi nada; **`dropStaleSignals()` no se llamaba en ningún sitio** fuera de los tests; y en el frontend, **los cuatro loaders caían a "cualquier avión" justo cuando la usuaria entrega el avión** (`aircraft: null` → todos reciben `undefined` a la vez), resucitando el síntoma de D15 por la vía más normal, terminar una rotación.
+- **La fuga que llegaba al PDF oficial.** La migración one-time del checklist copiaba `vj_hoto_checks` —clave sin matrícula— al HOTO del avión ACTUAL. D15 corrigió las rutas que la LEÍAN; esta, que ESCRIBE, quedó viva. Retirada, no "corregida": nadie guardó nunca a qué avión pertenecían esos ticks.
+- **La corrección es estructural.** Omitir la matrícula ya no devuelve "el más reciente de cualquier avión": **lanza**. El wildcard sigue existiendo pero hay que nombrarlo, lo que además lo deja greppable. Mismo principio que el índice único de D14: la garantía no puede depender de que el código se porte bien.
+- **Qué caduca al cambiar de avión:** la presentación, no el dato. Nueva señal `stale_open_context` (sujeto = avión ACTUAL, no el de los restos, o `dropStaleSignals` la descartaría) — destapó al instante las **2 sesiones abiertas de 9H-VCQ** que llevaban desde julio siendo invisibles.
+- **Guarda de escritura en el frontend:** `assertCurrentAircraft()` en 12 puntos + refresco en `visibilitychange`. El hueco real era estar en la pantalla del HOTO, cambiar de avión por Telegram, volver sin navegar y seguir escribiendo — ninguna corrección de query lo impide porque no hay query de por medio.
+- **Evaluador proactivo general (D35).** `existe` ≠ `merece atención` ≠ `merece INTERRUMPIRME`. Puerta 100 % determinista: fiabilidad → solo `urgent` → evidencia citable → novedad (dedup sobre `interventions`, firma sin contadores) → horario de silencio → cooldown leído de la base, no de memoria. Cada "no" trae su motivo. **Sin cron nuevo y sin tocar el de sueño**: se expone como endpoint dry-run y como tool MCP, para poder observar la alternativa antes de sustituir nada.
+- **El punto ciego de instrumentación, cerrado (D36).** Dos errores que la habrían hecho inútil, ambos encontrados verificando en producción: el coste **ignoraba la caché** (un turno real "costaba" 0,00004 $ en vez de 0,087 $ — un número que parece medido y está mal es peor que no tener número), y el barrido buscaba un campo `id` **que no existe** (es `responseId`), reportando `seen: 0` sobre 63 turnos reales **sin fallar**. Además se descubrió que OpenClaw ya reporta `cost` por turno: dato medido, se prefiere a la estimación propia.
+- **La respuesta, con datos:** 49 turnos registrados, barrido idempotente (segundo pase: 0 duplicados), y `GET /v1/usage/summary` dice que **los turnos del agente son el 97,8 % del gasto** (1,288 $ de 1,317 $ en 30 días), con 332.957 tokens de escritura de caché frente a 18.209 de input.
+- **Coherence pass (D37)** y tres bugs más encontrados mirando la pantalla: la tarjeta de Inventario decía "Al día · Sin novedades" para un avión sin ninguna sesión (derivaba su estado de títulos de tareas, nunca miraba el módulo — misma clase que la señal de Laundry de D15); `(S.vjState||[])[0]` indexaba como array el singleton `vj_state`, así que la actividad de VistaJet salía siempre como "sin actividad registrada"; y `loadIsabelNow()` solo repintaba Home pese a que desde D24 el estado de cada dominio sale del Core, dejando un `—` permanente a quien navegara antes de tiempo.
+- **El botón `+` no existía.** D32 quitó el FAB duplicado y no quedó ninguno: `openAdd()` llevaba desde entonces siendo código inalcanzable desde la UI. Restaurado UNO — la lección de D32 era la duplicación, no el botón.
+- **Bloqueante de crédito de Anthropic: RESUELTO** (verificado, `/v1/chat` responde). 
+- 367/367 tests en `isabel-api` (49 nuevos), 7/7 en `life-os-app` (3 nuevos). Todo desplegado y verificado contra producción real.
 
 ## 2026-08-07 (tercera tanda — una sola Isabel de verdad: migración, cutover y contrato universal — D23…D33)
 
