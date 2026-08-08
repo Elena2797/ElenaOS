@@ -110,6 +110,20 @@ Fue bloqueante durante un día: los logs del Gateway eran explícitos (*"Your cr
 
 ## Arquitectura de señales
 
+### `globalContext.js` conserva bloques de VistaJet y JETMI — deliberadamente, y ya no bloquean nada
+D42 migró la pieza que SÍ bloqueaba: la ingesta de señales, que vivía dentro de un `if (domains['VistaJet'])` y consumía una clave `vistajet_signals`. El cuerpo era genérico pero el gancho no, así que un dominio nuevo habría necesitado el suyo. Ahora es un bus: `specialistRegistry.js` es el único sitio que nombra dominios y añadir uno es una línea.
+
+**Lo que queda, y por qué se queda:** los bloques que leen `vj_state`/`vj_tasks` (evidencia de rotación y tareas de VistaJet) y `operators` (contexto de JETMI). Tienen reemplazo posible —que sus specialists los emitan como señales— pero **no están en el camino que recorre un dominio nuevo**: son contexto adicional de dos dominios existentes, no el gancho por el que entra nadie. Gym lo demostró: se añadió sin tocarlos. Migrarlos ahora habría significado tocar el motor de prioridad del dominio más crítico sin necesidad. El guardarraíl bajó de 12 a 9 referencias y ya no puede subir.
+
+### Datos de entrenamiento de Gym en código en vez de en Supabase
+Los pesos de referencia y las restricciones viven como constantes en `main.js` (`GYM_REFERENCIA`, `GYM_RESTRICCIONES`). Es deuda real: son datos suyos y deberían estar en Supabase como el resto. **No se han borrado** al reconstruir la pantalla: las restricciones son limitaciones con motivo médico ("sin peso muerto convencional", "sin RDL sin validación previa") y eliminarlas por ser hardcoded habría sido perder información, no reducir deuda. Moverlas requiere decidir su modelo; no bloquea nada mientras tanto.
+
+### El check-in proactivo de Gym no está activado, y es una decisión de producto
+La señal `weekly_strength_target_missing` existe y es visible, pero su escalada temporal está **desactivada a propósito**. Se probó en producción y funcionaba: con 0/2 y un día restante el Core subió Gym a `urgent` él solo. Se desactivó porque habría producido un aviso esa misma noche que la usuaria no había pedido — el diseño de *cuándo* preguntar (objetivo, días restantes, ON/OFF, descanso declarado) está explícitamente pospuesto.
+
+### El contador `sesiones_semana` de `metrics` quedó obsoleto — RESUELTO (D43)
+Se incrementaba en cada "Registrar sesión" y **no se reseteaba nunca**, así que crecía indefinidamente; la vista además lo comparaba contra un "/2" escrito a mano mientras `metrics.target` ya guardaba ese 2. Ahora la semana la calcula el Core desde las sesiones reales y `target` es la fuente de verdad. La fila antigua sigue en `metrics` sin usarse: no se borra (dato histórico inocuo).
+
 ### `globalContext.js` todavía tiene bloques específicos de VistaJet y JETMI
 Anteriores al contrato universal de señales (D33): leen `vj_state`, `vj_tasks` y `operators` directamente dentro del Core. **No bloquean añadir un dominio nuevo** — las señales entran por la vía general (`resolveSignals`) y un specialist nuevo no necesita tocar el motor — pero son el resto de acoplamiento a migrar. Hay un test que mide ese acoplamiento y falla si crece (`signals.test.js`, máximo tolerado 12 referencias). Migrarlos consistiría en que VistaJet y JETMI emitan también su estado como señales del contrato, en vez de que el Core lo lea.
 

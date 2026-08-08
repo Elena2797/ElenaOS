@@ -38,5 +38,12 @@ Con presupuesto de autonomía que falla cerrado (6 entregas/día, 1/hora, 0,30 $
 
 Y la distinción que lo hace usable: **existe ≠ merece atención ≠ merece interrumpirme**. Una pregunta real pero no urgente (los restos abiertos de 9H-VCQ) se registra, se deduplica y **se ve en Home**, sin empujar nada a Telegram.
 
+## Gym: la prueba de que la arquitectura generaliza
+Gym se anadio **sin tocar** el Priority Engine, el bucle proactivo, el delivery, la deduplicacion, el cost tracking ni el cron. Lo unico que el Core necesito saber es UNA linea en el registro de specialists. Cero `if (domain === gym)`.
+
+Su sujeto es la SEMANA, no un avion — y la invariante de entidad y la ventana temporal le aplican igual sin que el Core sepa que es una semana. Captura por lenguaje natural resuelta de forma determinista en los casos reales ("hice pierna", "upper + 20 min de cinta", "hoy descanso"): el modelo solo entra cuando el parser no puede concluir.
+
+El check-in proactivo esta **deliberadamente sin activar**: se probo que la escalada funciona, y se desactivo para no producir un aviso que la usuaria no ha pedido.
+
 ## Siguiente objetivo
 Ver `NEXT_SESSION.md`. En corto: decidir el **disparador periódico** del ciclo (la vía limpia ya está investigada — un cron de OpenClaw con payload de comando, que no gasta turno de agente — pero crear una automatización que escribe sola a Telegram no se hace sin autorización), decidir `cacheRetention` con los datos ya medidos, migrar los bloques de VistaJet/JETMI que aún quedan dentro de `globalContext.js` al contrato universal de señales, y — solo cuando la usuaria lo elija — el siguiente dominio.
