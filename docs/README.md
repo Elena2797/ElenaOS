@@ -26,7 +26,8 @@ Cada dato vive en **un solo documento**. Si ves el mismo dato repetido en dos si
 | Trabajar con "el chat de Isabel" | `core/ISABEL_CHANNELS.md` **primero** — hay 4 sistemas distintos, solo uno activo |
 | Entender qué principios no se deben romper | `PRINCIPLES.md` |
 | Investigar o decidir algo de negocio de un dominio (ej. JETMI) | `research/<DOMINIO>/LOG.md` (mapa de cobertura) → `KNOWLEDGE.md` (lo verificado) → `HYPOTHESES.md` (lo abierto) |
-| Decidir qué modelos/proveedores de IA usa Isabel, o cuánto cuesta | `research/AI_RUNTIME/DECISION_MULTIMODELO_2026-08-09.md` — auditoría del Model Router, precios verificados, niveles de cerebro, benchmark propuesto y coste. **Decisión pendiente de la usuaria; ningún proveedor conectado.** |
+| Saber cuánto cuesta Isabel de verdad y por qué | `research/AI_RUNTIME/MEDICION_CONTEXTO_2026-08-09.md` — **empieza por aquí**: el gasto real es ~$4,30/día, no los $2,72/mes que reporta `/v1/usage/summary`. Causa demostrada y optimizaciones $0 propuestas |
+| Decidir qué modelos/proveedores de IA usa Isabel | `research/AI_RUNTIME/DECISION_MULTIMODELO_2026-08-09.md` — auditoría del Model Router, precios verificados, niveles de cerebro, benchmark y coste. **Decisión pendiente; ningún proveedor conectado.** Leer *después* del documento de medición |
 
 ## Estructura
 

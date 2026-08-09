@@ -45,7 +45,15 @@ La inspección visual automatizada de Home/Dominios/Gym/Isabel no pudo completar
 
 ## Coste actual medido
 
-Últimos 30 días registrados: **$2.716060**, 100 llamadas. Conversación: **$2.549703 (93,9%)**; light AI: **$0.166357 (6,1%)**. Mediana de contexto conversacional: **25.833 tokens**. La siguiente optimización debe atacar conversación/contexto, no microoptimizar las llamadas Haiku minoritarias.
+**La cifra que reporta LIFEOS está mal y ahora se sabe por qué.** `GET /v1/usage/summary` dice $2.716060 en 30 días (conversación 93,9%, light AI 6,1%). Medido contra las trayectorias reales del Gateway, el gasto real es **$12.535 en 70 horas ≈ $4,30/día ≈ $129/mes** — la instrumentación ve ~el 2%.
+
+Dos causas verificadas: `KNOWN_SESSION_KEYS = ['lifeos','main']` no incluye las sesiones de cron, y el barrido solo corre a mano o tras `/v1/chat`, así que **los turnos que más gastan —los que ocurren sin nadie delante— no se miden**.
+
+Causa del gasto, demostrada: un **`heartbeat` de OpenClaw que nadie configuró** (default `30m`) despierta a Sonnet 4.6 cada 30 minutos, 24 h al día, con ~28.000 tokens de contexto. Son **98 de 161 turnos y el 71,6% del gasto**. Su `target` es `none` (no entrega nada) y su checklist `HEARTBEAT.md` no existe. Explica el incidente de saldo del 2026-08-07.
+
+Composición del contexto, medida con `count_tokens`: de los 23.235 tokens fijos por turno, **17.178 (73,9%) son definiciones de tools** y 5.530 el system prompt; el transcript real son ~4.400 (16%) y la memoria persistente **168 tokens (0,7%)**. De las 42 tools expuestas, Isabel ha usado **10** en todo su histórico.
+
+Detalle completo y optimizaciones propuestas: [`research/AI_RUNTIME/MEDICION_CONTEXTO_2026-08-09.md`](research/AI_RUNTIME/MEDICION_CONTEXTO_2026-08-09.md). **Ninguna aplicada.**
 
 ## Bloqueos reales
 
