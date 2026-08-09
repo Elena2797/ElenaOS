@@ -62,6 +62,8 @@ Migración: `migration_v1.sql`. Columnas: id, title, area_id, objetivo, status (
 ### `eventos`
 Audit trail / contribuciones IA. Migración: `migration_v1.sql`. Columnas: id, project_id, area_id, origen (default `manual`), texto, herramienta, resumen, resultado_ubicacion, created_at.
 
+Convención universal preparada (aún no activada durante O4): las filas con `herramienta='lifeos:knowledge'` forman un ledger inmutable independiente de los eventos legacy. `texto` contiene un envelope JSON `schema_version:1`; `resultado_ubicacion` usa `knowledge://<entity-or-event-id>`. No se reinterpretan como conocimiento filas de Gym, Salud, VistaJet, Inventario o consumo de IA. El snapshot de estado, objetivos, señales, acciones y feedback se reconstruye plegando esas filas en orden de append. Ver `core/KNOWLEDGE_LOOP.md`.
+
 ### `alertas`
 Migración: `migration_v1.sql`. Columnas: id, texto, tipo (default `manual`), urgencia (default `media`), area_id, project_id, status (default `active`), created_at.
 

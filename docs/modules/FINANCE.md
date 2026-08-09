@@ -52,4 +52,39 @@ Ninguna registrada explícitamente.
 Cualquier automatización o especialista de dominio.
 
 # Próximo hito
-Ninguno decidido.
+
+Especialista financiero V1 de solo lectura y reglas deterministas, después de cerrar O4 y de versionar el esquema real. No requiere un modelo para agregar ni comparar presupuestos.
+
+# Auditoría para el próximo specialist (2026-08-09)
+
+## Fuente de verdad y fronteras
+
+La única fuente verificada para movimientos es `transactions`. Los presupuestos por categoría son filas `metrics.key='budget_<categoría>'`. No existen fuentes verificadas para saldos de cuenta, deuda, inversiones, suscripciones contractuales, facturas futuras ni patrimonio; un specialist no puede inventarlas ni derivarlas de un movimiento aislado.
+
+El frontend solo carga transacciones del año corriente. Por tanto, cualquier señal YTD es válida para ese intervalo, pero una comparación histórica completa requerirá una lectura backend con ventana declarada. Un fallo de `transactions` hoy puede convertirse silenciosamente en `[]`; antes de emitir “no hubo gasto” el specialist debe fallar cerrado y declarar la fuente no disponible.
+
+## Primera versión determinista propuesta
+
+Lectura pura de `transactions` + presupuestos, sin IA:
+
+- ingresos y gastos del mes, con ventana y moneda declaradas;
+- gasto por categoría;
+- presupuesto consumido por categoría (`spent / budget`) solo cuando existe presupuesto positivo;
+- señal `budget_exceeded` cuando el gasto verificable supera el presupuesto;
+- señal `budget_closing` cuando cruza un umbral explícito y aún queda parte relevante del mes;
+- transacciones sin categoría como problema de calidad de datos, nunca como gasto “Otros” inventado;
+- Action Candidate que cite categoría, gasto, presupuesto, intervalo y filas fuente.
+
+Debe quedar fuera de V1: predicciones de saldo, consejos de inversión, detección de fraude, atribución automática de comercios, “gasto anormal” sin baseline acordado y cualquier automatismo que mueva dinero.
+
+## Contrato con objetivos
+
+Finanzas podrá leer objetivos universales enlazados, por ejemplo un objetivo de ahorro con criterio y fecha. Solo emitirá impacto si el objetivo declara una métrica compatible y existe evidencia suficiente. Superar un presupuesto no debe marcar automáticamente un objetivo como `BLOCKED`; primero debe existir una regla de dominio explícita que conecte ambos.
+
+## Requisitos antes de activar
+
+1. Versionar el `CREATE TABLE transactions` real, índices, restricciones y RLS.
+2. Confirmar semántica de `amount` y `type`, moneda y tratamiento de transferencias.
+3. Añadir lectura backend fail-closed y tests con ventanas temporales.
+4. Validar categorías y presupuestos contra datos reales sin escribir ni recategorizar.
+5. Conectar sus señales al bus universal y verificar que Home muestra razón y evidencia.

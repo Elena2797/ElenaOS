@@ -1,5 +1,5 @@
-Estado: diseñado (casi nada verificado como implementado)
-Última verificación: 2026-07-10
+Estado: memoria universal implementada y probada en desconectado; no activada durante O4
+Última verificación: 2026-08-09
 Verificado en: grep de "memory"/"memoria"/contexto persistente en ambos repos
 Fuente de verdad de datos: tablas life_context, eventos (ver DATA_MODEL.md)
 
@@ -21,5 +21,8 @@ Fuente de verdad de datos: tablas life_context, eventos (ver DATA_MODEL.md)
 ## Lo más cercano a "memoria de producto" hoy
 Este mismo sistema de documentación (`/docs`) — es, de hecho, la respuesta operativa a la ausencia de memoria automática: la memoria persistente del proyecto se mantiene manualmente, por escritura explícita, no por un mecanismo del propio Isabel Core.
 
-## Idea futura (no diseñada en detalle en ningún documento)
-Un mecanismo real de memoria por parte de Isabel (qué se decidió, qué preferencias tiene la usuaria, qué patrones se repiten) sigue siendo una idea futura, no un diseño con especificación.
+## Implementación preparada durante O4
+
+`isabel-api` ya contiene contratos, política de escritura, ledger versionado, fold de estado, objetivos con historial, Action Candidates, feedback y evaluación de specialists. Reutiliza `eventos` exclusivamente mediante `herramienta='lifeos:knowledge'`. El E2E reconstruye el estado tras reinicio y demuestra lectura idéntica desde dos superficies.
+
+Permanece deliberadamente desconectado de `index.js`, `/v1/now`, Home y MCP mientras se mide el baseline de 48 horas. Por tanto, esta implementación todavía no cambia la afirmación operativa de arriba: en producción, una conversación general no se convierte automáticamente en memoria estructurada. Contrato completo y frontera de activación: [KNOWLEDGE_LOOP.md](KNOWLEDGE_LOOP.md).

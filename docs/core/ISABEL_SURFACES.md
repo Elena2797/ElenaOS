@@ -1,5 +1,5 @@
-Estado: parcial — el principio ya se cumple (una sola Isabel en LIFEOS); el contrato de contexto estructurado está diseñado, no implementado
-Última verificación: 2026-08-07
+Estado: parcial — LIFEOS y Telegram usan el mismo agente, pero sesiones distintas y sin memoria universal activada
+Última verificación: 2026-08-09
 Verificado en: auditoría de todas las llamadas a `openChat()` y del chat de Inventario en `life-os-app/src/main.js`; `DECISIONS.md` D18/D23/D24
 Fuente de verdad de datos: ninguna
 
@@ -19,7 +19,11 @@ Abrir Isabel desde Inventario no debe crear un agente de inventario: debe darle 
 
 **Lo que no está bien:** el chat de **Inventario** (`invSendMessage`/`invConfirm`, UI propia dentro del módulo) es una implementación conversacional completamente independiente: su propio historial (`vj_inventory_chat` en Supabase), su propio backend (`/v1/message`, `/v1/confirm` en `isabel-api`) y su propio modelo (Haiku vía `intentProvider.js`). Funciona bien y hace escrituras reales sobre la sesión de inventario — **no se retira** hasta que la ruta unificada demuestre que puede hacer las mismas actualizaciones correctamente (instrucción explícita de la usuaria).
 
-**Lo que bloquea el resto:** `openChat()` habla con el bridge local, no con la Isabel real de Telegram (ver `ISABEL_CHANNELS.md` § 2 y `DECISIONS.md` D18/D23). Enriquecer el contexto de una superficie que apunta a un cerebro congelado sería añadir features al camino legacy — justo lo que D18 prohíbe.
+**Ruta actual verificada:** `openChat()` envía a `POST /v1/chat`; `isabel-api` lo entrega al Gateway/OpenClaw y al mismo agente `main` que atiende Telegram. LIFEOS usa la session key `lifeos` y Telegram `main`: comparten agente, tools y Supabase, pero no el transcript. Esto evita dos identidades, aunque no crea por sí solo memoria estructurada entre superficies.
+
+**Lo que sigue separado:** el chat operativo de Inventario (`/v1/message` y `/v1/confirm`) conserva su UI, historial y flujo propios. No debe retirarse hasta que la ruta unificada reproduzca sus confirmaciones y guardas de entidad sin regresión.
+
+**Nuevo bloqueo explícito:** la entrada de conocimiento universal está preparada pero desconectada durante O4. Hasta activarla y añadir una entrada conversacional controlada, un hecho general oído en Telegram no aparecerá automáticamente en Home. Ver [KNOWLEDGE_LOOP.md](KNOWLEDGE_LOOP.md).
 
 ## El contrato de contexto (diseñado, pendiente de D23)
 
