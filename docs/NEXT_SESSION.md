@@ -5,7 +5,7 @@ Ultima actualizacion: 2026-08-09 — fase economica $0 cerrada
 ## Estado exacto
 
 - Heartbeat: **PASS**. 99 historicos; ultimo `2026-08-09T13:17:56.992Z`; cero despues del reinicio de `13:22Z`.
-- O4: desplegada en `isabel-api` `9c2e1760df359e91476014f6928f330e6ae5be0d`, Railway `0c64da45-b24b-489c-9124-9f76dd1c5d52` `SUCCESS`.
+- O4: introducida en `9c2e1760df359e91476014f6928f330e6ae5be0d`; produccion actual `5175136033c181e1c44bc030c0a4e4d5948c34d4`, Railway `f146452d-9c02-412e-b90c-08d173bc05ff` `SUCCESS`.
 - Prueba O4 automatica: tick `2026-08-09T14:30:00Z`, HTTP 200, 27 registros con superficie despues del barrido, cero requests a `/v1/chat`, presupuesto proactivo 0 calls/0 turns/$0.
 - Baseline desde `2026-08-09T13:22Z`: cero `session.started`, cero turnos de modelo, cero heartbeat. En esta ventana la autonomia del sistema costo $0; aun no es una proyeccion mensual.
 - Tools/skills: auditoria completa persistida. P1 y O3 estan propuestas, **NO aplicadas**.

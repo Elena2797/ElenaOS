@@ -9,7 +9,7 @@ LIFEOS mantiene una sola Isabel, un Priority Engine global, especialistas determ
 
 ## Producción
 
-- `isabel-api` sirve el commit `9c2e1760df359e91476014f6928f330e6ae5be0d` con deployment Railway `0c64da45-b24b-489c-9124-9f76dd1c5d52` `SUCCESS`/`RUNNING`.
+- `isabel-api` sirve el commit `5175136033c181e1c44bc030c0a4e4d5948c34d4` con deployment Railway `f146452d-9c02-412e-b90c-08d173bc05ff` `SUCCESS`/`RUNNING`. O4 se introdujo en `9c2e176`; el commit actual solo agrega benchmark/simulador y conserva `/health` y O4 en verde.
 - `life-os-app`: el cambio funcional de Gym es `f366ff7b762dcb7659b13346e2c87b7c46c2b1b8`; el último deployment Vercel verificado figura `success`. El alias productivo responde 200 y el bundle contiene `/v1/gym/state`/`target_sessions`, sin `regSesion` ni `sesiones_semana`.
 - Gateway nuevo: Telegram configurado/conectado en polling, adaptador `/healthz` OK, MCP `lifeos: ok`, cron proactivo OK y `NO_REPLY`.
 - `faithful-light`: source Git desconectado, sin deployments activos y sin dominios; servicio/variables conservados para rollback.
