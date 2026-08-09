@@ -1,54 +1,52 @@
-Última actualización: 2026-08-09 — sesión pausada a mitad de la FASE C
+Ultima actualizacion: 2026-08-09 — fase economica $0 cerrada
 
-# Próxima sesión
+# Proxima sesion
 
-## LO PRIMERO, EN CUANTO ABRAS: confirmar que el heartbeat murió
+## Estado exacto
 
-La sesión se cerró **sin poder confirmarlo**. Estaba desactivado y el Gateway reiniciado a las ~13:22 UTC, pero el siguiente heartbeat tocaba a las **13:47:57 UTC** y la sesión terminó a las 13:28.
+- Heartbeat: **PASS**. 99 historicos; ultimo `2026-08-09T13:17:56.992Z`; cero despues del reinicio de `13:22Z`.
+- O4: desplegada en `isabel-api` `9c2e1760df359e91476014f6928f330e6ae5be0d`, Railway `0c64da45-b24b-489c-9124-9f76dd1c5d52` `SUCCESS`.
+- Prueba O4 automatica: tick `2026-08-09T14:30:00Z`, HTTP 200, 27 registros con superficie despues del barrido, cero requests a `/v1/chat`, presupuesto proactivo 0 calls/0 turns/$0.
+- Baseline desde `2026-08-09T13:22Z`: cero `session.started`, cero turnos de modelo, cero heartbeat. En esta ventana la autonomia del sistema costo $0; aun no es una proyeccion mensual.
+- Tools/skills: auditoria completa persistida. P1 y O3 estan propuestas, **NO aplicadas**.
+- Benchmark: A-W intacto (23) + JETMI (10) + sensibilidad (4), 37 total. `--fixtures`: J-M 4/4 PASS, coste $0.
+- Simulador: corregido para no cobrar `/v1/now`, inventario ni Gym como IA. 503/503 tests, 158 suites.
+- SSH: backup `C:\Users\USER\.ssh\config.pre-lifeos-20260809.bak`; aliases inequivocos `railway-isabel-gateway-old` y `railway-isabel-gateway-new`.
 
-```bash
-ssh 360bc08a-11be-4019-b5fd-9e98ce45aee4@ssh.railway.com "node -" < scripts/hb_check.js
-```
+## Antes de decidir otra optimizacion
 
-Lo que hay que ver: `total_heartbeats` **sigue en 99** y `ultimo` **sigue siendo `2026-08-09T13:17:56Z`**. Si aparece uno posterior a las 13:22, el reinicio no bastó y hay que investigar por qué (el scheduler vive en el proceso — ver `KNOWN_PROBLEMS.md`).
+Dejar que O4 acumule al menos 48 horas. Consultar `GET /v1/usage/today?hours=48` y contrastar con trayectorias reales. Separar siempre:
 
-El script está en el scratchpad de esa sesión; se reconstruye en 10 líneas: recorrer `/data/.openclaw/agents/main/sessions/*.trajectory.jsonl`, filtrar `type === 'session.started'` con `data.trigger === 'heartbeat'`, contar y quedarse con el `ts` mayor.
+- `SYSTEM_AUTONOMY`: heartbeat (debe seguir 0), tick determinista, sleep cron y background;
+- `USER_CONVERSATION`: Telegram y LIFEOS;
+- `MEASURED` frente a `SIMULATED`.
 
-**No verifiques con `openclaw config get` ni con `openclaw status`.** Los dos decían "disabled" mientras el heartbeat seguía disparándose. Solo vale la trayectoria real.
+## Decisiones pendientes — no asumir
 
-## Estado: qué está hecho y desplegado
+1. **P1**: allowlist de 12 `lifeos__*` + `message` + `session_status`. Ahorro de bytes de schemas ~69%; no aplicar sin decision de la usuaria y snapshot.
+2. **O3**: `agents.entries.main.skills: []`; no aplicar sin decision.
+3. **Benchmark real**: requiere cuentas/keys y presupuesto explicito. Empezar solo con corpus sanitizado y limite de gasto.
+4. **G8**: structured output productivo depende de parseo/limpieza. Hay fixtures, pero no cambiar comportamiento productivo sin decision.
 
-| | Estado |
-|---|---|
-| Heartbeat desactivado (`every: "0m"`) | **aplicado en producción** + Gateway reiniciado + fijado en `openclaw.default.json` |
-| Benchmark corregido, corpus A–W (23 casos) | commiteado, **sin desplegar** (no hace falta: no corre en producción) |
-| Router: G1 timeout opt-in, G6 fallback.reason, `agent_conversation` delegada | commiteado, **sin desplegar** |
-| Observabilidad O4 (`surface`/`session_key`/`trigger`, `/v1/usage/today`, barrido en el tick) | commiteado, **SIN DESPLEGAR — decisión pendiente** |
-| Simulador de coste + escenarios | commiteado |
-| Recorte de tools/skills | **diseñado y medido, NO aplicado** |
+## Simulacion revisada — no es factura
 
-497/497 pruebas. Repos limpios. Nada pusheado a GitHub todavía.
+| Escenario | ACTUAL | P1 contexto | Haiku everyday | Gemini hipotetico | Mixta hipotetica |
+|---|---:|---:|---:|---:|---:|
+| LIGHT | €8,42 | €3,68 | €1,23 | €0,33 | €0,33 |
+| NORMAL | €17,07 | €7,80 | €3,19 | €1,04 | €1,22 |
+| HEAVY | €41,77 | €20,00 | €9,16 | €3,28 | €4,22 |
+| ISABEL 150% | €81,37 | €41,16 | €22,43 | €8,86 | €11,77 |
 
-Commits: `isabel-api` `5d20a04 → 97e92b7 → 785d765 → <cost-model>` · `isabel-gateway` `a9785b0` · `life-os-app` `7dcdde5 → <docs>`.
+El cambio frente a la tabla anterior se debe a una correccion: 150 lecturas LIFEOS/dia son L0=$0; solo se simulan 8 microtareas/dia que realmente requieren IA.
 
-## Decisiones que bloquean el avance
+## Invariantes
 
-1. **¿Desplegar `isabel-api`?** Sin desplegar, la observabilidad no mide nada y no se puede comprobar el ahorro del heartbeat. `git push` → Railway auto-despliega.
-2. **¿Aplicar el perfil de tools P1?** −59% de contexto (23.235 → ~9.425 tok/turno). Riesgo: el histórico son ~3 días. Diseño en `ARQUITECTURA_ECONOMICA_2026-08-09.md` §4.
-3. **¿Crear las cuentas?** Google AI Studio (€0) y OpenRouter (~$10). Sin ellas no hay benchmark real.
+No cambiar Sonnet/Haiku, providers, `cacheRetention`, presupuestos, sleep cron, proactive cron, Telegram, P1/O3 ni claves sin decision explicita. No enviar Telegrams de prueba. No borrar el Gateway antiguo. No gastar benchmark real. No usar datos personales/medicos/operativos reales en benchmarks.
 
-## Dónde se quedó exactamente
+## Documentos de entrada
 
-**FASE C a medias.** Skills clasificadas y perfiles de tools medidos con `count_tokens`; falta decidir y aplicar. **FASES D y E hechas** (investigación de proveedores y simulador). **FASE F pendiente**: falta ampliar el corpus con casos de research JETMI y de sensibilidad, y ejecutar `--fixtures` ($0). **FASE G pendiente**: presentar el coste previsto antes de gastar.
-
-## El hallazgo que manda sobre el plan
-
-El simulador dice que **recortar contexto no basta**: Isabel al 150% cuesta €88,72/mes hoy, €48,50 con el perfil P1 y **€29,78 incluso bajando toda la conversación a Haiku**. Solo baja de €20 con un L2 barato (€13,53 mixta / €10,62 Gemini).
-
-Es decir: **cambiar el modelo de L2 dejó de ser opcional** para el objetivo del 150%. Para el uso de HOY sí sobra con lo ya hecho.
-
-## Invariantes que no se tocan
-
-Telegram solo en el Gateway nuevo · un único sleep cron activo · `proactive-tick-15m` intacto · MCP `lifeos` · Gateway antiguo como rollback, sin borrar · sin mensajes de prueba a Telegram · sin claves en código, chat, logs ni commits · benchmarks solo con fixtures sintéticos.
-
-**Aviso que ahorra un error caro:** migrar a Sonnet 5 por precio es una trampa. Su precio introductorio ($2/$10 hasta el 31-ago-2026) parece más barato que Sonnet 4.6, pero los modelos 4.7+ usan un tokenizador que produce ~30% más tokens; desde el 1-sep sale ~30% MÁS caro. Está modelado y fijado por test en el simulador.
+1. `docs/CURRENT_STATE.md`
+2. `docs/research/AI_RUNTIME/ARQUITECTURA_ECONOMICA_2026-08-09.md`
+3. `docs/research/AI_RUNTIME/AUDITORIA_TOOLS_SKILLS_2026-08-09.md`
+4. `docs/research/AI_RUNTIME/DECISION_MULTIMODELO_2026-08-09.md`
+5. `docs/KNOWN_PROBLEMS.md`

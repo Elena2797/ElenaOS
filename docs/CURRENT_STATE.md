@@ -1,5 +1,5 @@
 Estado: fotografía operativa vigente
-Última verificación: 2026-08-08
+Última verificación: 2026-08-09
 
 # Estado actual de LIFEOS
 
@@ -9,7 +9,7 @@ LIFEOS mantiene una sola Isabel, un Priority Engine global, especialistas determ
 
 ## Producción
 
-- `isabel-api` sirve el commit `70785564bec14acbc15b076817e4e1042535d277` con deployment Railway `SUCCESS`/`RUNNING`.
+- `isabel-api` sirve el commit `9c2e1760df359e91476014f6928f330e6ae5be0d` con deployment Railway `0c64da45-b24b-489c-9124-9f76dd1c5d52` `SUCCESS`/`RUNNING`.
 - `life-os-app`: el cambio funcional de Gym es `f366ff7b762dcb7659b13346e2c87b7c46c2b1b8`; el último deployment Vercel verificado figura `success`. El alias productivo responde 200 y el bundle contiene `/v1/gym/state`/`target_sessions`, sin `regSesion` ni `sesiones_semana`.
 - Gateway nuevo: Telegram configurado/conectado en polling, adaptador `/healthz` OK, MCP `lifeos: ok`, cron proactivo OK y `NO_REPLY`.
 - `faithful-light`: source Git desconectado, sin deployments activos y sin dominios; servicio/variables conservados para rollback.
@@ -34,9 +34,9 @@ Core decide y el frontend representa. Home, Dominios y Gym cargan `GET /v1/gym/s
 
 ## Verificación
 
-- Backend: 455/455 pruebas, 143 suites.
+- Backend: 503/503 pruebas, 158 suites.
 - Frontend: 10/10 pruebas, 2 suites.
-- Benchmark: 15 casos A–O validados; $0, sin llamadas a modelo.
+- Benchmark: 23 casos A–W conservados + 10 JETMI + 4 de sensibilidad = 37 casos validados; fixtures J–M 4/4 PASS, coste $0, sin llamadas a modelo.
 - Build Vite: completo; advertencia existente de chunk grande, sin fallo.
 - Producción: `/health`, `/v1/now`, `/v1/gym/state`, `/v1/proactive/budget` responden 200.
 - No se envió ninguna notificación de prueba.
@@ -45,15 +45,15 @@ La inspección visual automatizada de Home/Dominios/Gym/Isabel no pudo completar
 
 ## Coste actual medido
 
-**La cifra que reporta LIFEOS está mal y ahora se sabe por qué.** `GET /v1/usage/summary` dice $2.716060 en 30 días (conversación 93,9%, light AI 6,1%). Medido contra las trayectorias reales del Gateway, el gasto real es **$12.535 en 70 horas ≈ $4,30/día ≈ $129/mes** — la instrumentación ve ~el 2%.
+La ventana historica medida antes de la correccion fue **$12.535 en 70 horas ≈ $4,30/día ≈ $129/mes**. Era gasto real con heartbeat, no la nueva tasa.
 
-Dos causas verificadas: `KNOWN_SESSION_KEYS = ['lifeos','main']` no incluye las sesiones de cron, y el barrido solo corre a mano o tras `/v1/chat`, así que **los turnos que más gastan —los que ocurren sin nadie delante— no se miden**.
+O4 ya corrige los puntos ciegos: barre `main`, `lifeos` y el cron estable desde el tick de 15 minutos, conserva el timestamp del evento y declara cobertura/coste. Se demostro en produccion a las 14:30 UTC sin abrir `/v1/chat`: 27 registros recibieron superficie y el tick termino 200/ok.
 
-Causa del gasto, demostrada: un **`heartbeat` de OpenClaw que nadie configuró** (default `30m`) despierta a Sonnet 4.6 cada 30 minutos, 24 h al día, con ~28.000 tokens de contexto. Son **98 de 161 turnos y el 71,6% del gasto**. Su `target` es `none` (no entrega nada) y su checklist `HEARTBEAT.md` no existe. Explica el incidente de saldo del 2026-08-07.
+Causa historica demostrada: el **heartbeat default de 30 minutos** produjo el 71,6% del gasto. Esta muerto: 99 heartbeats totales, ultimo `2026-08-09T13:17:56.992Z`, **cero posteriores** al reinicio de `13:22Z`.
 
-Composición del contexto, medida con `count_tokens`: de los 23.235 tokens fijos por turno, **17.178 (73,9%) son definiciones de tools** y 5.530 el system prompt; el transcript real son ~4.400 (16%) y la memoria persistente **168 tokens (0,7%)**. De las 42 tools expuestas, Isabel ha usado **10** en todo su histórico.
+Composición del contexto, medida con `count_tokens`: de los 23.235 tokens fijos por turno, **17.178 (73,9%) son definiciones de tools** y 5.530 el system prompt; la memoria persistente son 168 tokens. El catalogo actual expone **47 tools** y los metadatos retenidos muestran uso de **9**.
 
-Detalle completo y optimizaciones propuestas: [`research/AI_RUNTIME/MEDICION_CONTEXTO_2026-08-09.md`](research/AI_RUNTIME/MEDICION_CONTEXTO_2026-08-09.md). **Ninguna aplicada.**
+Detalle completo: [`research/AI_RUNTIME/MEDICION_CONTEXTO_2026-08-09.md`](research/AI_RUNTIME/MEDICION_CONTEXTO_2026-08-09.md) y [`research/AI_RUNTIME/AUDITORIA_TOOLS_SKILLS_2026-08-09.md`](research/AI_RUNTIME/AUDITORIA_TOOLS_SKILLS_2026-08-09.md). P1/O3 siguen **sin aplicar**.
 
 ## Bloqueos reales
 
@@ -64,4 +64,4 @@ Detalle completo y optimizaciones propuestas: [`research/AI_RUNTIME/MEDICION_CON
 
 ## Siguiente paso
 
-Ver `NEXT_SESSION.md`. No conectar proveedores hasta revisar esta tanda.
+Revisar este checkpoint. La siguiente decision es una sola: observar el baseline 48 h y despues elegir entre aplicar P1/O3 de forma reversible o autorizar un benchmark real sanitizado. No hay que conectar ningun proveedor hoy.

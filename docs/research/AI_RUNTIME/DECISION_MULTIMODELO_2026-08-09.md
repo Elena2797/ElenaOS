@@ -465,3 +465,15 @@ Medir **qué** ocupa esos 25.833 tokens de contexto por turno. Es la palanca de 
 **Mi apuesta, para que quede escrita antes de medir y se pueda comprobar si acierto:** el ganador de L2 será **Gemini 3.5 Flash-Lite** (10,6× más barato, cache read $0.03, términos UE sin entrenamiento) con **Haiku 4.5 como fallback** (cero integración nueva, comportamiento ya medido). L1 se irá a **Gemini 3.1 Flash-Lite** o se quedará en Haiku, porque el 6.1% no justifica riesgo. **Los niveles útiles serán tres, no cinco.**
 
 **Y la recomendación incómoda:** hoy €20 duran ~8 meses. Si lo que quieres es que duren mucho **al ritmo actual**, el paso 2 solo ya lo lleva a ~15 meses sin conectar nada ni arriesgar calidad. El multi-proveedor merece la pena por lo otro: por poder usar a Isabel 10 veces al día sin mirar el saldo. Si esa no es la intención, el paso 2 puede ser todo lo que hace falta.
+
+---
+
+## Addendum de cierre $0 — 2026-08-09
+
+- G1 y G6 estan corregidos. G8 no se cambio en produccion; el benchmark ya prueba schema estricto.
+- A-W esta completo y conserva 23 casos. Se agregaron `JETMI-01..10` y `SENS-01..04`: 37 casos en total, todos sinteticos.
+- `node benchmarks/model-router/run.mjs --fixtures`: J-M 4/4 PASS, coste reportado $0; no se conecto proveedor.
+- O4 esta desplegada y demostro barrido automatico sin `/v1/chat`.
+- El catalogo real actual son 47 tools; P1/O3 estan disenadas y NO aplicadas.
+- La tabla de coste inicial cobraba por error 150 lecturas deterministas LIFEOS/dia como L1. Corregida: ISABEL 150% = €81,37 actual; €41,16 P1; €22,43 Haiku; €8,86 Gemini hipotetico; €11,77 mixta.
+- No usar la frase "€20 duran X meses" hasta acumular baseline posterior al heartbeat. Desde `13:22Z` hasta el checkpoint no hubo ningun turno de modelo, pero la ventana aun es demasiado corta para proyectar.

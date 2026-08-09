@@ -1,4 +1,4 @@
-Estado: medición cerrada — optimizaciones PROPUESTAS, ninguna aplicada
+Estado: medicion cerrada — O1 y O4 APLICADAS/VERIFICADAS; P1/O3 NO aplicadas
 Última verificación: 2026-08-09
 Verificado en: trayectorias reales del volumen de `isabel-gateway` (lectura), `count_tokens` de Anthropic (endpoint gratuito, $0), `openclaw config get`, tabla de precios oficial de Anthropic
 Fuente de verdad de datos: ninguna (documento de análisis)
@@ -132,23 +132,23 @@ Las 15 no medibles son: `cron` (5.524 B), `browser` (4.388), `skill_workshop` (2
 
 ---
 
-## 4. Qué usa Isabel de verdad
+## 4. Qué usa Isabel de verdad — conteo corregido
 
-Extraído de **todo** el histórico de trayectorias (roles `toolResult` + bloques `toolCall`):
+**Correccion 2026-08-09:** el conteo anterior recorria `messagesSnapshot`, que es acumulativo, y volvia a contar los mismos tool calls en cada trace. El conteo deduplicado usa una vez `trace.artifacts.data.toolMetas` en 163 traces:
 
 | Invocaciones | Herramienta |
 |---|---|
-| 257 | `lifeos__vistajet_get_status` |
-| 159 | `lifeos__health_get_sleep_status` |
-| 82 | `lifeos__health_register_sleep` |
-| 41 | `lifeos__vistajet_update_status` |
-| 35 | `lifeos__isabel_message` |
-| 9 | `lifeos__lifeos_proactive_check` |
+| 34 | `lifeos__lifeos_proactive_check` |
+| 13 | `lifeos__vistajet_get_status` |
+| 9 | `lifeos__health_get_sleep_status` |
+| 4 | `lifeos__health_register_sleep` |
 | 3 | `message` |
-| 2 | `lifeos__lifeos_pending_questions` |
+| 3 | `lifeos__isabel_message` |
+| 2 | `lifeos__vistajet_update_status` |
+| 1 | `lifeos__lifeos_pending_questions` |
 | 1 | `lifeos__gym_log_session` |
 
-**Nueve tools de LIFEOS y `message`. Nada más.**
+**Nueve tools distintas, 70 invocaciones. Nada administrativo.** El catalogo mas reciente ya contiene 47 definiciones/54.970 bytes; ver la auditoria completa enlazada abajo.
 
 Cero invocaciones, en todo el histórico, de: `browser`, `canvas`, `cron`, `exec`, `process`, `file_write`, `file_fetch`, `dir_list`, `dir_fetch`, `read`, `write`, `edit`, `apply_patch`, `pdf`, `image`, `tts`, `web_search`, `web_fetch`, `skill_workshop`, `subagents`, `sessions_spawn`, `sessions_list`, `sessions_send`, `sessions_history`, `sessions_yield`, `nodes`, `gateway`, `memory_search`, `memory_get`, `create_goal`, `update_goal`, `get_goal`, `agents_list`, `session_status`.
 
@@ -156,13 +156,15 @@ Son **~33 herramientas, ~14.600 tokens en cada turno, que no se han usado ni una
 
 Lo mismo con las skills: 14 en estado `ready`, y son `meme-maker`, `python-debugpy`, `node-inspect-debugger`, `skill-creator`, `spike`, `canvas`, `diagram-maker`, `healthcheck`, `node-connect`, `taskflow`, `taskflow-inbox-triage`, `notion`, `browser-automation`, `weather`. **Ninguna tiene que ver con VistaJet, salud, finanzas, JETMI ni gimnasio.**
 
+Inventario actual por tool/skill, tokens, riesgos y perfiles: [`AUDITORIA_TOOLS_SKILLS_2026-08-09.md`](AUDITORIA_TOOLS_SKILLS_2026-08-09.md).
+
 ---
 
 ## 5. Optimizaciones $0 propuestas
 
-Ninguna reduce capacidades, memoria operacional, seguridad ni calidad. Ninguna toca `cacheRetention`. **Ninguna está aplicada.**
+Ninguna toca `cacheRetention`. Estado posterior: **O1 (heartbeat) y O4 (observabilidad) aplicadas y verificadas; P1/tools y O3/skills siguen sin aplicar.**
 
-### O1 — Configurar el heartbeat (que hoy no está configurado)
+### O1 — Configurar el heartbeat — APLICADA Y VERIFICADA
 
 **Qué:** `agents.defaults.heartbeat.every: false`. Alternativa conservadora: `every: "2h"` + `activeHours: { start: "08:00", end: "23:00" }` (48 → 8 ejecuciones/día).
 
@@ -190,7 +192,7 @@ Ninguna reduce capacidades, memoria operacional, seguridad ni calidad. Ninguna t
 
 **Riesgo:** prácticamente nulo. Cero referencias desde LIFEOS.
 
-### O4 — Arreglar la instrumentación (no ahorra: hace verificable todo lo demás)
+### O4 — Arreglar la instrumentación — APLICADA Y VERIFICADA
 
 **Qué:** (a) añadir las sesiones de cron y heartbeat a `KNOWN_SESSION_KEYS`; (b) disparar el barrido desde `proactive-tick-15m`, que ya corre cada 15 min, es determinista y cuesta $0.
 

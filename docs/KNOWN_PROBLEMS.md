@@ -115,22 +115,22 @@ Explica el incidente de saldo del 2026-08-07: las trayectorias contienen 16 turn
 
 **Resuelto el 2026-08-09:** `agents.defaults.heartbeat.every: "0m"` en la config viva + fijado en `openclaw.default.json` por si alguien fuerza un re-seed. Requirió reiniciar el Gateway (ver la entrada anterior). Verificado después: Telegram conectado en polling, ambos crons ok, adaptador `/healthz` ok, MCP `lifeos` presente. Rollback: `openclaw config unset agents.defaults.heartbeat` + reinicio.
 
-### El medidor de coste no ve los turnos que más gastan — ABIERTO
+### El medidor de coste no veía los turnos que más gastan — RESUELTO 2026-08-09 (O4)
 
 Dos huecos verificados en el código: (1) `gatewayChat.js` → `KNOWN_SESSION_KEYS = ['lifeos','main']`, así que las sesiones de cron (`agent:main:cron:*`) **no se barren nunca**; (2) el barrido solo se dispara a mano o tras un turno de `/v1/chat` — **si nadie chatea, nadie mide**, y los turnos caros son justamente los que ocurren sin nadie delante. Resultado: `/v1/usage/summary` reporta $2,72/30 días mientras el gasto real es ~$4,30/**día**.
 
-Arreglo propuesto (O4): añadir las sesiones de cron/heartbeat a la lista y disparar el barrido desde `proactive-tick-15m`, que ya corre cada 15 min y es determinista.
+O4 desplegada en `isabel-api` `9c2e176`: claves de sesión ampliables, barrido desde `proactive-tick-15m`, timestamps reales, identificador de respuesta, idempotencia y coalescing concurrente. Prueba productiva de las 14:30 UTC: tick 200/ok, 27 registros con superficie capturados y cero peticiones a `/v1/chat`.
 
-### Isabel recibe 42 definiciones de tools y usa 10 — ABIERTO
+### Isabel recibe 47 definiciones de tools y usa 9 — ABIERTO (P1 diseñada, NO aplicada)
 
-Medido con `count_tokens`: **17.178 de los 23.235 tokens fijos por turno (73,9%) son definiciones de herramientas**. En todo el histórico de trayectorias, Isabel solo ha invocado 9 tools `lifeos__*` y `message`. Las ~33 nativas de OpenClaw (`browser`, `exec`, `canvas`, `cron`, `pdf`, `tts`, `subagents`, `sessions_*`, `memory_*`, `gateway`, …) suman ~14.600 tokens por turno y **cero invocaciones**. Lo mismo con 14 skills `ready` (`meme-maker`, `python-debugpy`, `skill-creator`, `weather`…), ninguna relacionada con los dominios de Isabel.
+Medido con `count_tokens`: **17.178 de los 23.235 tokens fijos por turno (73,9%) son definiciones de herramientas**. El contexto retenido actual expone 47 tools (54.970 bytes) y los metadatos de 163 traces registran 70 invocaciones de solo 9 tools. Las tools administrativas nativas no tuvieron uso. Inventario completo, riesgos, P1 y O3: `research/AI_RUNTIME/AUDITORIA_TOOLS_SKILLS_2026-08-09.md`.
 
 Además de coste es superficie de seguridad: hoy Isabel puede ejecutar comandos (`exec`) y reescribir su propia configuración (`gateway`) desde una conversación de Telegram.
 
 ### Ninguna llamada a Anthropic registraba tokens/modelo/coste — RESUELTO (D31, completado en D36)
 D31 instrumentó las llamadas de `isabel-api`. D36 cerró el punto ciego que quedaba —los turnos del agente en OpenClaw, que resultaron ser el **97,8 % del gasto**— leyendo el `usage` real de `chat.history`, sin tocar OpenClaw. `GET /v1/usage/summary` responde la pregunta con datos.
 
-**Resto abierto:** el barrido (`POST /v1/usage/sweep`) solo corre a mano y automáticamente tras cada turno de `/v1/chat`. Los turnos de **Telegram y del cron** solo quedan registrados cuando alguien barre — no hay disparador periódico todavía.
+**Cerrado por O4:** el barrido también corre desde el tick determinista cada 15 minutos, aunque nadie abra `/v1/chat`.
 
 ## Resuelto: la cuenta de Anthropic se quedó sin crédito (2026-08-07 → 2026-08-08)
 

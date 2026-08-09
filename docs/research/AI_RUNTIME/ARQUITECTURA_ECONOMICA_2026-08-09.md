@@ -1,6 +1,6 @@
-Estado: fases A–F ejecutadas · decisión de proveedor PENDIENTE
+Estado: fase $0 cerrada · heartbeat y O4 verificados · P1/O3 y proveedor PENDIENTES
 Última verificación: 2026-08-09
-Verificado en: trayectorias reales del Gateway, `count_tokens` de Anthropic ($0), `openclaw config/status/cron/channels`, simulador con precios oficiales fechados, 497/497 pruebas
+Verificado en: trayectorias reales del Gateway, `count_tokens` de Anthropic ($0), `openclaw config/status/cron/channels`, O4 productivo, simulador y fixtures $0
 Fuente de verdad de datos: ninguna
 
 # Isabel como orquestador de inteligencia — economía y runtime multi-modelo
@@ -60,7 +60,7 @@ Ahorro esperado: **$3,07/día ≈ $92/mes**, más 155 tok/turno menos de system 
 
 ---
 
-## 3. Observabilidad (O4) — implementada, sin desplegar
+## 3. Observabilidad (O4) — desplegada y verificada
 
 Dos agujeros cerrados en `isabel-api`:
 
@@ -71,7 +71,9 @@ Cada registro declara **dónde** ocurrió, separado de **qué** se hizo: `surfac
 
 `GET /v1/usage/today?hours=24` responde *"¿cuánto costó Isabel hoy?"* separando **INTERACTIVO** (ella estaba delante) de **BACKGROUND** (el sistema solo) — el background es el recortable sin que note nada. Y **declara su propia cobertura**: cuántos registros traen `surface` y cuántos traen coste, para no fingir precisión.
 
-> **Límite honesto:** las sesiones de cron llevan un `runId` nuevo cada ejecución y no se pueden enumerar desde `isabel-api`. Cerrarlo del todo exige una ruta nueva en `gateway-adapter.mjs` (`sessions.list`) y **un despliegue del Gateway**, que no he hecho. Hoy ese hueco vale ~1 turno/día.
+Despliegue productivo: `isabel-api` commit `9c2e1760df359e91476014f6928f330e6ae5be0d`, deployment Railway `0c64da45-b24b-489c-9124-9f76dd1c5d52` `SUCCESS`. El cron estable de sueño se declara mediante `GATEWAY_SESSION_KEYS`.
+
+Prueba sin `/v1/chat`: el tick de `2026-08-09T14:30:00Z` hizo `POST /v1/proactive/tick` y terminó 200/ok; los logs muestran **cero** peticiones a `/v1/chat`. Después, `/v1/usage/today` pasó de 0 a 27 registros con superficie (`main_legacy_mixed`/`cron`). El backfill conserva el timestamp real, coalesce barridos concurrentes e informa fallos de inserción; no convierte historia anterior al heartbeat en baseline nuevo.
 
 ---
 
@@ -125,17 +127,19 @@ Coste del catálogo: `## Skills` 1.536 tok + `## Skill Workshop` 488 = **2.024 t
 
 Simulador: `npm run cost:simulate`. La unidad no es el mensaje sino la **conversación** — el primer turno escribe el prefijo entero en caché y los siguientes solo pagan el incremento; un modelo que no lo refleje miente, porque el 97,2% de la factura es cache-write.
 
-**ISABEL 150%** = 12 conversaciones/día de 8 turnos · 150 llamadas L1/día · 3 crons · 10 research/semana · 10 agentes/semana · documentos diarios · 96 ticks a $0.
+**Corrección del audit:** la versión inicial cobraba las 150 aperturas de `/v1/now`, inventario y Gym como llamadas L1. Esas rutas son deterministas. El modelo corregido separa 150 lecturas L0 a $0 de 8 llamadas estructuradas/día que hipotéticamente sí requieren IA.
+
+**ISABEL 150%** = 12 conversaciones/día de 8 turnos · 150 lecturas LIFEOS L0/día · 8 llamadas L1/día · 3 crons · 10 research/semana · 10 agentes/semana · documentos diarios · 96 ticks a $0.
 
 | Arquitectura | €/mes | ¿≤ €20? |
 |---|---|---|
-| ACTUAL (Sonnet 4.6, 47 tools) | **€88,72** | NO |
-| SOLO_CONTEXTO (perfil P1) | €48,50 | NO |
-| HAIKU_EVERYDAY (L2 → Haiku 4.5) | €29,78 | NO |
-| HIPÓTESIS MIXTA (L2 barato + Sonnet para L3) | **€13,53** | **SÍ** |
-| HIPÓTESIS GEMINI | €10,62 | SÍ |
+| ACTUAL (Sonnet 4.6, 47 tools) | **€81,37** | NO |
+| SOLO_CONTEXTO (perfil P1) | €41,16 | NO |
+| HAIKU_EVERYDAY (L2 → Haiku 4.5) | €22,43 | NO |
+| HIPÓTESIS MIXTA (L2 barato + Sonnet para L3) | **€11,77** | **SÍ** |
+| HIPÓTESIS GEMINI | €8,86 | SÍ |
 
-Y con el uso de **hoy** (NORMAL): €19,09 actual → €1,70 con la arquitectura mixta.
+Y con el uso **NORMAL simulado**: €17,07 actual → €1,22 con la arquitectura mixta.
 
 **La conclusión que cambia el plan: recortar contexto no basta.** Si el objetivo es Isabel al 150% bajo €20, cambiar el modelo de L2 **deja de ser opcional**. Para el uso actual sí sobra con lo hecho hoy.
 
