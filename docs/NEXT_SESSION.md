@@ -1,59 +1,54 @@
-Última actualización: 2026-08-09 — investigación multi-modelo cerrada, decisión pendiente
+Última actualización: 2026-08-09 — sesión pausada a mitad de la FASE C
 
 # Próxima sesión
 
-## Estado de la tanda anterior
+## LO PRIMERO, EN CUANTO ABRAS: confirmar que el heartbeat murió
 
-1. QA visual de Home, Dominios, Gym e Isabel: **sigue pendiente**. Repetir cuando el controlador de navegador funcione, o validarlo manualmente en el dispositivo. Limpiar service worker si se sirve un bundle anterior.
-2. Sleep cron: **cerrado el 2026-08-09**. Se disparó solo a las 08:00 Europe/Madrid con `lastRunStatus: ok`, `lastDeliveryStatus: delivered`, `consecutiveErrors: 0`. No se forzó ni se envió notificación de prueba.
+La sesión se cerró **sin poder confirmarlo**. Estaba desactivado y el Gateway reiniciado a las ~13:22 UTC, pero el siguiente heartbeat tocaba a las **13:47:57 UTC** y la sesión terminó a las 13:28.
 
-## La investigación de proveedores YA está hecha
+```bash
+ssh 360bc08a-11be-4019-b5fd-9e98ce45aee4@ssh.railway.com "node -" < scripts/hb_check.js
+```
 
-Vive en **[`research/AI_RUNTIME/DECISION_MULTIMODELO_2026-08-09.md`](research/AI_RUNTIME/DECISION_MULTIMODELO_2026-08-09.md)**: estado verificado heredado, auditoría del Model Router (8 huecos, G1/G8 bloqueantes), mapa de proveedores con precios oficiales de esa fecha, shortlist y descartes con motivo, arquitectura de 3 niveles de cerebro, comparación directo/OpenRouter/híbrido, división LIFEOS Router ↔ OpenClaw, auditoría del corpus A–O (8 hallazgos, 5 casos inejecutables), corpus propuesto A–W, coste estimado del benchmark, ahorro potencial, cuentas necesarias, riesgos y recomendación.
+Lo que hay que ver: `total_heartbeats` **sigue en 99** y `ultimo` **sigue siendo `2026-08-09T13:17:56Z`**. Si aparece uno posterior a las 13:22, el reinicio no bastó y hay que investigar por qué (el scheduler vive en el proceso — ver `KNOWN_PROBLEMS.md`).
 
-**Sigue sin conectarse ningún proveedor y sin ejecutarse ningún benchmark de pago.** No hacerlo sin decisión explícita de la usuaria.
+El script está en el scratchpad de esa sesión; se reconstruye en 10 líneas: recorrer `/data/.openclaw/agents/main/sessions/*.trajectory.jsonl`, filtrar `type === 'session.started'` con `data.trigger === 'heartbeat'`, contar y quedarse con el `ts` mayor.
 
-## Hecho el 2026-08-09: instrumento arreglado y coste real medido
+**No verifiques con `openclaw config get` ni con `openclaw status`.** Los dos decían "disabled" mientras el heartbeat seguía disparándose. Solo vale la trayectoria real.
 
-**Benchmark corregido** (`isabel-api` @ `97e92b7`, 470/470 pruebas): capability inexistente, 5 casos inejecutables, scoring que producía falsos negativos, schema y argumentos de tool sin comprobar, fixtures de fallo y generador de contexto sin implementar, y sin medida de estabilidad. Corpus ampliado a **A–W** (23 casos). `--validate` y `--fixtures` cuestan $0. Detalle en `isabel-api/benchmarks/model-router/README.md`.
+## Estado: qué está hecho y desplegado
 
-**Router:** G1 (timeout **opt-in**, producción intacta) y G6 (`fallback.reason`) arreglados. `agent_conversation` declarada DELEGADA a OpenClaw con test que impide routers anidados. **G8 sigue abierto a propósito**: tocarlo cambiaría el parseo de `/v1/now`, Inventario y Gym en producción.
+| | Estado |
+|---|---|
+| Heartbeat desactivado (`every: "0m"`) | **aplicado en producción** + Gateway reiniciado + fijado en `openclaw.default.json` |
+| Benchmark corregido, corpus A–W (23 casos) | commiteado, **sin desplegar** (no hace falta: no corre en producción) |
+| Router: G1 timeout opt-in, G6 fallback.reason, `agent_conversation` delegada | commiteado, **sin desplegar** |
+| Observabilidad O4 (`surface`/`session_key`/`trigger`, `/v1/usage/today`, barrido en el tick) | commiteado, **SIN DESPLEGAR — decisión pendiente** |
+| Simulador de coste + escenarios | commiteado |
+| Recorte de tools/skills | **diseñado y medido, NO aplicado** |
 
-**Medición del coste — ver [`research/AI_RUNTIME/MEDICION_CONTEXTO_2026-08-09.md`](research/AI_RUNTIME/MEDICION_CONTEXTO_2026-08-09.md).**
+497/497 pruebas. Repos limpios. Nada pusheado a GitHub todavía.
 
-## Lo siguiente: decisión sobre las optimizaciones $0
+Commits: `isabel-api` `5d20a04 → 97e92b7 → 785d765 → <cost-model>` · `isabel-gateway` `a9785b0` · `life-os-app` `7dcdde5 → <docs>`.
 
-Ninguna aplicada. Orden propuesto, una a una para poder atribuir el efecto:
+## Decisiones que bloquean el avance
 
-1. **O1 — desactivar el `heartbeat`** (`agents.defaults.heartbeat.every: false`). Es el **71,6% del gasto** ($3,07/día). No entrega nada (`target: none`) y su checklist no existe. **Observar 48 h antes de seguir.**
-2. **O4 — arreglar la instrumentación**: añadir las sesiones de cron a `KNOWN_SESSION_KEYS` y disparar el barrido desde `proactive-tick-15m`. No ahorra; hace verificable todo lo demás.
-3. **O3 — desactivar las 14 skills ajenas** (~2.024 tok/turno, riesgo casi nulo).
-4. **O2 — allowlist de tools**: dejar las 9 `lifeos__*` + `message`. ~14.600 tok/turno y cero invocaciones en todo el histórico. Por tandas.
+1. **¿Desplegar `isabel-api`?** Sin desplegar, la observabilidad no mide nada y no se puede comprobar el ahorro del heartbeat. `git push` → Railway auto-despliega.
+2. **¿Aplicar el perfil de tools P1?** −59% de contexto (23.235 → ~9.425 tok/turno). Riesgo: el histórico son ~3 días. Diseño en `ARQUITECTURA_ECONOMICA_2026-08-09.md` §4.
+3. **¿Crear las cuentas?** Google AI Studio (€0) y OpenRouter (~$10). Sin ellas no hay benchmark real.
 
-Efecto acumulado estimado: **$4,30/día → ~$0,34/día**; con el uso real de Estefanía, **~$4/mes**. €20 pasarían de durar ~5 días a ~5 meses.
+## Dónde se quedó exactamente
 
-**No tocar `cacheRetention` ni `contextPruning` todavía**: tocan el contexto conversacional y primero hay que ver el efecto de O1–O4.
+**FASE C a medias.** Skills clasificadas y perfiles de tools medidos con `count_tokens`; falta decidir y aplicar. **FASES D y E hechas** (investigación de proveedores y simulador). **FASE F pendiente**: falta ampliar el corpus con casos de research JETMI y de sensibilidad, y ejecutar `--fixtures` ($0). **FASE G pendiente**: presentar el coste previsto antes de gastar.
 
-## Después: proveedores
+## El hallazgo que manda sobre el plan
 
-La investigación sigue vigente en `research/AI_RUNTIME/DECISION_MULTIMODELO_2026-08-09.md`, **pero su prioridad ha bajado**: el sistema no gastaba de más porque Sonnet sea caro, sino porque lo despertaba 48 veces al día con un catálogo de 42 tools de las que usa 10. Cambiar de modelo antes habría dividido la factura por 10 y dejado intacto el factor 13.
+El simulador dice que **recortar contexto no basta**: Isabel al 150% cuesta €88,72/mes hoy, €48,50 con el perfil P1 y **€29,78 incluso bajando toda la conversación a Haiku**. Solo baja de €20 con un L2 barato (€13,53 mixta / €10,62 Gemini).
 
-Cuando toque: abrir OpenRouter + Google AI Studio → smoke (~$0.10) → completo ×3 (~$2.55) → decidir L2.
+Es decir: **cambiar el modelo de L2 dejó de ser opcional** para el objetivo del 150%. Para el uso de HOY sí sobra con lo ya hecho.
 
-**Aviso que ahorra un error caro:** migrar a Sonnet 5 por precio es una trampa. Su precio introductorio ($2/$10 hasta el 31-ago-2026) parece más barato que Sonnet 4.6, pero los modelos 4.7+ usan un tokenizador que produce ~30% más tokens; desde el 1-sep-2026 sale ~30% MÁS caro que hoy.
+## Invariantes que no se tocan
 
-**Aviso que ahorra un error caro:** migrar a Sonnet 5 por precio es una trampa. Su precio introductorio ($2/$10 hasta el 31-ago-2026) parece más barato que Sonnet 4.6, pero los modelos 4.7+ usan un tokenizador que produce ~30% más tokens; desde el 1-sep-2026 sale ~30% MÁS caro que hoy.
+Telegram solo en el Gateway nuevo · un único sleep cron activo · `proactive-tick-15m` intacto · MCP `lifeos` · Gateway antiguo como rollback, sin borrar · sin mensajes de prueba a Telegram · sin claves en código, chat, logs ni commits · benchmarks solo con fixtures sintéticos.
 
-## Invariantes
-
-- Una sola Isabel; proveedores no son agentes ni dominios.
-- Specialists piden capabilities, nunca nombres de modelos.
-- Frontend no decide modelo.
-- `runWithoutAI()` bloquea todo provider dentro del tick.
-- Sin provider o con fallo total: error explícito, nunca contenido inventado.
-- Coste reportado > estimación explícita > null; nunca inventar.
-- OpenClaw y el router directo son dos planos coordinados, no routers anidados.
-- `faithful-light` no se reconecta ni despliega sin una decisión explícita.
-- Gateway antiguo se conserva como rollback; no borrarlo.
-- La copia de `sleep-check-0800-madrid` del Gateway antiguo debe permanecer deshabilitada; exactamente una copia activa vive en el Gateway nuevo.
-- No reactivar `lifeos-agent`.
+**Aviso que ahorra un error caro:** migrar a Sonnet 5 por precio es una trampa. Su precio introductorio ($2/$10 hasta el 31-ago-2026) parece más barato que Sonnet 4.6, pero los modelos 4.7+ usan un tokenizador que produce ~30% más tokens; desde el 1-sep sale ~30% MÁS caro. Está modelado y fijado por test en el simulador.

@@ -97,15 +97,23 @@ Encontrado el 2026-08-07: `life_context.mode` se leía, se pintaba en la píldor
 
 **Resto abierto:** `tasks.suitable_modes` (array `{ON,OFF}`, pensado exactamente para filtrar tareas por modo) sigue sin usarse — `addTask()` lo hardcodea siempre a ambos modos y ningún filtro lo lee. No se conectó en D21 porque requeriría UI nueva para elegir el modo de una tarea al crearla, y no hay tarea real hoy que esté marcada para un solo modo.
 
-### El `heartbeat` de OpenClaw corre cada 30 min sin que nadie lo configurara — ABIERTO, es el 71,6% del gasto
+### Un `openclaw config set` NO aplica solo: el scheduler vive en el proceso — LECCIÓN CONFIRMADA 2026-08-09
+
+Al desactivar el heartbeat, `openclaw config get` devolvía `{"every":"0m"}`, `openclaw status` mostraba `Heartbeat │ disabled (main)` y el system prompt **ya había perdido su sección** (5.530 → 5.375 tokens). Parecía aplicado por triplicado. **Y a las 13:17:56 UTC se disparó otro heartbeat.** El propio `config set` lo avisa (*"Restart the gateway to apply"*) y es fácil pasarlo por alto entre la salida.
+
+**Regla:** cualquier afirmación de "ya está desactivado" tiene que verificarse contra la **trayectoria real** (`session.started` con su `trigger`), nunca contra `config get` ni `status`. Se resolvió con `railway redeploy` (mismo deployment, sin reconstruir); el volumen conserva config, sesiones y crons, y `OPENCLAW_SEED_FORCE` no está definida, así que el reinicio no re-siembra.
+
+### El `heartbeat` de OpenClaw corría cada 30 min sin que nadie lo configurara — RESUELTO 2026-08-09
 
 Encontrado el 2026-08-09 midiendo las trayectorias reales del Gateway. `agents.defaults` **no tiene clave `heartbeat`**, así que aplica el default documentado de OpenClaw (`30m`): un turno de agente completo cada 30 minutos, 24 h al día, con ~28.000 tokens de contexto y **$0,109 por ejecución**. 98 de 161 turnos medidos en 70 h; **$8,97 de $12,54**.
 
-Lo que lo vuelve indefendible: su `target` por defecto es `"none"` (**no entrega nada**), `/data/workspace/HEARTBEAT.md` **no existe** (no hay checklist que ejecutar), y LIFEOS ya tiene su bucle proactivo determinista a coste $0 (`proactive-tick-15m`, D41). D41 razonó que despertar al agente periódicamente costaría ~$0,098/tick y sería "un fallo arquitectónico" — el coste medido por heartbeat es **$0,109**. El fallo que D41 evitó ya estaba ocurriendo por un default que nadie había mirado.
+**Corrección a la primera versión de este hallazgo** (que contaba mal): `messagesSnapshot` es acumulativo, así que sumar sus `toolResult` inflaba los conteos. Medido por ventana temporal de cada run: **78 de 82 turnos válidos producen literalmente `"HEARTBEAT_OK"`**; 5 redactaron preguntas de sueño reales que **nunca se entregaron** (`target: none`, 0 envíos vía `message`); 12 de 98 invocaron alguna tool, 10 de ellas `lifeos_proactive_check` — lo que `proactive-tick-15m` ya hace a $0; y **cero escrituras de datos**. No era inútil: **duplicaba dos mecanismos más baratos y sus salidas útiles no llegaban a nadie**.
+
+`/data/workspace/HEARTBEAT.md` **no existe**, así que no había checklist que ejecutar. D41 razonó que despertar al agente periódicamente costaría ~$0,098/tick y sería "un fallo arquitectónico" — el coste medido por heartbeat es **$0,109**. El fallo que D41 evitó ya estaba ocurriendo por un default que nadie había mirado.
 
 Explica el incidente de saldo del 2026-08-07: las trayectorias contienen 16 turnos consecutivos con `"Your credit balance is too low"`.
 
-**No se ha desactivado**: cambiar el comportamiento de Isabel requiere decisión de la usuaria. Propuesta y riesgos en `research/AI_RUNTIME/MEDICION_CONTEXTO_2026-08-09.md`.
+**Resuelto el 2026-08-09:** `agents.defaults.heartbeat.every: "0m"` en la config viva + fijado en `openclaw.default.json` por si alguien fuerza un re-seed. Requirió reiniciar el Gateway (ver la entrada anterior). Verificado después: Telegram conectado en polling, ambos crons ok, adaptador `/healthz` ok, MCP `lifeos` presente. Rollback: `openclaw config unset agents.defaults.heartbeat` + reinicio.
 
 ### El medidor de coste no ve los turnos que más gastan — ABIERTO
 
