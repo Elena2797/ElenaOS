@@ -50,7 +50,7 @@ La inspección visual automatizada de Home/Dominios/Gym/Isabel no pudo completar
 ## Bloqueos reales
 
 1. QA visual automatizado: bloqueado por el controlador del navegador de Codex. Requiere recuperar esa conexión o validación manual en el dispositivo.
-2. El sleep cron productivo está habilitado e intacto, pero su última ejecución registrada falló durante el incidente de saldo bajo. La API de modelos funciona ahora (`/v1/now status:ok`), pero no se disparó el cron manualmente para evitar una notificación o gasto de prueba.
+2. ~~El sleep cron productivo está habilitado e intacto, pero su última ejecución registrada falló durante el incidente de saldo bajo.~~ **RESUELTO sin intervención el 2026-08-09**: el cron se disparó solo a las 08:00 Europe/Madrid y `openclaw cron list --json` (solo lectura, Gateway nuevo) devuelve `lastRunStatus: "ok"`, `lastDeliveryStatus: "delivered"`, `lastDelivered: true`, `consecutiveErrors: 0`. No se forzó manualmente ni se envió ninguna notificación de prueba.
 3. Rotar `ANTHROPIC_API_KEY` sigue pendiente de la usuaria.
 4. `isabel-gateway` continúa sin remoto demostrado.
 

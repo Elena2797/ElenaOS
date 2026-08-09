@@ -26,6 +26,7 @@ Cada dato vive en **un solo documento**. Si ves el mismo dato repetido en dos si
 | Trabajar con "el chat de Isabel" | `core/ISABEL_CHANNELS.md` **primero** — hay 4 sistemas distintos, solo uno activo |
 | Entender qué principios no se deben romper | `PRINCIPLES.md` |
 | Investigar o decidir algo de negocio de un dominio (ej. JETMI) | `research/<DOMINIO>/LOG.md` (mapa de cobertura) → `KNOWLEDGE.md` (lo verificado) → `HYPOTHESES.md` (lo abierto) |
+| Decidir qué modelos/proveedores de IA usa Isabel, o cuánto cuesta | `research/AI_RUNTIME/DECISION_MULTIMODELO_2026-08-09.md` — auditoría del Model Router, precios verificados, niveles de cerebro, benchmark propuesto y coste. **Decisión pendiente de la usuaria; ningún proveedor conectado.** |
 
 ## Estructura
 
@@ -47,7 +48,8 @@ docs/
   modules/                cada dominio: VistaJet (6 sub-módulos), Finanzas, JETMI, Salud/Gym, Marca Personal, Vida Personal
   operations/             cómo desplegar, verificar y recuperar el sistema
   archive/                decisiones y documentos ya no vigentes, preservados
-  research/               investigación externa por dominio: evidencia (sources/), conocimiento consolidado (KNOWLEDGE.md), hipótesis abiertas (HYPOTHESES.md), mapa de cobertura (LOG.md) — hoy solo research/JETMI/
+  research/               investigación externa: research/JETMI/ (negocio, con la estructura LOG/KNOWLEDGE/HYPOTHESES/sources)
+                          y research/AI_RUNTIME/ (proveedores y modelos de IA — documento único de decisión, fechado)
 ```
 
 ## Convención de metadatos
