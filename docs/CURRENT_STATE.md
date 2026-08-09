@@ -34,7 +34,7 @@ Core decide y el frontend representa. Home, Dominios y Gym cargan `GET /v1/gym/s
 
 ## Verificación
 
-- Backend: 503/503 pruebas, 158 suites.
+- Backend: 523/523 pruebas, 163 suites.
 - Frontend: 10/10 pruebas, 2 suites.
 - Benchmark: 23 casos A–W conservados + 10 JETMI + 4 de sensibilidad = 37 casos validados; fixtures J–M 4/4 PASS, coste $0, sin llamadas a modelo.
 - Build Vite: completo; advertencia existente de chunk grande, sin fallo.
@@ -65,3 +65,11 @@ Detalle completo: [`research/AI_RUNTIME/MEDICION_CONTEXTO_2026-08-09.md`](resear
 ## Siguiente paso
 
 Revisar este checkpoint. La siguiente decision es una sola: observar el baseline 48 h y despues elegir entre aplicar P1/O3 de forma reversible o autorizar un benchmark real sanitizado. No hay que conectar ningun proveedor hoy.
+
+## Preparacion multi-modelo durante O4
+
+Sin tocar produccion se audito el corpus completo (37 casos), se cerro una shortlist de 8 modelos, se construyeron adapters contractuales desconectados, politica de sensibilidad, Agent Budget Contract, JETMI LIGHT/NORMAL/150, Cost Simulator V2 y un smoke exacto de 48 requests con coste conservador `$0.744826`, kill-cap `$0.90` y cap absoluto `<$1`. P1, O3 y G8 siguen propuestas y **NO aplicadas**. No se conecto ningun proveedor, key ni runner real.
+
+Checkpoint completo: [`research/AI_RUNTIME/PREPARACION_MULTIMODELO_48H_2026-08-09.md`](research/AI_RUNTIME/PREPARACION_MULTIMODELO_48H_2026-08-09.md).
+
+Ultima lectura O4 solo-metadata: `2026-08-09T16:26:16.110Z`, frontera `13:22Z`, 0 registros IA, 0 turnos, `$0` y 0 registros sin coste conocido. Ventana valida parcial de 3 h 4 min 16 s; no confundir con las 48 h requeridas.

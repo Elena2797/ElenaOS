@@ -7,10 +7,10 @@ Ultima actualizacion: 2026-08-09 — fase economica $0 cerrada
 - Heartbeat: **PASS**. 99 historicos; ultimo `2026-08-09T13:17:56.992Z`; cero despues del reinicio de `13:22Z`.
 - O4: introducida en `9c2e1760df359e91476014f6928f330e6ae5be0d`; produccion actual `5175136033c181e1c44bc030c0a4e4d5948c34d4`, Railway `f146452d-9c02-412e-b90c-08d173bc05ff` `SUCCESS`.
 - Prueba O4 automatica: tick `2026-08-09T14:30:00Z`, HTTP 200, 27 registros con superficie despues del barrido, cero requests a `/v1/chat`, presupuesto proactivo 0 calls/0 turns/$0.
-- Baseline desde `2026-08-09T13:22Z`: cero `session.started`, cero turnos de modelo, cero heartbeat. En esta ventana la autonomia del sistema costo $0; aun no es una proyeccion mensual.
+- Baseline desde `2026-08-09T13:22Z`: lectura final `2026-08-09T16:26:16.110Z`, cero registros IA, cero turnos de modelo, cero heartbeat y $0. Son 3 h 4 min 16 s validas; aun no es una proyeccion mensual ni completa las 48 h.
 - Tools/skills: auditoria completa persistida. P1 y O3 estan propuestas, **NO aplicadas**.
 - Benchmark: A-W intacto (23) + JETMI (10) + sensibilidad (4), 37 total. `--fixtures`: J-M 4/4 PASS, coste $0.
-- Simulador: corregido para no cobrar `/v1/now`, inventario ni Gym como IA. 503/503 tests, 158 suites.
+- Simulador: corregido para no cobrar `/v1/now`, inventario ni Gym como IA. 523/523 tests, 163 suites.
 - SSH: backup `C:\Users\USER\.ssh\config.pre-lifeos-20260809.bak`; aliases inequivocos `railway-isabel-gateway-old` y `railway-isabel-gateway-new`.
 
 ## Antes de decidir otra optimizacion
@@ -50,3 +50,12 @@ No cambiar Sonnet/Haiku, providers, `cacheRetention`, presupuestos, sleep cron, 
 3. `docs/research/AI_RUNTIME/AUDITORIA_TOOLS_SKILLS_2026-08-09.md`
 4. `docs/research/AI_RUNTIME/DECISION_MULTIMODELO_2026-08-09.md`
 5. `docs/KNOWN_PROBLEMS.md`
+6. `docs/research/AI_RUNTIME/PREPARACION_MULTIMODELO_48H_2026-08-09.md`
+
+## Instrumento multimodelo preparado — no conectado
+
+- Corpus schema v3: 37 casos, con comportamiento esperado, scoring, coste/latencia máximos, tools, structured output, contexto, sensibilidad y pass/fail explícitos.
+- Shortlist cerrada: 8 modelos; adapters Anthropic/OpenAI/Kimi/Gemini/OpenRouter y policy de sensibilidad solo en `benchmarks/`.
+- Smoke autorizado solo en diseño: 48 requests PUBLIC, `$0.744826` conservador, corte `$0.90`, cap `<$1`, sin retries. **No ejecutar sin autorización de cuentas/keys/presupuesto.**
+- Cost Simulator V2 y JETMI 150 son simulaciones, no facturas ni cambios productivos.
+- Siguiente secuencia: terminar 48 h O4 -> decisión humana -> fixtures $0 -> smoke autorizado -> decisión separada de canary. Nunca saltar directamente a producción.
