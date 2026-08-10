@@ -80,7 +80,7 @@ Migración: `migration_v1.sql`. Columnas: id, texto, tipo (default `manual`), ur
 ### `transactions`
 **Sin `CREATE TABLE` en ningún repo** — la tabla ya existía cuando se escribió `finance_reset_final.sql` (que solo hace `ALTER TABLE ... ADD COLUMN IF NOT EXISTS source` y un `TRUNCATE` + re-insert). Deuda técnica: no hay forma de recrear esta tabla desde cero solo con el código del repo.
 Columnas confirmadas por muestreo real: id (uuid), date, description, amount (numeric), type (`expense`\|`income`), category, source (`revolut`\|`sabadell`\|…), created_at.
-Contenido real: 821 filas importadas (185 Revolut + 636 Sabadell), ver `finance_reset_final.sql` en la raíz del proyecto (fuera de cualquier repo git).
+Contenido real verificado el 2026-08-10: 881 filas entre 2026-01-01 y 2026-06-26 (762 gastos y 119 ingresos). Fuentes normalizadas: 240 Revolut, 631 Sabadell y 10 sin fuente conocida. Los scripts de importación históricos están en la raíz del proyecto, fuera del repo git.
 
 ---
 

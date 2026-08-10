@@ -26,7 +26,7 @@ describe('Telegram ↔ LIFEOS: revalidación de una app abierta', () => {
     assert.equal(reopenedApp.state.mode, 'after');
   });
 
-  test('refresca estado, preguntas, Gym y sueño sin invocar ningún read model con IA', async () => {
+  test('refresca estado, preguntas, Gym, sueño y Finanzas sin invocar ningún read model con IA', async () => {
     const calls = [];
     const sync = createSurfaceRevalidator({
       refreshActiveDomain: async () => { calls.push('domain'); },
@@ -34,12 +34,13 @@ describe('Telegram ↔ LIFEOS: revalidación de una app abierta', () => {
       refreshPendingQuestions: async () => { calls.push('pending'); },
       refreshGymState: async () => { calls.push('gym'); },
       refreshSleepState: async () => { calls.push('sleep'); },
+      refreshFinanceState: async () => { calls.push('finance'); },
       render: () => { calls.push('render'); },
     });
     const result = await sync.revalidate({ reason: 'visible' });
     assert.equal(result.status, 'revalidated');
     assert.equal(calls[0], 'domain');
-    assert.deepEqual(new Set(calls.slice(1, 5)), new Set(['primary', 'pending', 'gym', 'sleep']));
+    assert.deepEqual(new Set(calls.slice(1, 6)), new Set(['primary', 'pending', 'gym', 'sleep', 'finance']));
     assert.equal(calls.at(-1), 'render');
 
     const source = fs.readFileSync(new URL('../surfaceSync.js', import.meta.url), 'utf8');
@@ -75,12 +76,14 @@ describe('Telegram ↔ LIFEOS: revalidación de una app abierta', () => {
     let primary = 0;
     let gym = 0;
     let sleep = 0;
+    let finance = 0;
     let rendered = 0;
     const sync = createSurfaceRevalidator({
       reloadPrimaryState: async () => { primary += 1; },
       refreshPendingQuestions: async () => { throw new Error('offline'); },
       refreshGymState: async () => { gym += 1; },
       refreshSleepState: async () => { sleep += 1; },
+      refreshFinanceState: async () => { finance += 1; },
       render: () => { rendered += 1; },
     });
     const result = await sync.revalidate();
@@ -89,6 +92,7 @@ describe('Telegram ↔ LIFEOS: revalidación de una app abierta', () => {
     assert.equal(primary, 1);
     assert.equal(gym, 1);
     assert.equal(sleep, 1);
+    assert.equal(finance, 1);
     assert.equal(rendered, 1);
   });
 

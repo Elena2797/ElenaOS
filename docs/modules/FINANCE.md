@@ -1,90 +1,46 @@
-Estado: parcial (datos reales, sin lógica de dominio)
-Última verificación: 2026-07-10
-Verificado en: finance_reset_final.sql (raíz), muestreo real de la tabla transactions, grep de S.transactions en main.js
-Fuente de verdad de datos: DATA_MODEL.md § transactions
+Estado: especialista V1 de solo lectura preparado; UI/Core determinista integrado
+Última verificación: 2026-08-10
+Verificado en: datos reales de Supabase, `isabel-api/src/core/specialists/finance.js`, `GET /v1/finance/summary`, `life-os-app/src/services/financeReadModel.js`
+Fuente de verdad de datos: `DATA_MODEL.md` § `transactions` y `metrics`
 
-# modules/FINANCE.md
+# Finanzas
 
-# Objetivo
-Visibilidad sobre el estado financiero real de Estefanía — no un módulo de contabilidad completo, sino "¿en qué se fue el dinero, por categoría y por mes?"
+## Objetivo
 
-# Estado real
-Caso intermedio deliberado: **hay datos reales sustanciales** (821 transacciones importadas de dos bancos) pero **no hay lógica de dominio propia** — no hay especialista, no hay proyecciones, no hay alertas de presupuesto automáticas. Es el área genérica de tareas/decisiones con una vista de transacciones añadida encima.
+Responder con evidencia a “¿cómo va el mes y dónde requiere atención?”, sin convertir LIFEOS en un sistema contable ni inventar saldos o predicciones.
 
-# Qué funciona
-- Vista dentro de `areaView()` para el área "Finanzas": filtro por mes (`S.finMonth`), por categoría (`S.finCat`), vista YTD, heatmap de gasto por categoría/mes.
-- CRUD de transacciones vía `services/db.js` (insertar, editar categoría/fecha/monto/descripción, borrar).
-- Presupuestos por categoría guardados como filas de `metrics` (con `label: 'Presupuesto ' + categoría`).
-- 821 transacciones reales: 185 de Revolut + 636 de Sabadell, con categorías (Salud, Suscripciones, Transporte, Comida, Otros, Viajes, Ahorro, Amigas, Transferencias).
+## Estado real
 
-# Qué está parcialmente implementado
-Presupuestos: se guardan y se leen, pero no hay evidencia de alertas automáticas cuando se supera uno.
+La tabla contiene 881 movimientos entre 2026-01-01 y 2026-06-26: 762 gastos y 119 ingresos. Las fuentes normalizadas son 631 Sabadell, 240 Revolut y 10 sin fuente conocida. La lectura real de junio reconoce 125 movimientos, cero filas inválidas y cero gastos sin categoría.
 
-# Qué no existe todavía
-- Cualquier especialista de IA para Finanzas (proyecciones, detección de patrones, sugerencias).
-- Importación automática de nuevas transacciones — la importación observada fue manual, vía scripts SQL de un solo uso (`finance_reset_final.sql`, `recategorizacion_completa.sql`, etc., en la raíz del proyecto).
+La vista legacy sigue ofreciendo CRUD, filtros por mes/categoría, YTD y heatmap. Encima de ella, el Core incorpora una primera lectura determinista y fail-closed:
 
-# Modelo de datos
-Tabla `transactions` — **sin `CREATE TABLE` en ningún repo** (deuda técnica, ver KNOWN_PROBLEMS.md). Columnas confirmadas por muestreo: id, date, description, amount, type, category, source, created_at.
+- ventana mensual semiabierta y moneda EUR declaradas;
+- ingresos, gasto, neto y transferencias a ahorro separados;
+- Transferencias, Ahorro y Nómina no cuentan como consumo por categoría;
+- cobertura, fechas y fuentes normalizadas;
+- comparación sólo contra presupuestos positivos configurados;
+- señales explicables `budget_exceeded` y `budget_near_limit`;
+- candidatos de acción estructurados, todavía no conectados a prioridad ni entrega.
 
-# Flujos de usuario
-Ver transacciones del mes/año, filtrar por categoría, editar categorización, comparar contra presupuesto.
+## Contrato de seguridad
 
-# Backend/endpoints
-Ninguno — CRUD directo a Supabase desde el cliente.
+`GET /v1/finance/summary?month=YYYY-MM` es una lectura autenticada. No llama a modelos, no escribe, no entra en `/v1/now`, MCP, Telegram, proactividad o crons. Si la lectura falla, LIFEOS muestra “no disponible”; nunca convierte un fallo en cero gasto.
 
-# Frontend/vistas
-`life-os-app/src/main.js`: lógica de Finanzas dentro de `areaView()` (no tiene función de vista propia separada, a diferencia de los módulos VJ).
+No hay presupuestos configurados hoy, por lo que la lectura real produce cero señales y cero candidatos. Esto es el resultado correcto, no falta de detección.
 
-# Archivos relevantes
-`life-os-app/src/services/db.js` (funciones de `transactions`), `finance_reset_final.sql` y demás SQL de importación en la raíz.
+## Isabel y superficies
 
-# Verificaciones empíricas
-Ninguna realizada en esta sesión — el módulo no fue objeto de desarrollo activo, solo de auditoría de lo existente.
+LIFEOS consume el resumen Core y lo revalida al abrir o volver a la app. Isabel todavía no tiene tools financieras: no puede consultar este resumen desde Telegram ni escribir transacciones como specialist. Esa activación queda fuera de O4.
 
-# Bugs conocidos
-La tabla `transactions` no se puede recrear desde cero solo con el código versionado (sin migración formal).
+## Huecos
 
-# Decisiones cerradas
-Ninguna registrada explícitamente.
+- `transactions`, `metrics` y sus políticas no tienen migración reproducible completa en el repositorio.
+- No hay importación bancaria automática.
+- No existen fuentes verificadas para saldos, deuda, inversiones, suscripciones contractuales, facturas futuras o patrimonio.
+- Las señales financieras no alimentan aún Goals, FollowUps ni Home prioritario.
+- La vista legacy continúa calculando importes para sus gráficos; la nueva tarjeta de estado sí representa el Core.
 
-# Fuera de alcance actual
-Cualquier automatización o especialista de dominio.
+## Próximo hito
 
-# Próximo hito
-
-Especialista financiero V1 de solo lectura y reglas deterministas, después de cerrar O4 y de versionar el esquema real. No requiere un modelo para agregar ni comparar presupuestos.
-
-# Auditoría para el próximo specialist (2026-08-09)
-
-## Fuente de verdad y fronteras
-
-La única fuente verificada para movimientos es `transactions`. Los presupuestos por categoría son filas `metrics.key='budget_<categoría>'`. No existen fuentes verificadas para saldos de cuenta, deuda, inversiones, suscripciones contractuales, facturas futuras ni patrimonio; un specialist no puede inventarlas ni derivarlas de un movimiento aislado.
-
-El frontend solo carga transacciones del año corriente. Por tanto, cualquier señal YTD es válida para ese intervalo, pero una comparación histórica completa requerirá una lectura backend con ventana declarada. Un fallo de `transactions` hoy puede convertirse silenciosamente en `[]`; antes de emitir “no hubo gasto” el specialist debe fallar cerrado y declarar la fuente no disponible.
-
-## Primera versión determinista propuesta
-
-Lectura pura de `transactions` + presupuestos, sin IA:
-
-- ingresos y gastos del mes, con ventana y moneda declaradas;
-- gasto por categoría;
-- presupuesto consumido por categoría (`spent / budget`) solo cuando existe presupuesto positivo;
-- señal `budget_exceeded` cuando el gasto verificable supera el presupuesto;
-- señal `budget_closing` cuando cruza un umbral explícito y aún queda parte relevante del mes;
-- transacciones sin categoría como problema de calidad de datos, nunca como gasto “Otros” inventado;
-- Action Candidate que cite categoría, gasto, presupuesto, intervalo y filas fuente.
-
-Debe quedar fuera de V1: predicciones de saldo, consejos de inversión, detección de fraude, atribución automática de comercios, “gasto anormal” sin baseline acordado y cualquier automatismo que mueva dinero.
-
-## Contrato con objetivos
-
-Finanzas podrá leer objetivos universales enlazados, por ejemplo un objetivo de ahorro con criterio y fecha. Solo emitirá impacto si el objetivo declara una métrica compatible y existe evidencia suficiente. Superar un presupuesto no debe marcar automáticamente un objetivo como `BLOCKED`; primero debe existir una regla de dominio explícita que conecte ambos.
-
-## Requisitos antes de activar
-
-1. Versionar el `CREATE TABLE transactions` real, índices, restricciones y RLS.
-2. Confirmar semántica de `amount` y `type`, moneda y tratamiento de transferencias.
-3. Añadir lectura backend fail-closed y tests con ventanas temporales.
-4. Validar categorías y presupuestos contra datos reales sin escribir ni recategorizar.
-5. Conectar sus señales al bus universal y verificar que Home muestra razón y evidencia.
+Después de O4: versionar el esquema real y activar de forma reversible la lectura financiera para Isabel/Knowledge. La primera activación no debe incluir predicciones, recomendaciones de inversión ni movimientos de dinero.

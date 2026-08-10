@@ -5,9 +5,10 @@ import { readFileSync } from 'node:fs';
 import { O5_HOME_FIXTURES } from '../followUpHomeFixtures.js';
 
 const MAIN_URL = new URL('../../main.js', import.meta.url);
-// Checkpoint aprobado durante O4 después de promover SurfaceSync y la lectura
-// determinista de sueño. O5 sigue sin poder modificar ni importar el runtime.
-const MAIN_CHECKPOINT_SHA256 = '6D101274CCBE474EC95CD0A9258B7F290A763D94341B069AEADB00DE4529B496';
+// Checkpoint aprobado durante O4 después de promover SurfaceSync y las lecturas
+// deterministas de sueño y Finanzas. O5 sigue sin poder modificar ni importar
+// el runtime.
+const MAIN_CHECKPOINT_SHA256 = 'D140D9006592F8B035DEA92363DDEB21D238A3DBDAC7C6D111DE9C641F4AD4B7';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

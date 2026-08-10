@@ -9,6 +9,7 @@ import * as llcSvc from './services/laundryCleaning.js';
 import * as readiSvc from './services/readiness.js';
 import { createSurfaceRevalidator, shouldRevalidateVisibility } from './services/surfaceSync.js';
 import { currentSleepEntry, formatSleepMinutes } from './services/sleepReadModel.js';
+import { financeStateSummary } from './services/financeReadModel.js';
 // Definiciones del dominio HOTO: fuente única en src/hoto/model.js.
 // Se importan con los nombres VJ_* históricos para no tocar sus usos.
 import {
@@ -166,7 +167,7 @@ function pinPress(v) {
   }
 }
 
-let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'}, pendingQuestions:[], gym:null, sleep:null, _gymLoaded:false, _gymLoading:false, _gymSaving:false, _sleepLoading:false };
+let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, finance:null, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'}, pendingQuestions:[], gym:null, sleep:null, _gymLoaded:false, _gymLoading:false, _gymSaving:false, _sleepLoading:false, _financeRequestToken:0 };
 
 async function initApp() {
   db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -183,6 +184,7 @@ async function initApp() {
   loadIsabelNow(); // no bloquea el resto de la app — la tarjeta Isabel ya se pinta con el heurístico de cliente mientras esto resuelve
   loadGymState(); // Home y Dominios representan la misma semana que la vista Gym
   loadSleepState(); // representa el check-in persistido por Telegram/MCP
+  loadFinanceState(); // lectura Core fail-closed; no participa en prioridad durante O4
 }
 
 // ────── Gym — el estado semanal lo calcula el Core, no la vista ──────────
@@ -215,6 +217,21 @@ async function loadSleepState() {
     S.sleep = { error: e.message, latest: null, entries: [] };
   }
   S._sleepLoading = false;
+  render();
+}
+
+async function loadFinanceState(month = S.finMonth) {
+  const token = ++S._financeRequestToken;
+  try {
+    const res = await fetch(`${ISABEL_API}/v1/finance/summary?month=${encodeURIComponent(month)}`, { headers: { 'x-api-key': ISABEL_KEY } });
+    if (!res.ok) throw new Error('finance ' + res.status);
+    const model = await res.json();
+    if (token !== S._financeRequestToken) return;
+    S.finance = model;
+  } catch (e) {
+    if (token !== S._financeRequestToken) return;
+    S.finance = { month, error: e.message };
+  }
   render();
 }
 
@@ -568,9 +585,11 @@ function domainSignal(area) {
       const al = S.alertas.filter(a => a.area_id === area.id && a.urgencia === 'critica' && a.status === 'active');
       if (al.length > 0) return (al[0].texto || 'Alerta financiera activa').slice(0, 45);
     }
+    const month = new Date().toISOString().slice(0, 7);
+    const coreFinance = financeStateSummary(S.finance, month);
+    if (coreFinance.state !== 'loading') return coreFinance.headline;
     const d = S.dec.filter(x => x.area_id === area.id);
     if (d.length > 0) return (d[0].title || 'Decisión pendiente').slice(0, 45);
-    const month = new Date().toISOString().slice(0, 7);
     const movements = S.transactions.filter(t => String(t.date || '').startsWith(month)).length;
     return movements > 0
       ? `${movements} movimiento${movements !== 1 ? 's' : ''} registrado${movements !== 1 ? 's' : ''} este mes`
@@ -2002,6 +2021,16 @@ function areaView() {
       return '<div class="card" style="margin-bottom:10px"><div class="card-head"><span class="ch-icon">💸</span><span class="ch-label">¿A dónde fue el dinero?</span><span class="ch-count">YTD</span></div><div style="padding:10px 14px">'+bar+leg+'</div></div>';
     })();
 
+    const financeCoreStatus=financeStateSummary(S.finance,S.finMonth);
+    const financeCoreTone=financeCoreStatus.state==='attention'?'var(--warn)':financeCoreStatus.state==='unavailable'?'var(--urgent)':'var(--accent)';
+    const financeCoreCardHtml=`<div class="card" style="margin-bottom:8px;border-left:3px solid ${financeCoreTone}">
+      <div style="padding:10px 14px">
+        <div style="font-size:10px;font-weight:700;color:var(--t2);letter-spacing:.04em;margin-bottom:3px">LECTURA CORE · SOLO LECTURA</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text)">${escHtml(financeCoreStatus.headline)}</div>
+        ${financeCoreStatus.detail?`<div style="font-size:11px;color:var(--t2);margin-top:3px">${escHtml(financeCoreStatus.detail)}</div>`:''}
+      </div>
+    </div>`;
+
     if(S.finCat){
       const catTxs=txs.filter(t=>t.category===S.finCat);
       const catTotal=catTxs.reduce((s,t)=>s+parseFloat(t.amount||0),0);
@@ -2039,6 +2068,8 @@ function areaView() {
         <button onclick="finNext()" style="border:none;background:var(--surface);padding:8px 12px;border-radius:8px;cursor:pointer;font-size:16px">›</button>
       </div>
     </div>
+
+    ${financeCoreCardHtml}
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
       <div onclick="openIngresoModal('${S.finMonth}')" style="background:var(--surface);border-radius:var(--r-sm);padding:12px;text-align:center;cursor:pointer;position:relative">
@@ -2085,7 +2116,7 @@ function areaView() {
         const isActive=m.mk===S.finMonth;
         const col=m.tasa>=20?'#16A34A':m.tasa>=10?'#65A96E':'#D97706';
         const marCol=m.mar>=0?'#085041':'#A32D2D';
-        return `<div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer;${isActive?'background:rgba(21,128,61,0.06)':''}" onclick="S.finCat=null;S.finMonth='${m.mk}';render()">
+        return `<div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer;${isActive?'background:rgba(21,128,61,0.06)':''}" onclick="setFinanceMonth('${m.mk}')">
           <span style="font-size:12px;font-weight:${isActive?700:500};width:28px;color:${isActive?'var(--text)':'var(--t2)'}">${m.lab}</span>
           <div style="flex:1;background:var(--bg);border-radius:999px;height:5px;overflow:hidden">
             <div style="background:${col};height:100%;width:${barW}%;border-radius:999px"></div>
@@ -3930,6 +3961,7 @@ async function updateTxCat(id, category) {
   await dbSvc.updateTransactionCategory(id, category);
   const tx=S.transactions.find(t=>t.id===id);
   if(tx) tx.category=category;
+  loadFinanceState(S.finMonth);
 }
 
 function openBudgetEdit(cat,current){
@@ -3949,6 +3981,7 @@ async function saveBudgetVal(cat){
     S.budgets[cat]=val;
   }
   closeModal();render();
+  loadFinanceState(S.finMonth);
 }
 async function deleteBudget(cat){
   const existing=S.metrics.find(x=>x.key==='budget_'+cat);
@@ -3958,6 +3991,7 @@ async function deleteBudget(cat){
   }
   delete S.budgets[cat];
   closeModal();render();
+  loadFinanceState(S.finMonth);
 }
 
 const catList=['Comida','Renta','Hogar','Transporte','Ocio','Ropa','Salud','Farmacia','Suplementos','Suscripciones','Seguro','Belleza','Amigas','Jaime','Familia','Viajes','Perú','Donaciones','Multas','Ahorro','Deuda','Transferencias','Rotación','Nómina','Otros'];
@@ -4034,6 +4068,7 @@ async function saveAddIngreso(month){
   if(!error&&data?.[0]){S.transactions=[...S.transactions,data[0]];}
   else{S.transactions=await dbSvc.getTransactionsYTD();}
   render();
+  loadFinanceState(month);
   openIngresoModal(month);
 }
 
@@ -4082,6 +4117,7 @@ async function saveNewTx(){
   if(!error&&data?.[0]){S.transactions=[...S.transactions,data[0]];}
   else{S.transactions=await dbSvc.getTransactionsYTD();}
   render();
+  loadFinanceState(S.finMonth);
 }
 
 function openEditTx(id){
@@ -4120,6 +4156,7 @@ async function saveEditTx(id){
   const tx=S.transactions.find(t=>String(t.id)===String(id));
   if(tx){tx.date=date;tx.description=desc;tx.amount=amt;tx.type=type;tx.category=cat;}
   render();
+  loadFinanceState(S.finMonth);
 }
 
 async function deleteTx(id){
@@ -4128,20 +4165,26 @@ async function deleteTx(id){
   await dbSvc.deleteTransaction(id);
   S.transactions=S.transactions.filter(t=>String(t.id)!==String(id));
   render();
+  loadFinanceState(S.finMonth);
+}
+
+function setFinanceMonth(month) {
+  S.finMonth=month;
+  S.finCat=null;
+  render();
+  loadFinanceState(month);
 }
 
 function finPrev() {
   const [yr,mo]=S.finMonth.split('-').map(Number);
   const d=new Date(yr,mo-2,1);
-  S.finMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-  S.finCat=null; render();
+  setFinanceMonth(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
 }
 
 function finNext() {
   const [yr,mo]=S.finMonth.split('-').map(Number);
   const d=new Date(yr,mo,1);
-  S.finMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-  S.finCat=null; render();
+  setFinanceMonth(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
 }
 
 // ────── Project & Avanzar functions ──────────────────────────────────────────
@@ -4490,7 +4533,7 @@ window.addEventListener('load', showPin);
 
 // Telegram y LIFEOS son superficies del mismo estado persistente. Volver a la
 // pestaña revalida únicamente datos baratos: Supabase, preguntas pendientes,
-// Gym y sueño persistido. No llama a /v1/now (que hoy puede usar Haiku), no hace polling y no
+// Gym, sueño y Finanzas persistidos. No llama a /v1/now (que hoy puede usar Haiku), no hace polling y no
 // despierta a Isabel. VistaJet corre primero para comparar la entidad anterior
 // con la nueva e invalidar caches correlacionadas antes del reload global.
 const surfaceRevalidator = createSurfaceRevalidator({
@@ -4504,6 +4547,7 @@ const surfaceRevalidator = createSurfaceRevalidator({
   refreshPendingQuestions: loadPendingQuestions,
   refreshGymState: loadGymState,
   refreshSleepState: loadSleepState,
+  refreshFinanceState: () => loadFinanceState(S.finMonth),
   render,
 });
 

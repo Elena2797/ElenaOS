@@ -10,6 +10,7 @@ export function createSurfaceRevalidator({
   refreshPendingQuestions = async () => {},
   refreshGymState = async () => {},
   refreshSleepState = async () => {},
+  refreshFinanceState = async () => {},
   render = () => {},
   now = () => Date.now(),
   minIntervalMs = 2000,
@@ -31,6 +32,7 @@ export function createSurfaceRevalidator({
       refreshPendingQuestions(),
       refreshGymState(),
       refreshSleepState(),
+      refreshFinanceState(),
     ]);
     render();
     return {
@@ -42,6 +44,7 @@ export function createSurfaceRevalidator({
         pending_questions: primary[1].status,
         gym_state: primary[2].status,
         sleep_state: primary[3].status,
+        finance_state: primary[4].status,
       },
     };
   }
