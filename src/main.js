@@ -7,6 +7,7 @@ import * as invSvc from './services/inventory.js';
 import * as hotoSvc from './services/hoto.js';
 import * as llcSvc from './services/laundryCleaning.js';
 import * as readiSvc from './services/readiness.js';
+import { createSurfaceRevalidator, shouldRevalidateVisibility } from './services/surfaceSync.js';
 // Definiciones del dominio HOTO: fuente única en src/hoto/model.js.
 // Se importan con los nombres VJ_* históricos para no tocar sus usos.
 import {
@@ -553,14 +554,20 @@ function domainSignal(area) {
     }
     const d = S.dec.filter(x => x.area_id === area.id);
     if (d.length > 0) return (d[0].title || 'Decisión pendiente').slice(0, 45);
-    const mes = new Date().toLocaleString('es-ES', { month: 'long' });
-    return `${mes.charAt(0).toUpperCase() + mes.slice(1)} bajo control`;
+    const month = new Date().toISOString().slice(0, 7);
+    const movements = S.transactions.filter(t => String(t.date || '').startsWith(month)).length;
+    return movements > 0
+      ? `${movements} movimiento${movements !== 1 ? 's' : ''} registrado${movements !== 1 ? 's' : ''} este mes`
+      : 'Sin movimientos registrados este mes';
   }
 
   if (name === 'Salud') {
     if (health === 'rojo') return 'Requiere atención';
     if (health === 'naranja') return 'En seguimiento';
-    return 'Todo bajo control';
+    const indicators = S.metrics.filter(metric => metric.area_id === area.id).length;
+    return indicators > 0
+      ? `${indicators} indicador${indicators !== 1 ? 'es' : ''} registrado${indicators !== 1 ? 's' : ''}`
+      : 'Sin indicadores registrados';
   }
 
   if (name === 'Gym') {
@@ -1339,6 +1346,9 @@ function areaView() {
     const ops=Array.from(new Map(S.operators.map(o=>[(o.name||'')+'|'+(o.notes||''),o])).values());
     const activeOps=ops.filter(o=>o.status==='active');
     const contribs=isabelContributions(a.id,4);
+    const leadsMetric=parseInt(mv('leads')?.value||'0');
+    const cajaMetric=parseFloat(mv('caja')?.value||'0');
+    const ingresosMetric=parseFloat(mv('ingresos')?.value||'0');
 
     // ── Momentum (interpretación cualitativa de Isabel sobre velocidad) ──
     let momentum,momentumColor,momentumBg;
@@ -1410,9 +1420,6 @@ function areaView() {
     else isabelCriterion='El dominio está avanzando. Mantener el ritmo y cerrar las decisiones pendientes.';
 
     // ── 5 motores empresariales ────────────────────────────────────────
-    const leadsMetric=parseInt(mv('leads')?.value||'0');
-    const cajaMetric=parseFloat(mv('caja')?.value||'0');
-    const ingresosMetric=parseFloat(mv('ingresos')?.value||'0');
     const motorsJETMI=[
       {icon:'🧭',name:'Dirección',desc:'¿Cuál es el siguiente nivel?',
        state:activeProjs.length>0?'verde':'amber',
@@ -4454,14 +4461,29 @@ Object.assign(window, {
 
 window.addEventListener('load', showPin);
 
-// Segunda capa de la guarda de entidad (D34): hasta ahora `vj_state` solo se
-// refrescaba al NAVEGAR a VistaJet (`go()`), así que una pantalla ya abierta
-// podía quedarse indefinidamente con el avión anterior. El caso real es
-// justo ese: responder a Isabel por Telegram y volver a la app sin navegar.
-// Volver a la pestaña es la señal natural de "puede haber pasado algo fuera".
+// Telegram y LIFEOS son superficies del mismo estado persistente. Volver a la
+// pestaña revalida únicamente datos baratos: Supabase, preguntas pendientes y
+// Gym. No llama a /v1/now (que hoy puede usar Haiku), no hace polling y no
+// despierta a Isabel. VistaJet corre primero para comparar la entidad anterior
+// con la nueva e invalidar caches correlacionadas antes del reload global.
+const surfaceRevalidator = createSurfaceRevalidator({
+  isReady: () => Boolean(db),
+  refreshActiveDomain: async () => {
+    const inVJ = (S.view === 'area' && S.areas.find(a => a.id === S.areaId)?.name === 'VistaJet')
+      || VJ_SUBVIEWS.includes(S.view);
+    if (inVJ) await refreshVjContext();
+  },
+  reloadPrimaryState: reload,
+  refreshPendingQuestions: loadPendingQuestions,
+  refreshGymState: loadGymState,
+  render,
+});
+
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'visible') return;
-  const inVJ = (S.view === 'area' && S.areas.find(a => a.id === S.areaId)?.name === 'VistaJet')
-    || VJ_SUBVIEWS.includes(S.view);
-  if (inVJ) refreshVjContext();
+  if (!shouldRevalidateVisibility(document.visibilityState)) return;
+  surfaceRevalidator.revalidate({ reason: 'surface_visible' });
+});
+
+window.addEventListener('online', () => {
+  surfaceRevalidator.revalidate({ force: true, reason: 'network_restored' });
 });
