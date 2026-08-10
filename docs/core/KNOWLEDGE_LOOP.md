@@ -60,7 +60,7 @@ Se reutiliza `eventos`, sin nueva tabla ni migración destructiva. Solo las fila
 
 El estado corriente se obtiene plegando eventos en orden de append. `occurred_at` describe cuándo sucedió el hecho; no controla el orden de actualización, para que una importación histórica no deshaga el estado actual. Objetivos, señales, acciones y feedback se reconstruyen desde cero tras cualquier reinicio.
 
-Límite conocido: la lectura inicial está limitada a 5.000 eventos. Antes de alcanzarlo se necesita paginación o snapshots compactados verificables; no se debe truncar silenciosamente.
+La copia desconectada pagina el ledger completo y falla explícitamente si una página no puede leerse. El runtime productivo todavía no monta este read model. Los snapshots compactados verificables quedan como optimización futura, nunca como permiso para truncar silenciosamente.
 
 ## Objetivos
 
@@ -72,7 +72,7 @@ Campos soportados: porqué, alcance, horizonte, criterio de éxito, fecha objeti
 
 ## Specialists
 
-El registro universal acepta opcionalmente `evaluateKnowledge({snapshot, change})`. Cada specialist recibe el estado relevante, los objetivos y el cambio causante; puede emitir señales universales, transiciones de objetivos con razón y evidencia, Action Candidates y solicitudes explícitas de intervención.
+El registro universal acepta opcionalmente `evaluateKnowledge({snapshot, change})`. Cada specialist recibe el estado relevante, los objetivos y el cambio causante; puede emitir señales universales, transiciones de objetivos con razón y evidencia, Action Candidates y, en la arquitectura O5 preparada, `follow_up_requests`. Una necesidad de intake no es una Intervention; Intervention queda reservada para confirmar una mutación de alto impacto.
 
 El Core agrega esos contratos y aísla fallos. No contiene `if domain === ...`. El E2E usa un dominio sintético desconocido: disponibilidad `false` bloquea un objetivo y propone una alternativa; `true` lo reactiva y sustituye la prioridad.
 
@@ -98,4 +98,12 @@ Después de cerrar O4, la secuencia segura es:
 4. adaptar los writers existentes para emitir envelopes universales;
 5. solo después, añadir una única entrada conversacional genérica al catálogo MCP, con medición separada del coste de interpretación.
 
-Hasta el paso 5, un hecho general dicho por Telegram seguirá sin cruzar automáticamente a estado estructurado. Esta limitación es deliberada y visible, no una promesa implícita.
+Hasta el paso 5, un hecho general dicho por Telegram seguirá sin cruzar automáticamente a estado estructurado. Esta limitación es deliberada y visible, no una promesa implícita. La copia desconectada ya contiene y prueba `KnowledgeCandidate:v1`; aún no existe una tool viva que lo entregue.
+
+## O5 Closed Loop preparado
+
+La decisión formal de FollowUp, suppression, deferrals, friction, Waiting For,
+Home adaptativo y activación posterior está en
+`docs/core/ADR_O5_FOLLOW_UP_CLOSED_LOOP.md`. Su implementación vive únicamente
+en la copia desconectada y tiene un guard de hashes/import graph que impide
+alcanzarla desde el runtime O4.
