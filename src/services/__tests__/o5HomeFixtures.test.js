@@ -7,7 +7,7 @@ import { O5_HOME_FIXTURES } from '../followUpHomeFixtures.js';
 const MAIN_URL = new URL('../../main.js', import.meta.url);
 // Checkpoint aprobado durante O4 después de promover SurfaceSync y la lectura
 // determinista de sueño. O5 sigue sin poder modificar ni importar el runtime.
-const MAIN_CHECKPOINT_SHA256 = '4F8B3B330389EC0BF27C774992DE06ED07ACFA484EA39138B3E8472D17AA6F40';
+const MAIN_CHECKPOINT_SHA256 = '6D101274CCBE474EC95CD0A9258B7F290A763D94341B069AEADB00DE4529B496';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {
@@ -42,8 +42,10 @@ describe('O5 adaptive Home fixtures remain presentational and disconnected', () 
 
   test('live Home and Avanzar remain at the approved deterministic checkpoint and import no O5 fixture', () => {
     const bytes = readFileSync(MAIN_URL);
-    const source = bytes.toString('utf8');
-    const hash = createHash('sha256').update(bytes).digest('hex').toUpperCase();
+    // Git puede materializar el mismo blob con CRLF o LF según el worktree.
+    // El guard protege el contenido del runtime, no una convención de EOL.
+    const source = bytes.toString('utf8').replaceAll('\r\n', '\n');
+    const hash = createHash('sha256').update(source).digest('hex').toUpperCase();
     assert.equal(hash, MAIN_CHECKPOINT_SHA256);
     assert.doesNotMatch(source, /followUpHomeFixtures|followUpReadModel|needs_input/);
   });
