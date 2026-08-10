@@ -5,7 +5,9 @@ import { readFileSync } from 'node:fs';
 import { O5_HOME_FIXTURES } from '../followUpHomeFixtures.js';
 
 const MAIN_URL = new URL('../../main.js', import.meta.url);
-const MAIN_CHECKPOINT_SHA256 = '74563D76B8D0E9677B283B654D859A811A8119E19CC923DC76A7F7EC66158764';
+// Checkpoint aprobado durante O4 después de promover SurfaceSync y la lectura
+// determinista de sueño. O5 sigue sin poder modificar ni importar el runtime.
+const MAIN_CHECKPOINT_SHA256 = '4F8B3B330389EC0BF27C774992DE06ED07ACFA484EA39138B3E8472D17AA6F40';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {
@@ -38,7 +40,7 @@ describe('O5 adaptive Home fixtures remain presentational and disconnected', () 
     assert.doesNotMatch(source, /\b(score|weight)\b|\.sort\s*\(|workQueue\s*\(/);
   });
 
-  test('live Home and Avanzar remain byte-for-byte unchanged and import no O5 fixture', () => {
+  test('live Home and Avanzar remain at the approved deterministic checkpoint and import no O5 fixture', () => {
     const bytes = readFileSync(MAIN_URL);
     const source = bytes.toString('utf8');
     const hash = createHash('sha256').update(bytes).digest('hex').toUpperCase();
