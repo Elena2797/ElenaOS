@@ -8,6 +8,7 @@ import * as hotoSvc from './services/hoto.js';
 import * as llcSvc from './services/laundryCleaning.js';
 import * as readiSvc from './services/readiness.js';
 import { createSurfaceRevalidator, shouldRevalidateVisibility } from './services/surfaceSync.js';
+import { currentSleepEntry, formatSleepMinutes } from './services/sleepReadModel.js';
 // Definiciones del dominio HOTO: fuente única en src/hoto/model.js.
 // Se importan con los nombres VJ_* históricos para no tocar sus usos.
 import {
@@ -165,7 +166,7 @@ function pinPress(v) {
   }
 }
 
-let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'}, pendingQuestions:[], gym:null, _gymLoaded:false, _gymLoading:false, _gymSaving:false };
+let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'}, pendingQuestions:[], gym:null, sleep:null, _gymLoaded:false, _gymLoading:false, _gymSaving:false, _sleepLoading:false };
 
 async function initApp() {
   db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -181,6 +182,7 @@ async function initApp() {
   loadPendingQuestions();
   loadIsabelNow(); // no bloquea el resto de la app — la tarjeta Isabel ya se pinta con el heurístico de cliente mientras esto resuelve
   loadGymState(); // Home y Dominios representan la misma semana que la vista Gym
+  loadSleepState(); // representa el check-in persistido por Telegram/MCP
 }
 
 // ────── Gym — el estado semanal lo calcula el Core, no la vista ──────────
@@ -199,6 +201,20 @@ async function loadGymState() {
     S.gym = { error: e.message };   // fallo de red: se dice, no se inventa
   }
   S._gymLoading = false;
+  render();
+}
+
+async function loadSleepState() {
+  if (S._sleepLoading) return;
+  S._sleepLoading = true;
+  try {
+    const res = await fetch(`${ISABEL_API}/v1/health/sleep/recent?days=7`, { headers: { 'x-api-key': ISABEL_KEY } });
+    if (!res.ok) throw new Error('sleep ' + res.status);
+    S.sleep = await res.json();
+  } catch (e) {
+    S.sleep = { error: e.message, latest: null, entries: [] };
+  }
+  S._sleepLoading = false;
   render();
 }
 
@@ -564,6 +580,8 @@ function domainSignal(area) {
   if (name === 'Salud') {
     if (health === 'rojo') return 'Requiere atención';
     if (health === 'naranja') return 'En seguimiento';
+    const sleep = currentSleepEntry(S.sleep);
+    if (sleep) return `Sueño registrado: ${formatSleepMinutes(sleep.minutes)}`;
     const indicators = S.metrics.filter(metric => metric.area_id === area.id).length;
     return indicators > 0
       ? `${indicators} indicador${indicators !== 1 ? 'es' : ''} registrado${indicators !== 1 ? 's' : ''}`
@@ -1798,7 +1816,16 @@ function areaView() {
     const itu=get('iti_año');
     const meds=['Hiprex 1g (noche)','D-manosa diaria','Probióticos','Vitamina C','Cranberry PAC 36','NAC 600mg (noche)','L-glutamina','GABA + L-teanina + B6','Creatina'];
     const conds=['Vejiga dolorosa (crónica)','HPV — seguimiento activo','Hernia lumbar + ciática','Escoliosis dorsolumbar','Posible endometriosis (sin confirmar)','Hiperreactividad respiratoria'];
+    const sleepEntries=(S.sleep?.entries||[]).filter(entry=>formatSleepMinutes(entry.minutes)!==null);
+    const latestSleep=sleepEntries[0]||null;
     return `
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">🌙</span><span class="ch-label">Sueño reciente</span></div>
+      ${latestSleep
+        ? `<div style="padding:14px"><div style="font-size:26px;font-weight:700;color:#0F6E56">${formatSleepMinutes(latestSleep.minutes)}</div><div style="font-size:11px;color:var(--t2);margin-top:3px">${fechaRelativa(latestSleep.date)}</div></div>`
+        : `<div style="padding:14px;font-size:13px;color:var(--t2)">${S.sleep?.error?'No se pudo cargar el sueño registrado.':'Sin sueño registrado en los últimos 7 días.'}</div>`}
+      ${sleepEntries.slice(1,4).map(entry=>`<div style="padding:9px 14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--t2)">${fechaRelativa(entry.date)}</span><strong>${formatSleepMinutes(entry.minutes)}</strong></div>`).join('')}
+    </div>
     <div class="card" style="margin-bottom:10px">
       <div class="card-head"><span class="ch-icon">📊</span><span class="ch-label">Seguimiento</span></div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border)">
@@ -4462,8 +4489,8 @@ Object.assign(window, {
 window.addEventListener('load', showPin);
 
 // Telegram y LIFEOS son superficies del mismo estado persistente. Volver a la
-// pestaña revalida únicamente datos baratos: Supabase, preguntas pendientes y
-// Gym. No llama a /v1/now (que hoy puede usar Haiku), no hace polling y no
+// pestaña revalida únicamente datos baratos: Supabase, preguntas pendientes,
+// Gym y sueño persistido. No llama a /v1/now (que hoy puede usar Haiku), no hace polling y no
 // despierta a Isabel. VistaJet corre primero para comparar la entidad anterior
 // con la nueva e invalidar caches correlacionadas antes del reload global.
 const surfaceRevalidator = createSurfaceRevalidator({
@@ -4476,6 +4503,7 @@ const surfaceRevalidator = createSurfaceRevalidator({
   reloadPrimaryState: reload,
   refreshPendingQuestions: loadPendingQuestions,
   refreshGymState: loadGymState,
+  refreshSleepState: loadSleepState,
   render,
 });
 
