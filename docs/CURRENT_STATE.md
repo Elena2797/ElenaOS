@@ -1,7 +1,49 @@
 Estado: fotografía operativa vigente
-Última verificación: 2026-08-09
+Última verificación: 2026-08-10
 
 # Estado actual de LIFEOS
+
+## Checkpoint funcional — 2026-08-10 13:18 Europe/Madrid
+
+Este bloque reemplaza como estado vigente las cifras históricas que aparecen más abajo.
+
+### Producción verificada
+
+- Backend productivo: `60ee37215bff88d63a27df35911edae73f6eee84`, Railway `SUCCESS`/`RUNNING`.
+- Frontend funcional productivo: `a5c03f4`; Vercel responde 200 con bundle `/assets/index-D0Xxn-dR.js`, que contiene `/v1/finance/summary`, `/v1/health/sleep/recent` y `/v1/gym/state`.
+- `/health` responde OK.
+- `GET /v1/finance/summary?month=2026-06` responde el contrato autenticado: 125 movimientos, 0 filas inválidas, 0 gastos sin categoría, fuentes normalizadas `revolut/sabadell/unknown`, 0 presupuestos y por tanto 0 señales/0 candidatos.
+- No se aplicaron migraciones, flags, cambios de prompts/tools/modelos/crons/Telegram ni configuración de OpenClaw.
+
+### Qué se activó durante O4
+
+- SurfaceSync al abrir/volver a LIFEOS: Supabase, preguntas, Gym, sueño y Finanzas; sin polling y sin llamar a `/v1/now`.
+- Sueño reciente persistido, visible en LIFEOS cuando fue escrito por Telegram/MCP.
+- Finanzas V1 determinista y de sólo lectura: ventana mensual, cobertura, categorías, presupuestos explícitos y señales explicables. No está conectada a MCP, prioridad, proactividad ni entrega.
+
+### Qué está preparado pero desconectado
+
+O5 completo permanece inalcanzable desde el runtime: Conversation → KnowledgeCandidate → política → ledger/estado/Goals → specialists/signals/actions → prioridad → Home → FollowUps/feedback. No hay rutas montadas, migraciones aplicadas ni flags activos. El guard de import graph y checkpoints continúa verde.
+
+### Validación
+
+- Backend productivo exacto: 530/530 pruebas, 165 suites.
+- O5 desconectado: 102/102.
+- Frontend productivo exacto: 33/33 y build Vite/PWA.
+- Lectura real financiera total: 881 movimientos entre 2026-01-01 y 2026-06-26; 762 gastos, 119 ingresos; 631 Sabadell, 240 Revolut, 10 fuente desconocida.
+- Auditoría funcional por módulo: `docs/modules/MODULE_LOOP_AUDIT_2026-08-10.md`.
+
+### Coste O4 sin contaminación
+
+Ventana `2026-08-09T13:22:00Z → 2026-08-10T11:18:01Z`: 37 llamadas, $0.648633; Telegram 32/$0.525136, cron 3/$0.116153, isabel-api 2/$0.007344, heartbeat 0. Desde el deployment financiero de `2026-08-10T11:16:24.780Z`: 0 llamadas IA.
+
+### Siguiente frontera
+
+Hasta `2026-08-11T13:22:00Z` no tocar modelos, providers, routing, caché, heartbeat, prompts, tools, skills, crons, frecuencia, Telegram ni nada que cambie llamadas IA. Después del cierre de O4, el siguiente slice recomendado es activar una sola entrada canary reversible para KnowledgeCandidate y demostrar una frase general de Telegram → estado estructurado → LIFEOS, con deduplicación, provenance, kill switch y rollback.
+
+---
+
+
 
 ## Estado general
 

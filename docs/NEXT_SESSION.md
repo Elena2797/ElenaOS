@@ -2,6 +2,22 @@ Ultima actualizacion: 2026-08-09 — fase economica $0 cerrada
 
 # Proxima sesion
 
+## Relevo vigente — 2026-08-10
+
+1. No rehacer SurfaceSync, sueño ni Finanzas V1: ya están desplegados y verificados.
+2. No montar O5 durante la ventana O4. El gate termina el 2026-08-11 a las 13:22 UTC / 15:22 Madrid.
+3. No aplicar migraciones/flags ni cambiar OpenClaw, tools, prompts, modelos, routing, cacheRetention, heartbeat, crons, frecuencia o Telegram.
+4. Producción: backend `60ee372`; frontend funcional `a5c03f4`.
+5. Tests: backend 530/530; O5 desconectado 102/102; frontend 33/33 + build.
+6. Finanzas: endpoint productivo autenticado, lectura mensual pura; todavía no MCP/Home prioritario. No hay presupuestos configurados, así que cero señales es correcto.
+7. Coste O4 al 2026-08-10T11:18:01Z: 37 llamadas/$0.648633, heartbeat 0; 0 llamadas desde el deploy financiero.
+8. Al cerrar O4: volver a medir la ventana completa antes de cualquier activación. Luego canary reversible de KnowledgeCandidate, no activación masiva de Goals/Home/FollowUps.
+9. Leer `docs/modules/MODULE_LOOP_AUDIT_2026-08-10.md` para el estado honesto de VistaJet, JETMI, Finanzas, Salud, Gym, Marca Personal, Viajes/Visados y Admin General.
+
+---
+
+
+
 ## Estado exacto
 
 - Heartbeat: **PASS**. 99 historicos; ultimo `2026-08-09T13:17:56.992Z`; cero despues del reinicio de `13:22Z`.
