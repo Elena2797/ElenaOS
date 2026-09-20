@@ -5,10 +5,11 @@ Fuente de verdad de datos: `ai_budget_state` en Supabase (tras aplicar la migrac
 
 # Incidente de saldo del 2026-08-11 — causa, saneamiento y reactivación
 
-> **Estado a 2026-09-20 20:30: NOT READY TO RECHARGE.**
-> Todas las rutas de pago conocidas están cortadas o bloqueadas, y el gasto está
-> impedido por cuatro comprobaciones independientes. Falta aplicar la migración
-> del libro mayor y rotar la clave — las dos cosas requieren a Estefanía. §9.
+> **Estado a 2026-09-20 21:30: NOT READY TO RECHARGE.**
+> Todas las rutas de pago conocidas están cortadas o bloqueadas, el libro mayor
+> está aplicado y probado contra Postgres real, y el gasto está impedido por tres
+> comprobaciones independientes. Lo único que falta es **rotar la clave
+> expuesta**, que solo puede hacer Estefanía. §9.
 
 ## 1. Qué pasó, en una frase
 
@@ -101,7 +102,8 @@ Sigue vigente. Rotación: `ROTAR_ANTHROPIC_KEY.md`.
 | Gateway local y `isabel-bridge.js` detenidos | puertos 18789 y 3001 libres |
 | `api/chat.js` retirada y desplegada | `GET /api/chat` → **404** (antes 405); home 200; `gmail-auth` intacta |
 | Clave borrada de los dos servicios legacy | sin `ANTHROPIC_API_KEY` en ninguno |
-| Control de gasto desplegado (`99a27d4`) | Railway `SUCCESS`, `/health` 200 |
+| Control de gasto desplegado | Railway `SUCCESS`, `/health` 200 |
+| Migración del libro mayor aplicada | `ai_budget_state` y `ai_budget_reservations` con RLS; 8 funciones; SHA-256 del SQL idéntico al del repositorio |
 | Proxy montado en `/ai/v1/messages` | sin token → **401**; con token → **400 kill_switch**; heartbeat → **400 heartbeat_turn** |
 | Gateway apuntado al proxy | `baseUrl` en su volumen; su `ANTHROPIC_API_KEY` es ahora el token del proxy |
 
@@ -161,12 +163,28 @@ anterior del Gateway está en `/data/.openclaw/openclaw.json.pre-proxy-20260920`
 También se quitó `create extension pgcrypto`: `gen_random_uuid()` es nativo desde Postgres 13 y
 exigir una extensión ausente rompe el `psql` a mitad, con medio esquema creado.
 
-### Lo que sigue sin estar demostrado
+### Concurrencia, demostrada contra el Postgres real
 
-La **serialización entre conexiones concurrentes** (`FOR UPDATE`) no se ha probado contra un
-Postgres multiconexión: esta máquina no tiene Docker, ni `psql`, ni driver de Postgres, y el token
-de gestión de Supabase está caducado. `scripts/verify-budget-sql.mjs` queda listo para ejecutarlo
-contra una base de pruebas cuando la haya.
+`npm run verify:budget-concurrency` — **11/11** contra la base de producción, con meses `2099-xx`
+que se borran al terminar:
+
+- veinte reservas **simultáneas** de 1 $ contra 5 $ gastables → exactamente **cinco** concedidas,
+  quince `over_budget`, ningún id repetido;
+- liquidar la misma reserva dos veces a la vez → se cobra **una**;
+- reservas y liquidaciones entrelazadas → **ningún interbloqueo**, que era el riesgo del orden de
+  bloqueo corregido el mismo día;
+- una reserva caducada se cobra entera.
+
+Esto era lo último que quedaba sin demostrar, porque es comportamiento del motor y no de nuestro
+código. Ya no es una suposición.
+
+### Row Level Security
+
+Las dos tablas del presupuesto se crearon **con RLS activado y sin políticas**. Importa: la clave
+anónima de Supabase va incrustada en el bundle del frontend, es pública por diseño, y sin RLS
+cualquiera podría **poner a cero el contador de gasto**. Comprobado con la clave anónima real:
+lectura devuelve `[]` y la escritura se rechaza con `42501`. `isabel-api` usa la service key, que
+salta RLS, así que sigue funcionando.
 
 ## 8. Por qué el gasto está bloqueado ahora mismo
 
@@ -175,9 +193,11 @@ motivos independientes:
 
 1. `AI_KILL_SWITCH=true`;
 2. `AI_SPENDING_ENABLED=false`;
-3. el libro mayor no existe todavía → `state_unavailable`, que el control trata como "no sé cuánto
-   queda", no como "queda todo";
+3. la clave que tiene `isabel-api` es la expuesta, y no se levanta el freno hasta rotarla;
 4. y para los turnos de cron, además, la ruta no está declarada para ese consumidor.
+
+El libro mayor ya responde: 22,92 $ mensuales, 5,73 $ de reserva, **17,19 $ gastables**, 0 $
+gastado, 0 reservado.
 
 Configuración aplicada: 20 € mensuales, 5 € de reserva protegida, 0,25 € por llamada, 1 € por
 tarea, 2.048 tokens de salida, 2 llamadas en vuelo, TTL de 2 min, 2 intentos, almacén `supabase`.
@@ -192,13 +212,9 @@ tarea, 2.048 tokens de salida, 2 llamadas en vuelo, TTL de 2 min, 2 intentos, al
 
 ## 9. Lo que falta, y solo puedes hacerlo tú
 
-1. **Iniciar sesión en Supabase** en el navegador. Es lo único que bloquea la migración: no hay
-   ningún token de gestión válido ni contraseña de base de datos en el equipo, y un asistente no
-   introduce contraseñas ni completa autenticaciones. Con la sesión abierta, la migración se aplica
-   en una llamada.
-2. **Rotar la clave** — `ROTAR_ANTHROPIC_KEY.md`. La nueva va **solo** a `isabel-api`. Crear y
-   revocar claves de Anthropic es tuyo por definición.
-3. **Datos de la consola** para cerrar la reconciliación: fecha e importe de la recarga de agosto,
+1. **Rotar la clave** — `ROTAR_ANTHROPIC_KEY.md`. La nueva va **solo** a `isabel-api`. Crear y
+   revocar claves de Anthropic es tuyo por definición: un asistente no debe manejar ese secreto.
+2. **Datos de la consola** para cerrar la reconciliación: fecha e importe de la recarga de agosto,
    consumo diario del 1 al 11, movimientos de crédito, y si existe límite duro o solo alertas.
 
 ## 10. Canary, cuando lo anterior esté hecho
@@ -212,12 +228,17 @@ tarea, 2.048 tokens de salida, 2 llamadas en vuelo, TTL de 2 min, 2 intentos, al
 
 ## 11. Riesgos residuales
 
-1. La atomicidad multiconexión no está demostrada (§7).
-2. Los precios son los verificados el 2026-08-09; envejecen en silencio. `prices.js` guarda la fecha.
-3. **Anthropic no garantiza un límite duro** que bloquee gasto; sus avisos de presupuesto son
+1. Los precios son los verificados el 2026-08-09; envejecen en silencio. `prices.js` guarda la fecha.
+2. **Anthropic no garantiza un límite duro** que bloquee gasto; sus avisos de presupuesto son
    alertas. No verificado — mirarlo en la consola. El control local limita lo que sale de LIFEOS,
    no lo que el proveedor pueda facturar por otra vía.
-4. El proxy no admite streaming: lo rechaza en vez de dejar pasar un gasto que no sabría liquidar.
-5. `api/gmail-auth.js` y `api/gmail-callback.js` siguen publicadas en Vercel. No gastan Anthropic,
+3. El proxy no admite streaming: lo rechaza en vez de dejar pasar un gasto que no sabría liquidar.
+4. `api/gmail-auth.js` y `api/gmail-callback.js` siguen publicadas en Vercel. No gastan Anthropic,
    pero son endpoints sin autenticación: conviene revisarlos aparte.
+5. **`eventos` es legible con la clave anónima.** Comprobado el 2026-09-20: una petición con la
+   clave que va incrustada en el bundle público devuelve registros reales (sueño, uso de IA). Es la
+   consecuencia de "RLS desactivado por la arquitectura personal actual" que ya documenta
+   `INFRASTRUCTURE.md`, no algo que haya cambiado hoy. No se ha tocado porque activar RLS en tablas
+   que el frontend lee con esa misma clave rompería la app sin políticas previas. **Merece su propia
+   sesión**: es un problema de privacidad, no de coste.
 6. El Gateway nuevo no tiene remoto git demostrado: su configuración vive en un volumen.
