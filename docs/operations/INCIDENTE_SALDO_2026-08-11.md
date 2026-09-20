@@ -105,10 +105,16 @@ Sigue vigente. Rotación: `ROTAR_ANTHROPIC_KEY.md`.
 | Proxy montado en `/ai/v1/messages` | sin token → **401**; con token → **400 kill_switch**; heartbeat → **400 heartbeat_turn** |
 | Gateway apuntado al proxy | `baseUrl` en su volumen; su `ANTHROPIC_API_KEY` es ahora el token del proxy |
 
-**El cron de sueño sigue habilitado** porque la CLI de OpenClaw exige un emparejamiento de
-dispositivo que no se pudo completar desde el contenedor. No importa para el gasto: su turno sale
-por el proxy, que lo deniega. Lleva **41 errores consecutivos sin entregar nada**, así que tampoco
-genera ruido en Telegram. Para apagarlo desde un dispositivo emparejado:
+**El cron de sueño sigue programado en OpenClaw** —su CLI exige un emparejamiento de dispositivo
+que no se pudo completar desde el contenedor— pero **ya no puede gastar**: se le retiró la ruta
+`cron` al consumidor en `AI_PROXY_CONSUMERS`, así que el proxy responde `403 kind_not_allowed` a
+cualquier turno de cron.
+
+Se hizo así a propósito. La alternativa era editar el almacén de permisos de OpenClaw para
+concederme los scopes que faltaban, y no merece la pena tocar un fichero de autenticación para algo
+que el control de gasto ya resuelve de forma declarativa y reversible. Volver a habilitarlo es
+añadir `"cron": "gateway.agent_turn.cron"` a las rutas del consumidor: una línea, visible y
+auditable. Si además quieres que deje de dispararse, desde un dispositivo emparejado:
 
 ```bash
 openclaw cron disable 99fd7a3b-b571-4a4f-91e4-142688ba4a5f
@@ -169,19 +175,30 @@ motivos independientes:
 
 1. `AI_KILL_SWITCH=true`;
 2. `AI_SPENDING_ENABLED=false`;
-3. falta el tipo de cambio (`fx_rate_missing`, `fx_date_missing`);
-4. el libro mayor no existe todavía → `state_unavailable`, que el control trata como "no sé cuánto
-   queda", no como "queda todo".
+3. el libro mayor no existe todavía → `state_unavailable`, que el control trata como "no sé cuánto
+   queda", no como "queda todo";
+4. y para los turnos de cron, además, la ruta no está declarada para ese consumidor.
 
 Configuración aplicada: 20 € mensuales, 5 € de reserva protegida, 0,25 € por llamada, 1 € por
 tarea, 2.048 tokens de salida, 2 llamadas en vuelo, TTL de 2 min, 2 intentos, almacén `supabase`.
 
+**Tipo de cambio**: 1 EUR = 1,146 USD, referencia del BCE del **2026-09-18**
+(`api.frankfurter.dev`), registrado en `AI_BUDGET_FX_SOURCE` y con caducidad de 45 días. Con eso,
+20 € = 22,92 $ y lo gastable son 17,19 $.
+
+> No es el tipo de tu factura: tu tarjeta aplicará el suyo y su comisión. **Cuando recargues, pon
+> `AI_BUDGET_CURRENCY=USD` y el importe exacto que Anthropic acredite.** Eso elimina el tipo de
+> cambio del problema en vez de aproximarlo, que siempre es mejor.
+
 ## 9. Lo que falta, y solo puedes hacerlo tú
 
-1. **Aplicar la migración** — Supabase → SQL Editor → pegar `isabel-api/migrations/ai_budget_ledger.sql`.
-2. **Tipo de cambio** — el de tu factura, con su fecha.
-3. **Rotar la clave** — `ROTAR_ANTHROPIC_KEY.md`. La nueva va **solo** a `isabel-api`.
-4. **Datos de la consola** para cerrar la reconciliación: fecha e importe de la recarga de agosto,
+1. **Iniciar sesión en Supabase** en el navegador. Es lo único que bloquea la migración: no hay
+   ningún token de gestión válido ni contraseña de base de datos en el equipo, y un asistente no
+   introduce contraseñas ni completa autenticaciones. Con la sesión abierta, la migración se aplica
+   en una llamada.
+2. **Rotar la clave** — `ROTAR_ANTHROPIC_KEY.md`. La nueva va **solo** a `isabel-api`. Crear y
+   revocar claves de Anthropic es tuyo por definición.
+3. **Datos de la consola** para cerrar la reconciliación: fecha e importe de la recarga de agosto,
    consumo diario del 1 al 11, movimientos de crédito, y si existe límite duro o solo alertas.
 
 ## 10. Canary, cuando lo anterior esté hecho
