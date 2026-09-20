@@ -1,11 +1,27 @@
 Estado: fotografía operativa vigente
-Última verificación: 2026-08-10
+Última verificación: 2026-09-20
 
 # Estado actual de LIFEOS
+
+## ⚠ Corrección — 2026-09-20
+
+**Todo lo que este documento dice sobre el heartbeat y sobre el coste es incorrecto desde el
+2026-08-09.** El heartbeat se apagó solo en el Gateway nuevo; el Gateway antiguo del proyecto
+Railway `isabel-gateway` siguió despertando al agente 48 veces al día con la misma clave hasta que
+se detuvo el 2026-09-20. Agotó el saldo el 2026-08-11 a las 02:18 UTC.
+
+Las frases "Heartbeat: **PASS** … cero después del reinicio" y "Coste O4 sin contaminación" eran
+ciertas **solo para el Gateway nuevo**, que es lo único que O4 observa. No las uses como evidencia
+de nada.
+
+LIFEOS lleva parado desde entonces. Estado real, causa demostrada, mapa de rutas de pago y
+secuencia de reactivación: [`operations/INCIDENTE_SALDO_2026-08-11.md`](operations/INCIDENTE_SALDO_2026-08-11.md).
+Antes de tocar nada relacionado con gasto, leer ese documento primero.
 
 ## Checkpoint funcional — 2026-08-10 13:18 Europe/Madrid
 
 Este bloque reemplaza como estado vigente las cifras históricas que aparecen más abajo.
+Superado por la corrección de arriba en todo lo relativo a heartbeat y coste.
 
 ### Producción verificada
 
