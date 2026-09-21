@@ -11,7 +11,7 @@ El relevo anterior (2026-08-10, ventana O4) está en `archive/NEXT_SESSION_2026-
 - **Hueco de seguridad cerrado** (SECURITY.md #12): con la API key pública de la app se podía leer su Gmail y enviar correos en su nombre. Ahora el correo y la agenda solo existen con la llave privada del Gateway.
 - **Mensajes de coach ampliados:** 08:30 con agenda, correos importantes y rachas; 17:00 con la racha en juego; 21:30 con lo no contestado y los hábitos.
 - **Hábitos con racha** (D52): leer, escribir y gym, también en la tarjeta 🌱 Hábitos de la app. 36 tools.
-- **Informe de presupuesto con el gasto real de OpenRouter** (rama `feat/openrouter-en-presupuesto`, sin unir).
+- **Informe de presupuesto con el gasto real de OpenRouter** (`isabel-api` `993c98e`; cómo ejecutarlo, en la cabecera de `scripts/budget-status.mjs`).
 - **OAuth viejo de Gmail retirado de Vercel.**
 
 ## 2. Qué quedó pendiente
@@ -20,7 +20,7 @@ El relevo anterior (2026-08-10, ventana O4) está en `archive/NEXT_SESSION_2026-
 - **Prueba con ella por Telegram** (correos importantes, sin contestar, un borrador, un evento): lanzada el día 21, sin confirmar el resultado aquí.
 - ¿Usa otro calendario además del principal? Hoy solo se lee `primary`, y no tiene nada en los próximos 7 días.
 - Borrar el cliente de Google "Cliente web 1" (junio), el primer secreto del cliente nuevo (`****xmwJ`, que nadie guardó) y la tabla vacía `gmail_tokens`. Preguntarle antes: son cambios en su Google Cloud y en su Supabase.
-- Unir `feat/openrouter-en-presupuesto` a `main` de isabel-api cuando el Gateway use `/mcp/http`. Antes de eso, cada despliegue deja a Isabel sin tools hasta reiniciar el Gateway.
+- En los logs del Gateway sale `[memory] sync failed … No API key found for provider openai` (memory-core): la búsqueda de memoria de OpenClaw pide embeddings de OpenAI y no hay clave. Nadie lo ha investigado aún.
 - El guard O5 (`o5DisconnectedGuard.test.js`) falla en `main` desde `1e19184` (Outlook, de otra sesión): cambió `src/index.js` sin mover su checkpoint. Lo tiene que revisar quien hizo ese cambio.
 - Lo que ella dejó en cola: activar el aprendizaje y seguimiento (O5) y unir `docs/incidente-saldo` a `main` (preguntarle antes). O5 está construido y desconectado a propósito; su plan escrito es un canary reversible (`LIFEOS_KNOWLEDGE_STAGE`), no activarlo entero. Ver `core/KNOWLEDGE_LOOP.md` y `core/ADR_O5_FOLLOW_UP_CLOSED_LOOP.md`.
 
