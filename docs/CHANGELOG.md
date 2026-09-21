@@ -7,6 +7,15 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-09-21, noche (Isabel lee su Gmail y su Google Calendar — D51)
+
+- **Google conectado:** proyecto de Google Cloud `LIFEOS` con Gmail y Calendar activados, 5 permisos, cliente web nuevo "Isabel API (Railway)" y la app **"En producción"** (en "Prueba" el permiso caduca a los 7 días). Para publicarla, Google exige página de inicio y de privacidad: `isabel-api/public/privacidad.html` (`61d2722`). Cuenta conectada: la suya, verificada con `google_status`.
+- **Solo correo de personas** (`df9fabe`, `5ac5bc4`): el primer "sin contestar" eran 7 anuncios de AliExpress de 10. Se descarta lo que trae `Feedback-ID`, `List-Unsubscribe` o `Precedence: bulk`, salvo en hilos donde ella ya escribió.
+- **Seguridad (SECURITY.md #12):** con la API key pública de la app se podía leer su Gmail y enviar correos en su nombre. Desde `8c38b4a`, las tools de correo y agenda solo existen con `MCP_PRIVATE_KEY`, que el Gateway usa como `ISABEL_MCP_KEY`.
+- **Mensajes de coach:** el de las 08:30 trae agenda y correos importantes; el de las 21:30, lo no contestado con la oferta de dejar el borrador hecho (`isabel-gateway` `0d66964`).
+- **El empujón de las 17:00 del primer día no llegó:** empezó a su hora y lo cortó un reinicio del Gateway a las 17:00:14. El sueño de las 08:00 falló por última vez con "Consumidor no reconocido", antes del arreglo de Telegram.
+- Tres sesiones trabajaron a la vez en `isabel-api` (Google, D50 y Outlook). Por eso lo de esta se subió desde una copia limpia de `origin/main` y no con `railway up`: un `railway up` habría publicado trabajo a medias de las otras.
+
 ## 2026-09-21, última hora de la tarde (Telegram y la app, conectados de verdad — D50)
 
 - **Lo que Isabel apuntaba no se veía en Dominios:** VistaJet solo leía `vj_tasks` y ocultaba `tasks`; el resto de dominios contaba proyectos. Arreglado, y la lista de Tareas vuelve a VistaJet.

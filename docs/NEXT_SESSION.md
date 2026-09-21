@@ -1,77 +1,38 @@
-Ultima actualizacion: 2026-08-09 — fase economica $0 cerrada
+Última actualización: 2026-09-21, noche — Google conectado (D51)
 
-# Proxima sesion
+# Próxima sesión
 
-## Relevo vigente — 2026-08-10
+El relevo anterior (2026-08-10, ventana O4) está en `archive/NEXT_SESSION_2026-08-10.md`: ya no aplica.
 
-1. No rehacer SurfaceSync, sueño ni Finanzas V1: ya están desplegados y verificados.
-2. No montar O5 durante la ventana O4. El gate termina el 2026-08-11 a las 13:22 UTC / 15:22 Madrid.
-3. No aplicar migraciones/flags ni cambiar OpenClaw, tools, prompts, modelos, routing, cacheRetention, heartbeat, crons, frecuencia o Telegram.
-4. Producción: backend `60ee372`; frontend funcional `a5c03f4`.
-5. Tests: backend 530/530; O5 desconectado 102/102; frontend 33/33 + build.
-6. Finanzas: endpoint productivo autenticado, lectura mensual pura; todavía no MCP/Home prioritario. No hay presupuestos configurados, así que cero señales es correcto.
-7. Coste O4 al 2026-08-10T11:18:01Z: 37 llamadas/$0.648633, heartbeat 0; 0 llamadas desde el deploy financiero.
-8. Al cerrar O4: volver a medir la ventana completa antes de cualquier activación. Luego canary reversible de KnowledgeCandidate, no activación masiva de Goals/Home/FollowUps.
-9. Leer `docs/modules/MODULE_LOOP_AUDIT_2026-08-10.md` para el estado honesto de VistaJet, JETMI, Finanzas, Salud, Gym, Marca Personal, Viajes/Visados y Admin General.
+## 1. Qué se terminó en esta sesión
 
----
+- **Isabel lee su Gmail y su Google Calendar** (D51). App de Google "En producción", cuenta conectada y verificada, 34 tools en el Gateway.
+- **Solo correo de personas:** fuera la publicidad, aunque Gmail la tenga en Principal (`Feedback-ID`, `List-Unsubscribe`).
+- **Hueco de seguridad cerrado** (SECURITY.md #12): con la API key pública de la app se podía leer su Gmail y enviar correos en su nombre. Ahora el correo y la agenda solo existen con la llave privada del Gateway.
+- **Mensajes de coach ampliados:** 08:30 con agenda y correos importantes; 21:30 con lo no contestado.
 
+## 2. Qué quedó pendiente
 
+- **Verificar los disparos:** 21:30 del 2026-09-21 (primer cierre con correo), y el 2026-09-22 el sueño de las 08:00 (primero con DeepSeek, antes fallaba por el proxy), el parte de las 08:30 (primero con agenda y correo) y el empujón de las 17:00 (el del día 21 lo cortó un reinicio del Gateway y no llegó). Cómo: `openclaw cron list --json` como `node` en el Gateway, campo `state`.
+- **Prueba con ella por Telegram** (correos importantes, sin contestar, un borrador, un evento): lanzada el día 21, sin confirmar el resultado aquí.
+- ¿Usa otro calendario además del principal? Hoy solo se lee `primary`, y no tiene nada en los próximos 7 días.
+- Retirar `life-os-app/api/gmail-*.js` de Vercel y el cliente de Google "Cliente web 1" (junio). Borrar el primer secreto del cliente nuevo (`****xmwJ`), que nadie guardó.
+- El guard O5 (`o5DisconnectedGuard.test.js`) falla en `main` desde `1e19184` (Outlook, de otra sesión): cambió `src/index.js` sin mover su checkpoint. Lo tiene que revisar quien hizo ese cambio.
+- Lo que ella dejó en cola: hábitos con racha (leer, escribir, gym), activar el aprendizaje y seguimiento (O5), meter el gasto de OpenRouter en el informe de presupuesto, unir `docs/incidente-saldo` a `main` (preguntarle antes) y retirar los endpoints viejos de Gmail en Vercel.
 
-## Estado exacto
+## 3. Qué hacer inmediatamente después
 
-- Heartbeat: **PASS**. 99 historicos; ultimo `2026-08-09T13:17:56.992Z`; cero despues del reinicio de `13:22Z`.
-- O4: introducida en `9c2e1760df359e91476014f6928f330e6ae5be0d`; produccion actual `5175136033c181e1c44bc030c0a4e4d5948c34d4`, Railway `f146452d-9c02-412e-b90c-08d173bc05ff` `SUCCESS`.
-- Prueba O4 automatica: tick `2026-08-09T14:30:00Z`, HTTP 200, 27 registros con superficie despues del barrido, cero requests a `/v1/chat`, presupuesto proactivo 0 calls/0 turns/$0.
-- Baseline desde `2026-08-09T13:22Z`: lectura final `2026-08-09T16:26:16.110Z`, cero registros IA, cero turnos de modelo, cero heartbeat y $0. Son 3 h 4 min 16 s validas; aun no es una proyeccion mensual ni completa las 48 h.
-- Tools/skills: auditoria completa persistida. P1 y O3 estan propuestas, **NO aplicadas**.
-- Benchmark: A-W intacto (23) + JETMI (10) + sensibilidad (4), 37 total. `--fixtures`: J-M 4/4 PASS, coste $0.
-- Simulador: corregido para no cobrar `/v1/now`, inventario ni Gym como IA. 523/523 tests, 163 suites.
-- SSH: backup `C:\Users\USER\.ssh\config.pre-lifeos-20260809.bak`; aliases inequivocos `railway-isabel-gateway-old` y `railway-isabel-gateway-new`.
+1. Mirar el `state` de los cron de coach y de sueño (ver arriba) y decírselo a ella en corto.
+2. Si ella lo pide, seguir con los hábitos con racha.
 
-## Antes de decidir otra optimizacion
+## 4. Qué no debe romperse
 
-Dejar que O4 acumule al menos 48 horas. Consultar `GET /v1/usage/today?hours=48` y contrastar con trayectorias reales. Separar siempre:
+- **Nunca `railway up` desde `isabel-api`** si hay más de una sesión: publica también el trabajo a medias de las otras. El despliegue sale de los push a `main` en GitHub. Para subir solo lo tuyo, usa un worktree limpio de `origin/main`.
+- **No reiniciar el Gateway a la hora de un cron** (08:00, 08:30, 17:00, 21:30 Madrid): el mensaje en curso se corta y no se reintenta.
+- `MCP_PRIVATE_KEY` (isabel-api) e `ISABEL_MCP_KEY` (Gateway) son la misma llave. Si no coinciden, Isabel pierde el correo y la agenda. `openclaw.json` la referencia como `${ISABEL_MCP_KEY}`, no como valor.
+- La app de Google tiene que seguir "En producción": en "Prueba" el permiso caduca a los 7 días (error `google_reauth_required`).
+- Ejecutar `openclaw` en el contenedor siempre como `runuser -u node --`. Desde Git Bash, `MSYS_NO_PATHCONV=1`, o las rutas `/tmp/...` llegan cambiadas.
 
-- `SYSTEM_AUTONOMY`: heartbeat (debe seguir 0), tick determinista, sleep cron y background;
-- `USER_CONVERSATION`: Telegram y LIFEOS;
-- `MEASURED` frente a `SIMULATED`.
+## 5. Qué documentos leer
 
-## Decisiones pendientes — no asumir
-
-1. **P1**: allowlist de 12 `lifeos__*` + `message` + `session_status`. Ahorro de bytes de schemas ~69%; no aplicar sin decision de la usuaria y snapshot.
-2. **O3**: `agents.entries.main.skills: []`; no aplicar sin decision.
-3. **Benchmark real**: requiere cuentas/keys y presupuesto explicito. Empezar solo con corpus sanitizado y limite de gasto.
-4. **G8**: structured output productivo depende de parseo/limpieza. Hay fixtures, pero no cambiar comportamiento productivo sin decision.
-
-## Simulacion revisada — no es factura
-
-| Escenario | ACTUAL | P1 contexto | Haiku everyday | Gemini hipotetico | Mixta hipotetica |
-|---|---:|---:|---:|---:|---:|
-| LIGHT | €8,42 | €3,68 | €1,23 | €0,33 | €0,33 |
-| NORMAL | €17,07 | €7,80 | €3,19 | €1,04 | €1,22 |
-| HEAVY | €41,77 | €20,00 | €9,16 | €3,28 | €4,22 |
-| ISABEL 150% | €81,37 | €41,16 | €22,43 | €8,86 | €11,77 |
-
-El cambio frente a la tabla anterior se debe a una correccion: 150 lecturas LIFEOS/dia son L0=$0; solo se simulan 8 microtareas/dia que realmente requieren IA.
-
-## Invariantes
-
-No cambiar Sonnet/Haiku, providers, `cacheRetention`, presupuestos, sleep cron, proactive cron, Telegram, P1/O3 ni claves sin decision explicita. No enviar Telegrams de prueba. No borrar el Gateway antiguo. No gastar benchmark real. No usar datos personales/medicos/operativos reales en benchmarks.
-
-## Documentos de entrada
-
-1. `docs/CURRENT_STATE.md`
-2. `docs/research/AI_RUNTIME/ARQUITECTURA_ECONOMICA_2026-08-09.md`
-3. `docs/research/AI_RUNTIME/AUDITORIA_TOOLS_SKILLS_2026-08-09.md`
-4. `docs/research/AI_RUNTIME/DECISION_MULTIMODELO_2026-08-09.md`
-5. `docs/KNOWN_PROBLEMS.md`
-6. `docs/research/AI_RUNTIME/PREPARACION_MULTIMODELO_48H_2026-08-09.md`
-
-## Instrumento multimodelo preparado — no conectado
-
-- Corpus schema v3: 37 casos, con comportamiento esperado, scoring, coste/latencia máximos, tools, structured output, contexto, sensibilidad y pass/fail explícitos.
-- Shortlist cerrada: 8 modelos; adapters Anthropic/OpenAI/Kimi/Gemini/OpenRouter y policy de sensibilidad solo en `benchmarks/`.
-- Smoke autorizado solo en diseño: 48 requests PUBLIC, `$0.744826` conservador, corte `$0.90`, cap `<$1`, sin retries. **No ejecutar sin autorización de cuentas/keys/presupuesto.**
-- Cost Simulator V2 y JETMI 150 son simulaciones, no facturas ni cambios productivos.
-- Siguiente secuencia: terminar 48 h O4 -> decisión humana -> fixtures $0 -> smoke autorizado -> decisión separada de canary. Nunca saltar directamente a producción.
+`CURRENT_STATE.md` → `DECISIONS.md` D49, D50 y D51 → `SECURITY.md` #2 y #12 → `isabel-gateway/README.md` (variables y SSH).

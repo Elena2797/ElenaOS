@@ -3,6 +3,13 @@ Estado: fotografía operativa vigente
 
 # Estado actual de LIFEOS
 
+## Actualización — 2026-09-21, noche (manda sobre la de abajo)
+
+- **Isabel ve su Gmail y su Google Calendar** (D51): 34 tools en el Gateway. Las de correo y agenda solo con la llave privada `ISABEL_MCP_KEY` (SECURITY.md #12).
+- **Isabel empuja** tres veces al día (D49); desde hoy el parte de las 08:30 trae agenda y correos importantes, y el cierre de las 21:30 lo no contestado.
+- **Backend:** `isabel-api` `8c38b4a` en `main`, desplegado desde GitHub. `npm test` 729/731: fallan el guard O5 por `src/index.js` (cambio de Outlook de otra sesión, `1e19184`) y, solo fuera de la carpeta del repo, la prueba que lee `../life-os-app`.
+- **Gateway:** `isabel-gateway` `a09f555` (sin remoto; se despliega con `railway up`). Cerebro DeepSeek V4 Flash (D47).
+
 ## Actualización — 2026-09-21
 
 - **Isabel (Telegram) vuelve a funcionar.** Cerebro principal: `openrouter/deepseek/deepseek-v4-flash` (OpenRouter directo, 10 $ de prepago). Repuesto: `anthropic/claude-sonnet-4-6` por el proxy de presupuesto `/ai/v1/messages`. Ver `DECISIONS.md` D46 y D47.

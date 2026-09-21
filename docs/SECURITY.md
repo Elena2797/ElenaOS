@@ -1,5 +1,5 @@
 Estado: implementado (documenta riesgos reales, no un plan de mitigación)
-Última verificación: 2026-08-08
+Última verificación: 2026-09-21
 Verificado en: grep directo sobre isabel-api/src y life-os-app/src, lectura de .git/config; riesgo #5 confirmado en la práctica el 2026-08-02; riesgos #7 y #8 confirmados el 2026-08-05 durante la auditoría de OpenClaw; riesgo #7 resuelto y verificado en producción el 2026-08-06; riesgo #9 encontrado el 2026-08-06 durante el despliegue de isabel-gateway
 Fuente de verdad de datos: ninguna
 
@@ -55,6 +55,11 @@ Encontrado el 2026-08-07 auditando la topología de Railway para la migración d
 **Nada lo referencia** (cero ocurrencias en `life-os-app`, `isabel-api`, la config del Gateway y `/docs`, salvo la propia documentación de este hallazgo) y sus logs solo contienen líneas de arranque, ninguna petición servida — veredicto **ORPHANED**, ver `operations/GATEWAY_MIGRATION.md` para la auditoría completa. Además era relevante para la frontera de confianza del adaptador IPv6 mientras permanecía vivo. El estado anterior a la mitigación se preservó en un snapshot antes de detenerlo.
 
 **Mitigación aplicada:** se confirmó otra vez que no tuvo tráfico HTTP en los 7 días anteriores, que no tenía dominio público y que nadie lo referenciaba. Se desconectó su source GitHub —causa de que reviviera en cada push— y se detuvo el deployment con `railway down`. No se borraron servicio, variables ni configuración. Estado verificado: cero deployments activos, cero dominios y source `repo:null`. El rollback está documentado en el snapshot privado de esta tanda.
+
+### 12. Con la API key pública se podía leer su Gmail y enviar correos en su nombre — RESUELTO 2026-09-21
+Encontrado el 2026-09-21, una hora después de conectar Google (D51). Las tools de correo y agenda (`gmail_*`, `calendar_*`, `google_status` y `outlook_recent`, esta última de otra sesión) vivían en `/mcp`, protegido solo por la API key del riesgo #2, que está en el bundle público de la app: comprobado ese día en el JS de `elena-os-wheat.vercel.app`, y su valor en Railway es el mismo que el fallback. Cualquiera que lo leyera podía leer su correo y su agenda, y enviar correos en su nombre: `gmail_propose_send` + `gmail_confirm_send` los puede llamar el mismo atacante. El OAuth solo impedía conectar **otra** cuenta, no usar la suya. No hay indicios de que nadie lo usara.
+**Arreglo** (`isabel-api` `8c38b4a`, `isabel-gateway` `a09f555`): `/mcp` acepta dos llaves. Con `MCP_PRIVATE_KEY` están todas las tools. Esa llave solo vive en Railway: en isabel-api y, en el Gateway, como `ISABEL_MCP_KEY`, referenciada como `${ISABEL_MCP_KEY}` en `openclaw.json`. Con la llave pública están todas menos las de correo y agenda, que se filtran por nombre (`PRIVATE_TOOL`) para que una tool de correo nueva quede protegida sin acordarse. Una sesión privada no acepta llamadas con la llave pública, y sin `MCP_PRIVATE_KEY` configurada no hay acceso privado.
+**Sigue abierto:** el resto de `/v1` y de las tools MCP (tareas, salud, recordatorios, inventario) sigue con la llave pública del riesgo #2.
 
 ## Lo que NO se encontró (positivo)
 - No hay contraseñas ni secretos de terceros hardcodeados más allá de lo anterior.
