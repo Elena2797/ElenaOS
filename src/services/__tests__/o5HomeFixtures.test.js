@@ -7,8 +7,10 @@ import { O5_HOME_FIXTURES } from '../followUpHomeFixtures.js';
 const MAIN_URL = new URL('../../main.js', import.meta.url);
 // Checkpoint aprobado durante O4 después de promover SurfaceSync y las lecturas
 // deterministas de sueño y Finanzas. O5 sigue sin poder modificar ni importar
-// el runtime.
-const MAIN_CHECKPOINT_SHA256 = 'D140D9006592F8B035DEA92363DDEB21D238A3DBDAC7C6D111DE9C641F4AD4B7';
+// el runtime. Actualizado el 2026-09-21: Dominios y VistaJet muestran las tareas
+// de `tasks` que apunta Isabel, y Home refleja la prioridad declarada, los
+// recordatorios y se recalcula al volver de Telegram (D50). Sin O5, sin fixtures.
+const MAIN_CHECKPOINT_SHA256 = '4E25CE780CCFCAF72D3C2E085F8A5AF77F0992CC290A4C84084467B9A985D429';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

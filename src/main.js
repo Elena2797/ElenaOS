@@ -167,7 +167,7 @@ function pinPress(v) {
   }
 }
 
-let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, finance:null, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'}, pendingQuestions:[], gym:null, sleep:null, _gymLoaded:false, _gymLoading:false, _gymSaving:false, _sleepLoading:false, _financeRequestToken:0 };
+let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, finance:null, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'}, pendingQuestions:[], reminders:null, gym:null, sleep:null, _gymLoaded:false, _gymLoading:false, _gymSaving:false, _sleepLoading:false, _financeRequestToken:0 };
 
 async function initApp() {
   db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -185,6 +185,40 @@ async function initApp() {
   loadGymState(); // Home y Dominios representan la misma semana que la vista Gym
   loadSleepState(); // representa el check-in persistido por Telegram/MCP
   loadFinanceState(); // lectura Core fail-closed; no participa en prioridad durante O4
+  loadReminders(); // los recordatorios que ella le pidió a Isabel por Telegram
+}
+
+// ────── Recordatorios — los que ella le pide a Isabel por Telegram ──────────
+// `reminders` tiene RLS: la app no la lee directa, pasa por GET /v1/reminders.
+// null = no se pudo leer (no es "no hay ninguno"): la tarjeta no se pinta.
+async function loadReminders() {
+  try {
+    const res = await fetch(`${ISABEL_API}/v1/reminders`, { headers: { 'x-api-key': ISABEL_KEY } });
+    if (!res.ok) throw new Error('reminders ' + res.status);
+    const data = await res.json();
+    S.reminders = data.ok ? data.reminders : null;
+  } catch (e) {
+    console.error('reminders', e);
+    S.reminders = null;
+  }
+  if (S.view === 'home') render();
+}
+
+function remindersCard() {
+  const list = S.reminders || [];
+  if (!list.length) return '';
+  const rows = list.slice(0, 3).map((r, i) => `<div style="display:flex;align-items:flex-start;gap:10px;${i < Math.min(list.length, 3) - 1 ? 'padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid var(--border)' : ''}">
+      <span style="font-size:13px;flex-shrink:0">⏰</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;color:var(--text);line-height:1.4">${r.text}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px">${r.when}</div>
+      </div>
+    </div>`).join('');
+  const more = list.length > 3 ? `<div style="font-size:11px;color:var(--t3);margin-top:8px">y ${list.length - 3} más</div>` : '';
+  return `<div style="background:var(--surface);border-radius:14px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)">
+    <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:10px">Recordatorios</div>
+    ${rows}${more}
+  </div>`;
 }
 
 // ────── Gym — el estado semanal lo calcula el Core, no la vista ──────────
@@ -333,8 +367,12 @@ function pendingQuestionsCard() {
 }
 
 // ────── Isabel · Ahora — consume GET /v1/now, alimenta la tarjeta Isabel de Home ───
-async function loadIsabelNow() {
-  S.isabelNow = { status: 'loading' };
+// `silent`: al volver de Telegram la tarjeta conserva lo que ya enseñaba hasta
+// que llega la evaluación nueva, en vez de parpadear a "Revisando…". Un fallo
+// sí se declara igual: 'unreachable' hace que Home use la última evaluación
+// marcada como no fresca (D19), nunca una vieja presentada como actual.
+async function loadIsabelNow({ silent = false } = {}) {
+  if (!silent) S.isabelNow = { status: 'loading' };
   try {
     const res = await fetch(`${ISABEL_API}/v1/now`, { headers: { 'x-api-key': ISABEL_KEY } });
     if (!res.ok) throw new Error(`Isabel Core ${res.status}`);
@@ -497,6 +535,34 @@ function domainStatusLabel(area, health) {
   return { rojo: 'necesita atención', naranja: 'en seguimiento', verde: 'en progreso' }[health] || '—';
 }
 
+// Pendientes de un dominio, vengan de la tabla que vengan. Lo que Isabel apunta
+// por Telegram (D48/D49) va a `tasks` con su área, también si es de VistaJet;
+// el "+ Añadir tarea" de VistaJet escribe en `vj_tasks`. La tarjeta y la vista
+// de VistaJet solo miraban `vj_tasks`: siete pendientes reales apuntados por
+// Isabel no salían en ninguna parte y la tarjeta decía "Tranquilo por ahora".
+function openDomainTasks(area) {
+  const generic=S.tasks.filter(t=>t.area_id===area.id&&t.status!=='done');
+  const vj=area.name==='VistaJet'?(S.vjTasks||[]).filter(t=>t.status!=='done'):[];
+  return [...generic,...vj];
+}
+
+// El pendiente que la tarjeta pone delante: mismo orden que `tasks_list` de
+// Isabel (prioridad, fecha, antigüedad) más el horizonte, para que la app y el
+// chat nombren el mismo primero.
+function nextDomainTask(area) {
+  const rank={critical:0,high:1,medium:2,low:3}, hz={today:0,this_week:1,this_month:2,next_month:3};
+  return openDomainTasks(area).sort((a,b)=>
+    (rank[a.priority]??9)-(rank[b.priority]??9)
+    || String(a.due_date||'9999-12-31').localeCompare(String(b.due_date||'9999-12-31'))
+    || (hz[a.horizon]??9)-(hz[b.horizon]??9)
+    || String(a.created_at||'').localeCompare(String(b.created_at||'')))[0]||null;
+}
+
+function clip(text, max) {
+  const s=String(text||'');
+  return s.length>max?s.slice(0,max-1).trimEnd()+'…':s;
+}
+
 function domainStats(area) {
   const projects=S.projects.filter(p=>p.area_id===area.id&&['active','paused'].includes(p.status));
   const activeProjects=projects.filter(p=>p.status==='active');
@@ -518,22 +584,23 @@ function domainStats(area) {
   const progress=activeProjects.length?Math.min(96,Math.round(((withNext*0.55+withIa*0.35)/activeProjects.length)*100)+10):Math.min(35,tasks.length*8+events.length*5);
   const health=areaHealth(area.id);
   const statusLabel=domainStatusLabel(area,health);
-  const vjTaskCount=area.name==='VistaJet'?(S.vjTasks||[]).filter(t=>t.status!=='done').length:0;
-  const score=activeProjects.length*4+events.length*3+(tasks.length+vjTaskCount)+waits.length+decisions.length;
-  return {projects,activeProjects,tasks,waits,decisions,events,lastAt,progress,statusLabel,score,vjTaskCount};
+  const pendingCount=openDomainTasks(area).length;
+  const score=activeProjects.length*4+events.length*3+pendingCount+waits.length+decisions.length;
+  return {projects,activeProjects,tasks,waits,decisions,events,lastAt,progress,statusLabel,score,pendingCount};
 }
 
-// "Qué hay activo" en la unidad que corresponde a cada dominio: VistaJet no
-// tiene proyectos (su carga son tareas de rotación), así que contarlos decía
-// siempre "0 proyectos activos". Una sola definición para la tarjeta de
-// Dominios y para la cabecera del área — antes divergían.
+// "Qué hay activo" en la unidad que corresponde a cada dominio. Los pendientes
+// van primero y en todos los dominios: antes solo se contaban proyectos, así que
+// un área con tareas y sin proyectos decía "0 proyectos activos". VistaJet no
+// tiene proyectos (su carga son tareas de rotación) y no los cuenta. Una sola
+// definición para la tarjeta de Dominios y para la cabecera del área.
 function domainActiveLabel(a, st) {
-  if (a.name === 'VistaJet') {
-    return st.vjTaskCount > 0
-      ? `${st.vjTaskCount} tarea${st.vjTaskCount !== 1 ? 's' : ''} VJ activa${st.vjTaskCount !== 1 ? 's' : ''}`
-      : 'sin tareas VJ pendientes';
-  }
-  return `${st.activeProjects.length} proyecto${st.activeProjects.length !== 1 ? 's' : ''} activo${st.activeProjects.length !== 1 ? 's' : ''}`;
+  const n = st.pendingCount;
+  const pending = n > 0 ? `${n} pendiente${n !== 1 ? 's' : ''}` : 'sin pendientes';
+  const p = st.activeProjects.length;
+  if (a.name === 'VistaJet' || p === 0) return pending;
+  const projects = `${p} proyecto${p !== 1 ? 's' : ''} activo${p !== 1 ? 's' : ''}`;
+  return n > 0 ? `${pending} · ${projects}` : projects;
 }
 
 function domainCard(a) {
@@ -563,8 +630,8 @@ function domainSignal(area) {
       const day = S.vjState.rotation_day;
       return day ? `Rotación activa · Día ${day}` : 'Rotación activa';
     }
-    const pending = (S.vjTasks || []).filter(t => t.status !== 'done');
-    if (pending.length > 0) return `${pending.length} tarea${pending.length !== 1 ? 's' : ''} pendiente${pending.length !== 1 ? 's' : ''}`;
+    const next = nextDomainTask(area);
+    if (next) return clip(next.title, 45);
     return 'Tranquilo por ahora';
   }
 
@@ -577,6 +644,8 @@ function domainSignal(area) {
     const openDec = S.dec.filter(d => d.area_id === area.id);
     if (openDec.length > 0) return `${openDec.length} decisión${openDec.length !== 1 ? 'es' : ''} pendiente${openDec.length !== 1 ? 's' : ''}`;
     if (areaProjects.length > 0) return `${areaProjects.length} proyecto${areaProjects.length !== 1 ? 's' : ''} en curso`;
+    const next = nextDomainTask(area);
+    if (next) return clip(next.title, 45);
     return 'En construcción';
   }
 
@@ -629,6 +698,10 @@ function domainSignal(area) {
     if (stale) return `${(stale.title || '').slice(0, 35)} sin actividad`;
     return 'En seguimiento';
   }
+  // "Sin novedades" o "Todo bajo control" con pendientes abiertos contradice lo
+  // que ella acaba de apuntar con Isabel: se nombra el primero.
+  const next = nextDomainTask(area);
+  if (next) return clip(next.title, 45);
   if (!areaProjects.length) return 'Sin novedades';
   return 'Todo bajo control';
 }
@@ -651,6 +724,25 @@ function workQueue() {
         reason: days < 0 ? 'Vencida' : days === 0 ? 'Vence hoy' : 'Vence mañana',
         area: areaName(t.area_id), areaId: t.area_id, type: 'task', ref: t.id });
     });
+
+  // Lo que ella marcó al contárselo a Isabel (o en la app), con las mismas
+  // reglas que el Core de /v1/now (D50): urgente (sin fecha o que vence en ≤3
+  // días), para hoy sin fecha, e importante sin fecha. Antes solo contaban las
+  // fechas, y lo que Isabel apuntaba sin fecha no llegaba nunca a Atención.
+  const queued = new Set(items.map(it => it.ref));
+  const daysTo = t => Math.ceil((new Date(t.due_date) - new Date()) / 864e5);
+  const flagged = (t, weight, impact, reason) => {
+    queued.add(t.id);
+    items.push({ id: 'task_' + t.id, title: t.title, impact, weight, time: '~15-30 min',
+      reason, area: areaName(t.area_id), areaId: t.area_id, type: 'task', ref: t.id });
+  };
+  const open = S.tasks.filter(t => t.status === 'pending' && !queued.has(t.id));
+  open.filter(t => t.priority === 'critical' && (!t.due_date || daysTo(t) <= 3))
+    .forEach(t => flagged(t, 5, 'crítico', t.due_date ? `Urgente · vence en ${daysTo(t)} días` : 'Urgente'));
+  open.filter(t => !queued.has(t.id) && !t.due_date && t.horizon === 'today')
+    .forEach(t => flagged(t, 4, 'alto', 'Para hoy'));
+  open.filter(t => !queued.has(t.id) && !t.due_date && t.priority === 'high')
+    .forEach(t => flagged(t, 3, 'medio', 'Importante'));
 
   S.tasks.filter(t => t.status === 'avoiding')
     .forEach(t => items.push({ id: 'task_' + t.id, title: t.title, impact: 'alto', weight: 4, time: '~15 min',
@@ -729,6 +821,9 @@ function isabelEvidenceLabel(e) {
     case 'waiting_overdue': return `${e.domain}: ${plural(e.value, 'espera vencida', 'esperas vencidas')}`;
     case 'critical_alert': return `${e.domain}: ${plural(e.value, 'alerta crítica', 'alertas críticas')}`;
     case 'stale_projects': return `${e.domain}: ${plural(e.count, 'proyecto parado', 'proyectos parados')} hace ${e.max_days} días`;
+    case 'critical_task': return `${e.domain}: ${plural(e.value, 'tarea urgente', 'tareas urgentes')}`;
+    case 'planned_today': return `${e.domain}: ${plural(e.value, 'tarea para hoy', 'tareas para hoy')}`;
+    case 'important_tasks': return `${e.domain}: ${plural(e.value, 'tarea importante', 'tareas importantes')}`;
     case 'pending_tasks_without_deadline': return `${e.domain}: ${plural(e.count, 'tarea sin fecha', 'tareas sin fecha')}`;
     case 'rotation_active': return `${e.domain}: rotación activa · día ${e.value}`;
     default: return `${e.domain}: ${e.signal}`;
@@ -884,6 +979,8 @@ function homeView() {
     ${isabelHomeCard(priority, greeting)}
 
     ${pendingQuestionsCard()}
+
+    ${remindersCard()}
 
     <!-- ¿Qué merece mi atención ahora? -->
     <div style="background:var(--surface);border-radius:14px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)">
@@ -1092,6 +1189,9 @@ function areasView() {
 function areaView() {
   const a=S.areas.find(x=>x.id===S.areaId);
   if(!a) return '';
+  // La lista de Tareas sale en TODAS las áreas, VistaJet incluida: antes se
+  // ocultaba ahí, y lo que Isabel apunta en `tasks` para VistaJet quedaba sin
+  // ninguna pantalla donde verlo.
   const ts=S.tasks.filter(t=>t.area_id===a.id);
   const ws=S.wf.filter(w=>w.area_id===a.id);
   const ds=S.dec.filter(d=>d.area_id===a.id);
@@ -2186,9 +2286,9 @@ function areaView() {
       </div>`;
     }).join('')}
   </div>`:''}
-  ${isVJ?'':`${section('✓','Tareas',ts.map(t=>taskEl(t)).join('')||empty('Sin tareas'))}
+  ${section('✓','Tareas',ts.map(t=>taskEl(t)).join('')||empty('Sin tareas'))}
   ${ws.length?section('⏳','Esperando',ws.map(wfEl).join('')):''}
-  ${ds.length?section('❓','Decisiones',ds.map(decEl).join('')):''}`}`;
+  ${ds.length?section('❓','Decisiones',ds.map(decEl).join('')):''}`;
 }
 
 function globalView() {
@@ -4548,6 +4648,8 @@ const surfaceRevalidator = createSurfaceRevalidator({
   refreshGymState: loadGymState,
   refreshSleepState: loadSleepState,
   refreshFinanceState: () => loadFinanceState(S.finMonth),
+  refreshReminders: loadReminders,
+  refreshPriority: () => loadIsabelNow({ silent: true }),
   render,
 });
 

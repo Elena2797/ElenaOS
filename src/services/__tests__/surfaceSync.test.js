@@ -26,7 +26,7 @@ describe('Telegram ↔ LIFEOS: revalidación de una app abierta', () => {
     assert.equal(reopenedApp.state.mode, 'after');
   });
 
-  test('refresca estado, preguntas, Gym, sueño y Finanzas sin invocar ningún read model con IA', async () => {
+  test('refresca estado, preguntas, Gym, sueño, Finanzas, recordatorios y prioridad, sin polling ni modelo directo', async () => {
     const calls = [];
     const sync = createSurfaceRevalidator({
       refreshActiveDomain: async () => { calls.push('domain'); },
@@ -35,17 +35,27 @@ describe('Telegram ↔ LIFEOS: revalidación de una app abierta', () => {
       refreshGymState: async () => { calls.push('gym'); },
       refreshSleepState: async () => { calls.push('sleep'); },
       refreshFinanceState: async () => { calls.push('finance'); },
+      refreshReminders: async () => { calls.push('reminders'); },
+      refreshPriority: async () => { calls.push('priority'); },
       render: () => { calls.push('render'); },
     });
     const result = await sync.revalidate({ reason: 'visible' });
     assert.equal(result.status, 'revalidated');
     assert.equal(calls[0], 'domain');
-    assert.deepEqual(new Set(calls.slice(1, 6)), new Set(['primary', 'pending', 'gym', 'sleep', 'finance']));
+    assert.deepEqual(new Set(calls.slice(1, 8)), new Set(['primary', 'pending', 'gym', 'sleep', 'finance', 'reminders', 'priority']));
     assert.equal(calls.at(-1), 'render');
+    assert.equal(result.sources.priority, 'fulfilled');
 
     const source = fs.readFileSync(new URL('../surfaceSync.js', import.meta.url), 'utf8');
     const executableSource = source.replace(/\/\/.*$/gm, '');
-    assert.doesNotMatch(executableSource, /\/v1\/now|loadIsabelNow|modelRouter|setInterval/);
+    assert.doesNotMatch(executableSource, /modelRouter|setInterval/);
+  });
+
+  test('D50: lo apuntado por Telegram cambia también la prioridad de Home al volver', () => {
+    const main = fs.readFileSync(new URL('../../main.js', import.meta.url), 'utf8');
+    const wiring = main.slice(main.indexOf('createSurfaceRevalidator({'));
+    assert.match(wiring, /refreshPriority: \(\) => loadIsabelNow\(\{ silent: true \}\)/);
+    assert.match(wiring, /refreshReminders: loadReminders/);
   });
 
   test('coalesce eventos simultáneos y limita rebotes de visibilidad', async () => {

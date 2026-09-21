@@ -16,7 +16,8 @@ export async function loadAll() {
   const settled = await Promise.allSettled([
     _db.from('life_context').select('*').order('created_at', { ascending: false }).limit(1),
     _db.from('areas').select('*').order('sort_order'),
-    _db.from('tasks').select('*,areas(name,color)').neq('status', 'done'),
+    // Abiertas = ni hechas ni descartadas (D50: Isabel descarta lo que ya no hace falta).
+    _db.from('tasks').select('*,areas(name,color)').not('status', 'in', '(done,discarded)'),
     _db.from('waiting_for').select('*,areas(name,color)').eq('status', 'active'),
     _db.from('decisions').select('*,areas(name,color)').eq('status', 'open'),
     _db.from('metrics').select('*'),

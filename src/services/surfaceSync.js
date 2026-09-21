@@ -1,7 +1,12 @@
 // Revalidación barata entre superficies. Telegram y LIFEOS escriben en las
 // mismas fuentes persistentes; al volver a una app ya abierta solo hay que
-// volver a leer datos. No hay polling y este servicio nunca llama a /v1/now ni
-// a ningún modelo.
+// volver a leer datos. No hay polling y este servicio no llama a ningún modelo.
+//
+// Desde D50 también se vuelve a pedir la prioridad de Home: sin eso, lo que
+// ella acababa de contarle a Isabel cambiaba las listas pero no la tarjeta de
+// prioridad, que se quedaba con la evaluación de cuando abrió la app. El Core
+// reutiliza su última respuesta si el contexto no cambió, así que volver sin
+// novedades no paga otra llamada al modelo.
 
 export function createSurfaceRevalidator({
   isReady = () => true,
@@ -11,6 +16,8 @@ export function createSurfaceRevalidator({
   refreshGymState = async () => {},
   refreshSleepState = async () => {},
   refreshFinanceState = async () => {},
+  refreshReminders = async () => {},
+  refreshPriority = async () => {},
   render = () => {},
   now = () => Date.now(),
   minIntervalMs = 2000,
@@ -33,6 +40,8 @@ export function createSurfaceRevalidator({
       refreshGymState(),
       refreshSleepState(),
       refreshFinanceState(),
+      refreshReminders(),
+      refreshPriority(),
     ]);
     render();
     return {
@@ -45,6 +54,8 @@ export function createSurfaceRevalidator({
         gym_state: primary[2].status,
         sleep_state: primary[3].status,
         finance_state: primary[4].status,
+        reminders: primary[5].status,
+        priority: primary[6].status,
       },
     };
   }
