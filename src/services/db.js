@@ -67,6 +67,19 @@ export async function completeTask(id) {
   await _db.from('tasks').update({ status: 'done', completed_at: new Date().toISOString() }).eq('id', id);
 }
 
+// "Mañana" desde el foco de Home: la tarea sale de hoy y vuelve con fecha.
+export async function postponeTask(id, dueDate) {
+  const { error } = await _db.from('tasks').update({ due_date: dueDate, horizon: 'this_week' }).eq('id', id);
+  return !error;
+}
+
+// Quitar = `discarded` (D50): no se borra y deja de contar como abierta en
+// todas partes (app, Core, Isabel). Completar queda solo para lo que ella hizo.
+export async function discardTask(id) {
+  const { error } = await _db.from('tasks').update({ status: 'discarded' }).eq('id', id);
+  return !error;
+}
+
 export async function createTask({ title, area_id, priority, horizon, due_date, suitable_modes, notes }) {
   const { data } = await _db.from('tasks').insert({
     title, area_id, priority, horizon, due_date, suitable_modes, notes,

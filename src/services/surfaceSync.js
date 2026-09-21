@@ -19,6 +19,8 @@ export function createSurfaceRevalidator({
   refreshReminders = async () => {},
   refreshHabits = async () => {},
   refreshPriority = async () => {},
+  // Lo privado de la app (lo que le dijo Isabel, agenda) si está conectada (D57).
+  refreshPrivate = async () => {},
   render = () => {},
   now = () => Date.now(),
   minIntervalMs = 2000,
@@ -44,6 +46,7 @@ export function createSurfaceRevalidator({
       refreshReminders(),
       refreshPriority(),
       refreshHabits(),
+      refreshPrivate(),
     ]);
     render();
     return {
@@ -59,6 +62,7 @@ export function createSurfaceRevalidator({
         reminders: primary[5].status,
         priority: primary[6].status,
         habits: primary[7].status,
+        private: primary[8].status,
       },
     };
   }

@@ -61,8 +61,27 @@ test('una tarea descartada deja de salir en la app', () => {
 });
 
 test('Home enseña los recordatorios pedidos por Telegram', () => {
-  assert.match(functionBody('homeView'), /remindersCard\(\)/);
+  // Desde D57 van en la tarjeta "Hoy", junto a la agenda.
+  assert.match(functionBody('homeView'), /todayCard\(\)/);
+  assert.match(functionBody('todayCard'), /S\.reminders/);
   assert.match(functionBody('loadReminders'), /\/v1\/reminders/);
+});
+
+// D57: Home es "Hoy con Isabel": una sola lista de qué hacer (el foco, con las
+// mismas reglas que el Core), y la app no redacta la opinión de Isabel.
+test('Home tiene un solo foco de tareas y no inventa la voz de Isabel', () => {
+  const home = functionBody('homeView');
+  assert.match(home, /focusCard\(\)/);
+  assert.doesNotMatch(home, /atItems|isabelHomeCard/);
+  assert.match(functionBody('homeFocusItems'), /workQueue\(\)/);
+  assert.doesNotMatch(source, /isabelRolLabel|Criterio de Isabel -->/);
+});
+
+// D57: lo privado solo con la app conectada; la medicación ya no va en el JS.
+test('lo privado sale del servidor con token de app, no del bundle', () => {
+  assert.match(functionBody('loadAppToday'), /\/v1\/app\/today/);
+  assert.match(functionBody('loadHealthProfile'), /\/v1\/app\/health-profile/);
+  assert.doesNotMatch(source, /Hiprex|Vejiga dolorosa/);
 });
 
 // D53: standby es estar de rotación sin volar, a menudo sin avión. La app lo

@@ -38,12 +38,13 @@ describe('Telegram ↔ LIFEOS: revalidación de una app abierta', () => {
       refreshReminders: async () => { calls.push('reminders'); },
       refreshPriority: async () => { calls.push('priority'); },
       refreshHabits: async () => { calls.push('habits'); },
+      refreshPrivate: async () => { calls.push('private'); },
       render: () => { calls.push('render'); },
     });
     const result = await sync.revalidate({ reason: 'visible' });
     assert.equal(result.status, 'revalidated');
     assert.equal(calls[0], 'domain');
-    assert.deepEqual(new Set(calls.slice(1, 9)), new Set(['primary', 'pending', 'gym', 'sleep', 'finance', 'reminders', 'priority', 'habits']));
+    assert.deepEqual(new Set(calls.slice(1, 10)), new Set(['primary', 'pending', 'gym', 'sleep', 'finance', 'reminders', 'priority', 'habits', 'private']));
     assert.equal(calls.at(-1), 'render');
     assert.equal(result.sources.priority, 'fulfilled');
 

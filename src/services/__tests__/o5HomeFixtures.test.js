@@ -15,8 +15,11 @@ const MAIN_URL = new URL('../../main.js', import.meta.url);
 // fixtures. Y otra vez (D55): sin chat propio; "Hablar con Isabel" abre
 // Telegram. Solo se quita código; sin O5. Y otra (D56): el saludo y JETMI
 // cuentan solo lo que Isabel hizo desde la visita anterior, y la app instalada
-// busca versión nueva al volver (services/appUpdate.js). Sin O5.
-const MAIN_CHECKPOINT_SHA256 = '94D28D0D0039406ADB39A22E44F164D53C6FF0F72CDC684DA46970494B64F5E6';
+// busca versión nueva al volver (services/appUpdate.js). Sin O5. Y otra (D57):
+// Home "Hoy con Isabel" (lo que dijo en Telegram, foco con botones, agenda,
+// rachas, lo que hizo), conexión por código de Telegram, Marca con Instagram,
+// Salud sin medicación en el bundle, JETMI sin voz inventada. Sin O5.
+const MAIN_CHECKPOINT_SHA256 = '8CC8B5B31C9377745A29DBBDB7BAA6B48F28E3B9BD3E53CBDFF5AAF39C3CB404';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

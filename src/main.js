@@ -2,6 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import * as dbSvc from './services/db.js';
 import { watchAppUpdates } from './services/appUpdate.js';
+import { createAppLinkClient } from './services/appLink.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import * as invSvc from './services/inventory.js';
 import * as hotoSvc from './services/hoto.js';
@@ -167,7 +168,7 @@ function pinPress(v) {
   }
 }
 
-let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, finance:null, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'}, pendingQuestions:[], reminders:null, gym:null, sleep:null, _gymLoaded:false, _gymLoading:false, _gymSaving:false, _sleepLoading:false, _financeRequestToken:0 };
+let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, finance:null, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'}, pendingQuestions:[], reminders:null, appToday:null, appBrand:null, healthProfile:null, isabelMsgOpen:false, link:null, gym:null, sleep:null, _gymLoaded:false, _gymLoading:false, _gymSaving:false, _sleepLoading:false, _financeRequestToken:0 };
 
 async function initApp() {
   db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -193,6 +194,7 @@ async function initApp() {
   loadFinanceState(); // lectura Core fail-closed; no participa en prioridad durante O4
   loadReminders(); // los recordatorios que ella le pidió a Isabel por Telegram
   loadHabits(); // las rachas de leer, escribir y gym que Isabel apunta por Telegram (D52)
+  loadAppToday(); // lo último que le dijo Isabel y su agenda, si este móvil está conectado (D57)
 }
 
 // ────── Recordatorios — los que ella le pide a Isabel por Telegram ──────────
@@ -224,12 +226,16 @@ async function loadHabits() {
     console.error('habits', e);
     S.habits = null;
   }
-  if (S.view === 'area') render();
+  if (S.view === 'area' || S.view === 'home') render();
 }
 
-function habitsStreakRow() {
+// `actions`: con la app conectada, leer y escribir se marcan con un toque
+// (POST /v1/app/habits, misma regla que habits_log). El gym no: se apunta con
+// la sesión de entreno.
+function habitsStreakRow({ actions = false } = {}) {
   const list = (S.habits || []).filter(h => h.known !== false);
   if (!list.length) return '';
+  const canTap = actions && appClient().isLinked();
   const icon = { leer: '📖', escribir: '✍️', gym: '🏋️' };
   const cell = (h) => {
     const weeks = h.unit === 'semanas';
@@ -248,26 +254,319 @@ function habitsStreakRow() {
         <div style="font-size:24px;font-weight:700;color:${color};margin-top:2px">${h.streak ?? '—'}</div>
         <div style="font-size:10px;color:var(--t2)">${unit}</div>
         <div style="font-size:9px;color:var(--t3);margin-top:2px">${note}</div>
+        ${canTap && h.habit !== 'gym' && h.done_today !== true ? `<button onclick="logHabitToday('${h.habit}')" style="margin-top:6px;border:0.5px solid var(--border);background:var(--bg);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:600;color:#0F6E56;cursor:pointer">✓ Hoy</button>` : ''}
       </div>`;
   };
   return `<div style="display:grid;grid-template-columns:repeat(${list.length},1fr);gap:1px;background:var(--border);border-top:1px solid var(--border)">${list.map(cell).join('')}</div>`;
 }
 
-function remindersCard() {
-  const list = S.reminders || [];
-  if (!list.length) return '';
-  const rows = list.slice(0, 3).map((r, i) => `<div style="display:flex;align-items:flex-start;gap:10px;${i < Math.min(list.length, 3) - 1 ? 'padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid var(--border)' : ''}">
-      <span style="font-size:13px;flex-shrink:0">⏰</span>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:500;color:var(--text);line-height:1.4">${r.text}</div>
-        <div style="font-size:11px;color:var(--t3);margin-top:2px">${r.when}</div>
+// ────── Hoy con Isabel (D57) ─────────────────────────────────────────────
+// Home es la vista de Isabel: lo último que le dijo en Telegram, su foco de
+// hoy (las mismas reglas que el Core y el coach), su día, sus rachas y lo que
+// Isabel hizo. La app no inventa lo que "opina" Isabel: enseña lo que dijo y
+// lo que hay, y deja actuar con un toque. Con Isabel se habla en Telegram.
+
+let appLinkClient = null;
+function appClient() {
+  return appLinkClient || (appLinkClient = createAppLinkClient({ base: ISABEL_API, apiKey: ISABEL_KEY }));
+}
+
+const HOME_CARD = 'background:var(--surface);border-radius:14px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)';
+const HOME_LABEL = 'font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:10px';
+const HOME_BTN = 'border:0.5px solid var(--border);background:var(--bg);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;color:var(--t2)';
+
+// Fecha civil en Madrid, como la cuenta el servidor (D50).
+function madridDate(offsetDays = 0) {
+  return new Date(Date.now() + offsetDays * 864e5).toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' });
+}
+
+function fmtWhen(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const day = d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' });
+  const hm = d.toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' });
+  if (day === madridDate(0)) return 'hoy ' + hm;
+  if (day === madridDate(-1)) return 'ayer ' + hm;
+  return d.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid', day: 'numeric', month: 'short' }) + ' ' + hm;
+}
+
+// Isabel escribe con **negritas** de Telegram: se escapa todo y solo se
+// convierte eso.
+function mdLite(text) {
+  return escHtml(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+async function loadAppToday() {
+  if (!appClient().isLinked()) { S.appToday = null; return; }
+  const r = await appClient().get('/v1/app/today');
+  S.appToday = r.ok ? r : (r.unlinked ? null : { error: r.error });
+  if (S.view === 'home') render();
+}
+
+function toggleIsabelMsg() { S.isabelMsgOpen = !S.isabelMsgOpen; render(); }
+
+// Marca Personal: estrategia + Instagram (15 min de caché en el servidor).
+async function loadAppBrand() {
+  S._brandLoading = true;
+  const r = await appClient().get('/v1/app/brand');
+  S.appBrand = r.ok ? r : { instagram: { ok: false, error: r.error } };
+  S._brandLoading = false;
+  if (S.view === 'area') render();
+}
+
+function toggleBrandStrategy() { S.brandStrategyOpen = !S.brandStrategyOpen; render(); }
+
+// Salud: su protocolo y sus condiciones ya no van dentro del JS público de la
+// app; vienen del servidor con el token de app.
+async function loadHealthProfile() {
+  S._healthProfileLoading = true;
+  const r = await appClient().get('/v1/app/health-profile');
+  S.healthProfile = r.ok ? r : { error: r.error };
+  S._healthProfileLoading = false;
+  if (S.view === 'area') render();
+}
+
+function isabelSaidCard() {
+  if (!appClient().isLinked()) {
+    return `<div class="brief-card" style="margin-bottom:10px;border:0.5px solid var(--border)">
+      <div style="${HOME_LABEL}">Isabel</div>
+      <div style="font-size:14px;color:var(--text);line-height:1.55;margin-bottom:12px">Conecta este móvil para ver aquí lo último que te ha dicho Isabel y tu agenda de hoy, y para marcar tus rachas con un toque.</div>
+      <button onclick="openLink()" style="background:var(--text);color:#fff;border:none;border-radius:999px;padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer">Conectar con un código de Telegram</button>
+    </div>`;
+  }
+  const t = S.appToday;
+  const msgs = t && t.isabel && t.isabel.ok ? t.isabel.messages : null;
+  let body;
+  if (!t) body = `<div style="font-size:13px;color:var(--t3)">Cargando lo último de Isabel…</div>`;
+  else if (!msgs) body = `<div style="font-size:13px;color:var(--t3)">No pude leer tu conversación con Isabel ahora mismo.</div>`;
+  else if (!msgs.length) body = `<div style="font-size:13px;color:var(--t3)">Isabel todavía no te ha escrito.</div>`;
+  else {
+    const m = msgs[0];
+    const clamp = S.isabelMsgOpen ? '' : 'display:-webkit-box;-webkit-line-clamp:8;-webkit-box-orient:vertical;overflow:hidden;';
+    body = `<div style="font-size:11px;color:var(--t3);margin-bottom:6px">${fmtWhen(m.at)}</div>
+      <div onclick="toggleIsabelMsg()" style="font-size:14px;color:var(--text);line-height:1.55;white-space:pre-wrap;cursor:pointer;${clamp}">${mdLite(m.text)}</div>`;
+  }
+  return `<div class="brief-card" style="margin-bottom:10px;border:0.5px solid var(--border)">
+    <div style="${HOME_LABEL}">Isabel te dijo</div>
+    ${body}
+    <button onclick="openIsabel()" style="background:none;border:none;padding:10px 0 0;font-size:12px;font-weight:600;color:var(--t2);cursor:pointer">Contestar en Telegram →</button>
+  </div>`;
+}
+
+// Solo lo urgente que NO es una tarea (entrega del avión, esperas, alertas…):
+// las tareas ya salen en "Tu foco de hoy" y no se repiten.
+const TASK_SIGNALS = new Set(['task_overdue', 'due_today', 'due_soon', 'critical_task', 'planned_today', 'important_tasks', 'pending_tasks_without_deadline']);
+function urgentStrip(priority) {
+  if (!(priority.source === 'now' || priority.source === 'cached') || priority.mode !== 'urgent' || !priority.area) return '';
+  const ev = (priority.evidence || []).filter(e => e.domain === priority.area.name && e.signal !== 'no_signal' && !TASK_SIGNALS.has(e.signal));
+  if (!ev.length) return '';
+  const style = isabelAttentionStyle('urgent');
+  const labels = [...new Set(ev.map(e => {
+    const l = isabelEvidenceLabel(e);
+    return l.endsWith(`: ${e.signal}`) ? `${e.domain}: necesita atención` : l;
+  }))].slice(0, 3);
+  return `<div style="${HOME_CARD};border-left:3px solid ${style.fg}">
+    <div style="${HOME_LABEL};color:${style.fg}">Urgente · ${priority.area.name}</div>
+    ${labels.map(l => `<div style="font-size:13px;color:var(--text);line-height:1.5">· ${escHtml(l)}</div>`).join('')}
+    <button onclick="go('area','${priority.area.id}')" style="margin-top:10px;background:${style.fg};color:#fff;border:none;border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">Ir a ${priority.area.name} →</button>
+  </div>`;
+}
+
+// El foco de hoy: la cola de siempre (mismas reglas que el Core, D50), solo
+// tareas y sin las que ella movió a otro día.
+function homeFocusItems() {
+  const today = madridDate(0);
+  return workQueue().filter(it => it.type === 'task').filter(it => {
+    const t = S.tasks.find(x => x.id === it.ref);
+    return t && (!t.due_date || String(t.due_date).slice(0, 10) <= today);
+  });
+}
+
+function focusCard() {
+  const top = homeFocusItems().slice(0, 3);
+  const open = S.tasks.filter(t => t.status === 'pending' || t.status === 'avoiding').length;
+  const rows = top.map((it, i) => `<div style="${i < top.length - 1 ? 'padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border)' : ''}">
+      <div style="font-size:14px;font-weight:500;color:var(--text);line-height:1.4">${escHtml(it.title)}</div>
+      <div style="font-size:11px;color:var(--t3);margin-top:2px">${escHtml(it.reason)}${it.area ? ' · ' + escHtml(it.area) : ''}</div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button onclick="focusDone('${it.ref}')" style="${HOME_BTN};color:#0F6E56">✓ Hecho</button>
+        <button onclick="focusTomorrow('${it.ref}')" style="${HOME_BTN}">Mañana</button>
+        <button onclick="focusDiscard('${it.ref}')" style="${HOME_BTN}">Quitar</button>
       </div>
     </div>`).join('');
-  const more = list.length > 3 ? `<div style="font-size:11px;color:var(--t3);margin-top:8px">y ${list.length - 3} más</div>` : '';
-  return `<div style="background:var(--surface);border-radius:14px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)">
-    <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:10px">Recordatorios</div>
-    ${rows}${more}
+  return `<div style="${HOME_CARD}">
+    <div style="${HOME_LABEL}">Tu foco de hoy</div>
+    ${rows || `<div style="font-size:13px;color:var(--t2)">Nada urgente ni marcado para hoy.</div>`}
+    ${open ? `<button onclick="go('global')" style="background:none;border:none;padding:12px 0 0;font-size:12px;font-weight:500;color:var(--t2);cursor:pointer">Ver todas tus tareas (${open}) →</button>` : ''}
   </div>`;
+}
+
+async function focusDone(id) {
+  await done(id);
+  loadIsabelNow({ silent: true });
+}
+
+async function focusTomorrow(id) {
+  const due = madridDate(1);
+  if (!(await dbSvc.postponeTask(id, due))) { alert('No se pudo mover la tarea. Inténtalo otra vez.'); return; }
+  const t = S.tasks.find(x => x.id === id);
+  if (t) { t.due_date = due; t.horizon = 'this_week'; }
+  render();
+  loadIsabelNow({ silent: true });
+}
+
+async function focusDiscard(id) {
+  const t = S.tasks.find(x => x.id === id);
+  if (!confirm(`¿Quitar "${t ? t.title : 'esta tarea'}"? No se borra: queda descartada.`)) return;
+  if (!(await dbSvc.discardTask(id))) { alert('No se pudo quitar la tarea. Inténtalo otra vez.'); return; }
+  S.tasks = S.tasks.filter(x => x.id !== id);
+  render();
+  loadIsabelNow({ silent: true });
+}
+
+// Su día: la agenda de Google (con la app conectada) y los recordatorios.
+function todayCard() {
+  const linked = appClient().isLinked();
+  const ag = S.appToday && S.appToday.agenda;
+  const rows = [];
+  if (linked && ag && ag.ok) {
+    (ag.events || []).forEach(e => rows.push({
+      icon: '📅', text: e.title,
+      when: e.all_day ? 'todo el día' : `${String(e.start || '').slice(11, 16)}${e.end ? '–' + String(e.end).slice(11, 16) : ''}`,
+    }));
+  }
+  (S.reminders || []).slice(0, 3).forEach(r => rows.push({ icon: '⏰', text: r.text, when: r.when }));
+  let agendaNote = '';
+  if (linked && ag) {
+    if (ag.ok && !(ag.events || []).length) agendaNote = 'Agenda libre hoy.';
+    else if (!ag.ok) agendaNote = ag.error === 'google_reauth_required' ? 'Google está desconectado: no puedo leer tu agenda.' : 'No pude leer tu agenda ahora mismo.';
+  }
+  if (!rows.length && !agendaNote) return '';
+  return `<div style="${HOME_CARD}">
+    <div style="${HOME_LABEL}">Hoy</div>
+    ${agendaNote ? `<div style="font-size:13px;color:var(--t2);margin-bottom:${rows.length ? '10px' : '0'}">${agendaNote}</div>` : ''}
+    ${rows.map((r, i) => `<div style="display:flex;gap:10px;align-items:flex-start;${i < rows.length - 1 ? 'padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid var(--border)' : ''}">
+      <span style="font-size:13px;flex-shrink:0">${r.icon}</span>
+      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500;color:var(--text);line-height:1.4">${escHtml(r.text)}</div>
+      <div style="font-size:11px;color:var(--t3);margin-top:2px">${escHtml(r.when || '')}</div></div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function habitsCard() {
+  const row = habitsStreakRow({ actions: true });
+  if (!row) return '';
+  return `<div class="card" style="margin-bottom:10px">
+    <div class="card-head"><span class="ch-icon">🌱</span><span class="ch-label">Rachas</span></div>
+    ${row}
+  </div>`;
+}
+
+async function logHabitToday(habit) {
+  const r = await appClient().post('/v1/app/habits', { habit, done: true });
+  if (!r.ok && !r.unlinked) alert('No se pudo apuntar. Inténtalo otra vez.');
+  await loadHabits();
+  render();
+}
+
+// Lo que Isabel hizo de verdad (sin el registro de coste, D56). El punto verde
+// marca lo que pasó desde la visita anterior.
+function isabelDoneCard() {
+  const evs = S.eventos.filter(e => ['ia', 'isabel'].includes(e.origen)).slice(0, 5);
+  if (!evs.length) return '';
+  const since = S.prevOpenAt || 0;
+  return `<div style="${HOME_CARD}">
+    <div style="${HOME_LABEL}">Lo que hizo Isabel</div>
+    ${evs.map(e => {
+      const isNew = since && new Date(e.created_at).getTime() > since;
+      return `<div style="display:flex;gap:8px;padding:4px 0;line-height:1.45">
+        <span style="font-size:12px;color:${isNew ? '#0F6E56' : 'var(--t3)'};flex-shrink:0">${isNew ? '●' : '·'}</span>
+        <div style="flex:1;min-width:0"><div style="font-size:13px;color:var(--text)">${escHtml(e.resumen || e.texto || '')}</div>
+        <div style="font-size:11px;color:var(--t3)">${fmtWhen(e.created_at)}</div></div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ── Conectar este móvil: código por Telegram ──
+const LINK_ERRORS = {
+  too_many_codes: 'Has pedido demasiados códigos. Espera unos minutos.',
+  telegram_unavailable: 'No pude mandarte el código por Telegram. Inténtalo en un momento.',
+  wrong_code: 'Ese código no es. Revisa el último que te llegó.',
+  too_many_attempts: 'Demasiados intentos. Pide otro código.',
+  code_expired: 'El código ha caducado. Pide otro.',
+  network: 'Sin conexión. Inténtalo otra vez.',
+};
+
+function openLink() {
+  S.link = { step: 'start', busy: false, error: null };
+  renderLinkModal();
+}
+
+function renderLinkModal() {
+  let m = document.getElementById('modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.className = 'overlay'; m.id = 'modal';
+    m.onclick = e => { if (e.target === m) closeModal(); };
+    document.body.appendChild(m);
+  }
+  const L = S.link || {};
+  const err = L.error ? `<div style="font-size:12px;color:#A32D2D;margin:4px 0 8px">${L.error}</div>` : '';
+  m.innerHTML = L.step === 'code'
+    ? `<div class="modal">
+        <h3>Escribe el código</h3>
+        <div style="font-size:13px;color:var(--t2);margin-bottom:10px">Te lo acabo de mandar por Telegram. Caduca en 10 minutos.</div>
+        <input class="fi" id="link-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123 456" onkeydown="if(event.key==='Enter')linkVerify()">
+        ${err}
+        <div class="ma">
+          <button class="btn btn-s" onclick="closeModal()">Cancelar</button>
+          <button class="btn btn-p" onclick="linkVerify()" ${L.busy ? 'disabled' : ''}>Conectar</button>
+        </div>
+        <button onclick="linkStart()" style="background:none;border:none;padding:12px 0 0;font-size:12px;color:var(--t2);cursor:pointer">Mandarme otro código</button>
+      </div>`
+    : `<div class="modal">
+        <h3>Conectar con Isabel</h3>
+        <div style="font-size:13px;color:var(--t2);line-height:1.5;margin-bottom:12px">Te mando un código de 6 cifras a Telegram. Lo escribes aquí una vez y este móvil queda conectado.</div>
+        ${err}
+        <div class="ma">
+          <button class="btn btn-s" onclick="closeModal()">Cancelar</button>
+          <button class="btn btn-p" onclick="linkStart()" ${L.busy ? 'disabled' : ''}>Mandarme el código</button>
+        </div>
+      </div>`;
+  if (L.step === 'code') setTimeout(() => document.getElementById('link-code')?.focus(), 150);
+}
+
+async function linkStart() {
+  S.link = { ...(S.link || {}), busy: true, error: null };
+  renderLinkModal();
+  const r = await appClient().start();
+  S.link = r.ok
+    ? { step: 'code', linkId: r.link_id, busy: false, error: null }
+    : { ...(S.link || {}), busy: false, error: LINK_ERRORS[r.error] || 'No se pudo pedir el código.' };
+  renderLinkModal();
+}
+
+async function linkVerify() {
+  if (!S.link || S.link.busy) return;
+  const code = document.getElementById('link-code')?.value || '';
+  S.link.busy = true;
+  const r = await appClient().verify(S.link.linkId, code);
+  if (r.ok) {
+    S.link = null;
+    closeModal();
+    render();
+    await Promise.all([loadAppToday(), loadHabits()]);
+    render();
+    return;
+  }
+  const left = r.attempts_left ? ` Te quedan ${r.attempts_left} intentos.` : '';
+  S.link = {
+    ...S.link, busy: false,
+    step: (r.error === 'too_many_attempts' || r.error === 'code_expired') ? 'start' : 'code',
+    error: (LINK_ERRORS[r.error] || 'No se pudo conectar.') + left,
+  };
+  renderLinkModal();
 }
 
 // ────── Gym — el estado semanal lo calcula el Core, no la vista ──────────
@@ -867,13 +1166,11 @@ function projectVisualCard(p) {
   </div>`;
 }
 
-// ────── Isabel · una sola tarjeta en Home ──────────────────────────────────
-// Antes había dos tarjetas independientes ("Isabel habla primero", cálculo
-// cliente limitado a VistaJet/JETMI; "Isabel · Ahora", GET /v1/now) que podían
-// dar prioridades distintas. resolveHomePriority() decide una sola prioridad;
-// isabelHomeCard() la redacta en una sola voz. El fallback de cliente sigue
-// existiendo para que la tarjeta nunca esté vacía si /v1/now no responde
-// (D8 — nunca interpretar en silencio un fallo de carga como "no hay nada").
+// ────── Prioridad del Core en Home ─────────────────────────────────────────
+// resolveHomePriority() decide una sola prioridad desde GET /v1/now (o su
+// última respuesta válida, D19). Desde D57 Home no enseña el texto que redacta
+// el modelo de /v1/now: solo resalta el dominio y, si hay algo urgente que no
+// es una tarea, la tarjeta "Urgente". Lo que dice Isabel sale de Telegram.
 
 function isabelAttentionStyle(mode) {
   switch (mode) {
@@ -966,59 +1263,6 @@ function resolveHomePriority() {
   return { source: 'neutral', status: iN ? iN.status : 'loading', area: null };
 }
 
-function isabelHomeCard(priority, greeting) {
-  const showBeta = priority.source === 'now' || priority.source === 'cached';
-  const header = `<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:10px">Isabel${showBeta ? ' <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--t3)">· beta</span>' : ''}</div>`;
-  const staleNote = priority.source === 'cached'
-    ? `<div style="font-size:11px;color:var(--t3);margin-bottom:8px">Última evaluación disponible — hace ${priority.ageMin < 1 ? 'un momento' : priority.ageMin + ' min'}. Isabel no responde ahora mismo.</div>`
-    : '';
-
-  if (priority.status === 'no_signal') {
-    return `<div class="brief-card" style="margin-bottom:10px;border:0.5px solid var(--border)">
-      ${header}
-      <div style="font-size:15px;color:var(--text);line-height:1.7;margin-bottom:6px">${greeting}</div>
-      ${staleNote}
-      <div style="font-size:14px;font-weight:600;color:var(--ok)">✓ Nada requiere tu atención ahora.</div>
-      <button onclick="openIsabel()" style="background:none;border:none;padding:6px 0 0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer;display:block;margin-top:4px">Hablar con Isabel →</button>
-    </div>`;
-  }
-
-  if (priority.source === 'now' || priority.source === 'cached') {
-    const style = isabelAttentionStyle(priority.mode);
-    const top3 = (priority.evidence || []).filter(e => e.signal !== 'no_signal').slice(0, 3);
-    const canIgnoreCount = (priority.canIgnore || []).length;
-    return `<div class="brief-card" style="margin-bottom:10px;border-left:3px solid ${style.fg}${priority.source === 'cached' ? ';opacity:.75' : ''}">
-      ${header}
-      <div style="font-size:15px;color:var(--text);line-height:1.7;margin-bottom:8px">${greeting}</div>
-      ${staleNote}
-      ${priority.reliable === false ? `<div style="font-size:11px;color:var(--warn);background:var(--warn-bg);border-radius:8px;padding:6px 8px;margin-bottom:8px">⚠ Evaluación parcial — algunas fuentes no respondieron; puede haber señales que Isabel no vio.</div>` : ''}
-      <div style="display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${style.fg};background:${style.bg};border-radius:999px;padding:3px 9px;margin-bottom:8px">${style.label}</div>
-      ${priority.status === 'llm_error'
-        ? `<div style="font-size:13px;color:var(--t2);margin-bottom:8px">Isabel no pudo redactar una recomendación ahora mismo, pero esto es lo que se detectó:</div>`
-        : `<div style="font-size:15px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:6px">${priority.headline || ''}</div>
-           ${priority.recommendation ? `<div style="font-size:13px;color:var(--t2);line-height:1.5;margin-bottom:8px">${priority.recommendation}</div>` : ''}`}
-      ${top3.length ? `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">${top3.map(e => `<div style="font-size:11px;color:var(--t3)">· ${isabelEvidenceLabel(e)}</div>`).join('')}</div>` : ''}
-      ${canIgnoreCount ? `<div style="font-size:11px;color:var(--t3);margin-bottom:${priority.area ? '10px' : '0'}">${canIgnoreCount} dominio${canIgnoreCount !== 1 ? 's' : ''} sin nada pendiente ahora — puedes dejarlo${canIgnoreCount !== 1 ? 's' : ''} para después.</div>` : ''}
-      <div style="display:flex;gap:14px;align-items:center">
-        ${priority.area ? `<button onclick="go('area','${priority.area.id}')" style="background:${style.fg};color:#fff;border:none;border-radius:999px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer">Ir a ${priority.area.name} →</button>` : ''}
-        <button onclick="openIsabel()" style="background:none;border:none;padding:0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer">Hablar con Isabel →</button>
-      </div>
-    </div>`;
-  }
-
-  // source === 'neutral' — /v1/now todavía no ha respondido nunca (ni en
-  // vivo ni en caché). Ningún dominio se resalta: no hay prioridad que
-  // representar todavía, y no se inventa una.
-  return `<div class="brief-card" style="margin-bottom:10px;border:0.5px solid var(--border)">
-    ${header}
-    <div style="font-size:15px;color:var(--text);line-height:1.7;margin-bottom:4px">${greeting}</div>
-    <button onclick="openIsabel()" style="background:none;border:none;padding:6px 0 0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer;display:block;margin-top:4px">Hablar con Isabel →</button>
-    ${priority.status === 'loading' ? `<div style="font-size:11px;color:var(--t3);margin-top:8px">Revisando tus dominios…</div>` : ''}
-    ${priority.status === 'data_unavailable' ? `<div style="font-size:11px;color:var(--t3);margin-top:8px">⚠ Isabel no está disponible ahora mismo — evaluación parcial, no se puede confirmar que no haya algo urgente.</div>` : ''}
-    ${priority.status === 'unreachable' ? `<div style="font-size:11px;color:var(--t3);margin-top:8px">Isabel no está disponible ahora mismo — el resto de Life OS funciona con normalidad.</div>` : ''}
-  </div>`;
-}
-
 function homeView() {
   const now = Date.now();
   const hour = new Date().getHours();
@@ -1045,33 +1289,30 @@ function homeView() {
   // ── Una sola prioridad para toda la vista (tarjeta Isabel + dominio resaltado) ──
   const priority = resolveHomePriority();
 
-  // ── Atención — preview de los 3 primeros de la cola de Avanzar ───────
-  const atItems = workQueue().slice(0, 3);
-
+  // "Hoy con Isabel" (D57): lo que dijo, lo urgente que no es una tarea, el
+  // foco, su día, sus rachas, lo que le preguntó y lo que hizo. Después, las
+  // puertas a los dominios. Una sola lista de "qué hago" (el foco).
   return `
   <div style="padding:0 0 80px">
 
-    ${isabelHomeCard(priority, greeting)}
+    <div style="font-size:15px;color:var(--text);line-height:1.6;margin:2px 2px 12px">${escHtml(greeting)}</div>
+
+    ${isabelSaidCard()}
+
+    ${urgentStrip(priority)}
+
+    ${focusCard()}
+
+    ${todayCard()}
+
+    ${habitsCard()}
 
     ${pendingQuestionsCard()}
 
-    ${remindersCard()}
-
-    <!-- ¿Qué merece mi atención ahora? -->
-    <div style="background:var(--surface);border-radius:14px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)">
-      <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:10px">Atención</div>
-      ${atItems.length > 0
-        ? atItems.map((it, i) => `<div style="display:flex;align-items:flex-start;gap:10px;${i < atItems.length - 1 ? 'padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--border)' : ''}">
-            <span style="color:var(--t3);font-size:12px;margin-top:2px;flex-shrink:0">→</span>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:13px;font-weight:500;color:var(--text);line-height:1.4">${it.title}</div>
-              <div style="font-size:11px;color:var(--t3);margin-top:2px">${it.reason}${it.area ? ' · ' + it.area : ''}</div>
-            </div>
-          </div>`).join('')
-        : `<div style="font-size:13px;color:var(--t2)">Nada pendiente ahora.</div>`}
-    </div>
+    ${isabelDoneCard()}
 
     <!-- Dominios — puertas -->
+    <div style="${HOME_LABEL};margin:18px 2px 8px">Tus dominios</div>
     <div style="display:flex;flex-direction:column;gap:6px">
       ${visdoms.map(a => {
         const bp = domainBlueprint(a.name);
@@ -1452,7 +1693,7 @@ function areaView() {
     const R=S.vjReadiness;
     const readiCard=(()=>{
       const head=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3)">Isabel · copiloto de entrega</div>
+        <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3)">Copiloto de entrega</div>
         <button onclick="openVjState()" style="border:none;background:var(--bg);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:500;cursor:pointer;color:var(--t2)">${st.label}</button>
       </div>
       ${vj.aircraft?`<div style="font-size:11px;color:var(--t3);margin-bottom:8px">${vj.aircraft}${status==='rotacion'&&vj.rotation_day&&vj.rotation_total?' · Día '+vj.rotation_day+'/'+vj.rotation_total:''}</div>`:''}
@@ -1615,23 +1856,6 @@ function areaView() {
     const riesgoDec=jetmiDec.filter(d=>Math.floor((now-new Date(d.created_at))/864e5)>14);
     const riesgo=riesgoDec.length>0?`${riesgoDec.length} decisión${riesgoDec.length>1?'es':''} lleva${riesgoDec.length>1?'n':''} más de 14 días sin respuesta.`:null;
 
-    // ── Rol activo de Isabel (auto-activado por contexto) ──────────────
-    let isabelRol,isabelRolLabel;
-    if(oldestDec&&/legal|contrato|validac/i.test(oldestDec.title)){isabelRol='legal';isabelRolLabel='Legal & Compliance';}
-    else if(critTask&&/contenido|instagram|tiktok|post/i.test(critTask.title)){isabelRol='marketing';isabelRolLabel='Responsable de Marketing';}
-    else if(critTask&&/operador|fleet|aeronave/i.test(critTask.title)){isabelRol='partnerships';isabelRolLabel='Head of Partnerships';}
-    else if(jetmiDec.some(d=>/estrateg|direcci|nivel|objetivo/i.test(d.title))){isabelRol='strategy';isabelRolLabel='Cofundadora / Estratega';}
-    else if(accionHoy&&activeProjs.length>0){isabelRol='cro';isabelRolLabel='CRO — Pipeline Comercial';}
-    else{isabelRol='strategy';isabelRolLabel='Cofundadora / Estratega';}
-
-    // Criterio de Isabel
-    let isabelCriterion;
-    if(cuello&&oldestDec) isabelCriterion=`El cuello de botella real es "${oldestDec.title}". Hasta que se cierre, todo lo demás avanza en ralentí.`;
-    else if(accionHoy&&cuello) isabelCriterion=`${cuello} Empezaría por resolverlo antes de abrir nuevos frentes.`;
-    else if(activeProjs.length>0&&staleProjs.length>0) isabelCriterion=`${staleProjs.length} proyecto${staleProjs.length>1?'s están':' está'} parado${staleProjs.length>1?'s':''}. Antes de abrir nuevos, definiría qué desbloquea los existentes.`;
-    else if(activeOps.length===0) isabelCriterion='Sin operadores activos no hay oferta posible. El primer operador cualificado es la mayor palanca ahora mismo.';
-    else isabelCriterion='El dominio está avanzando. Mantener el ritmo y cerrar las decisiones pendientes.';
-
     // ── 5 motores empresariales ────────────────────────────────────────
     const motorsJETMI=[
       {icon:'🧭',name:'Dirección',desc:'¿Cuál es el siguiente nivel?',
@@ -1689,11 +1913,10 @@ function areaView() {
     }
 
     return `
-    <!-- CRITERIO DE ISABEL — BRÚJULA ESTRATÉGICA -->
+    <!-- ESTADO DE JETMI — calculado de sus datos; no es la opinión de Isabel (D57) -->
     <div style="background:var(--surface);border-radius:12px;padding:16px;margin-bottom:12px;border:0.5px solid var(--border)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3)">Isabel · modo producción</div>
-        <span style="font-size:10px;font-weight:600;background:#EEEDFE;color:#534AB7;padding:2px 8px;border-radius:999px">${isabelRolLabel}</span>
+        <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3)">Estado de JETMI</div>
       </div>
 
       <!-- Nivel actual → siguiente -->
@@ -1721,8 +1944,6 @@ function areaView() {
         <div style="font-size:13px;color:#085041;line-height:1.45">${accionHoy}</div>
       </div>`:''}
 
-      <!-- Criterio de Isabel -->
-      <div style="font-size:13px;color:var(--text);line-height:1.55;margin-bottom:12px">${isabelCriterion}</div>
       <button onclick="openIsabel()" style="background:none;border:none;padding:0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer">Hablar con Isabel →</button>
     </div>
 
@@ -1802,22 +2023,18 @@ function areaView() {
     </details>`;
   }:'';
 
+  // Vida Personal (D57): solo lo que está vivo. El sueño es el que ella le
+  // cuenta a Isabel (el mismo de Salud), no un número apuntado a mano; las
+  // rachas se marcan con un toque. Las listas fijas de relaciones y planes se
+  // quitaron: no cambiaban nunca y VISION dice que esto no es un CRM.
   const vidaView=isVida?()=>{
     const m=S.metrics.filter(x=>x.area_id===a.id);
     const get=k=>m.find(x=>x.key===k);
     const cannabisStart=get('cannabis_start_date');
-    const sueno=get('horas_sueno');
     const diasSinCannabis=cannabisStart?Math.floor((Date.now()-new Date(cannabisStart.value))/(864e5)):0;
     const cannabisColor=diasSinCannabis>30?'#0F6E56':diasSinCannabis>7?'#854F0B':'#A32D2D';
-    const rels=[
-      {name:'Jaime',status:'Pareja · conexión fuerte',icon:'❤️'},
-      {name:'Madre',status:'Cercana · apoyo clave',icon:'💛'},
-      {name:'Padre',status:'Melanoma · apoyo con límites',icon:'🧡'},
-    ];
-    const planes=[
-      {icon:'🇨🇳',label:'China',desc:'Hong Kong · Shenzhen · Chongqing · Guilin'},
-      {icon:'🇵🇹',label:'Portugal',desc:'Residencia fiscal norte Portugal — objetivo medio plazo'},
-    ];
+    const sleepEntries=(S.sleep?.entries||[]).filter(entry=>formatSleepMinutes(entry.minutes)!==null);
+    const latestSleep=sleepEntries[0]||null;
     return `
     <div class="card" style="margin-bottom:10px">
       <div class="card-head"><span class="ch-icon">🌱</span><span class="ch-label">Hábitos</span></div>
@@ -1829,89 +2046,66 @@ function areaView() {
           <button onclick="resetCannabis()" style="margin-top:6px;padding:4px 10px;border-radius:6px;background:var(--bg);border:1px solid var(--border);font-size:11px;cursor:pointer">Reiniciar</button>
         </div>
         <div style="background:var(--surface);padding:14px 12px;text-align:center">
-          <div style="font-size:28px;font-weight:700">${sueno?sueno.value:'—'}<span style="font-size:14px;color:var(--t2);font-weight:400">h</span></div>
-          <div style="font-size:10px;color:var(--t2);margin-top:2px">sueño anoche</div>
-          <div style="display:flex;gap:4px;justify-content:center;margin-top:6px">
-            ${[6,7,8,9].map(h=>`<button onclick="setSueno(${h})" style="padding:3px 6px;border-radius:5px;border:1px solid ${sueno&&parseInt(sueno.value)===h?'var(--text)':'var(--border)'};background:${sueno&&parseInt(sueno.value)===h?'var(--text)':'var(--surface)'};color:${sueno&&parseInt(sueno.value)===h?'#fff':'var(--t2)'};font-size:10px;cursor:pointer">${h}h</button>`).join('')}
-          </div>
+          <div style="font-size:28px;font-weight:700">${latestSleep?formatSleepMinutes(latestSleep.minutes):'—'}</div>
+          <div style="font-size:10px;color:var(--t2);margin-top:2px">sueño</div>
+          <div style="font-size:9px;color:var(--t3);margin-top:2px">${latestSleep?fechaRelativa(latestSleep.date)+' · se lo cuentas a Isabel':'se lo cuentas a Isabel a las 08:00'}</div>
         </div>
       </div>
-      ${habitsStreakRow()}
-    </div>
-    <div class="card" style="margin-bottom:10px">
-      <div class="card-head"><span class="ch-icon">👥</span><span class="ch-label">Relaciones</span></div>
-      ${rels.map(r=>`
-      <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-top:1px solid var(--border)">
-        <span style="font-size:20px">${r.icon}</span>
-        <div>
-          <div style="font-size:14px;font-weight:600">${r.name}</div>
-          <div style="font-size:12px;color:var(--t2)">${r.status}</div>
-        </div>
-      </div>`).join('')}
-    </div>
-    <div class="card" style="margin-bottom:10px">
-      <div class="card-head"><span class="ch-icon">✈️</span><span class="ch-label">Planes</span></div>
-      ${planes.map(p=>`
-      <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-top:1px solid var(--border)">
-        <span style="font-size:22px">${p.icon}</span>
-        <div>
-          <div style="font-size:14px;font-weight:600">${p.label}</div>
-          <div style="font-size:12px;color:var(--t2)">${p.desc}</div>
-        </div>
-      </div>`).join('')}
+      ${habitsStreakRow({ actions: true })}
     </div>`;
   }:'';
 
+  // Marca Personal (D57): su Instagram real y su estrategia (D54), no cifras
+  // apuntadas a mano. Instagram es privado: solo con la app conectada.
   const marcaView=isMarca?()=>{
-    const m=S.metrics.filter(x=>x.area_id===a.id);
-    const get=k=>m.find(x=>x.key===k);
-    const posts=get('posts_semana');
-    const replies=get('replies_stories');
-    const saves=get('saves');
-    const diasSin=get('dias_sin_publicar');
-    const diasVal=diasSin?parseInt(diasSin.value):0;
-    const capas=[
-      {icon:'✈️',label:'ON duty — captura',desc:'Fotos, audios, notas. Sin publicar. Acumulas.'},
-      {icon:'📱',label:'OFF duty — publica',desc:'Procesa lo capturado. Máx. 3 stories/semana.'},
-      {icon:'📌',label:'Mensual — ancla',desc:'Una pieza de fondo. Conecta con tu posicionamiento.'},
-    ];
+    const linked=appClient().isLinked();
+    if(linked&&!S._brandLoading&&!S.appBrand){ loadAppBrand(); }
+    const B=S.appBrand;
+    const ig=B&&B.instagram;
+    const nf=n=>typeof n==='number'?n.toLocaleString('es-ES'):'—';
+    const stat=(v,l)=>`<div style="background:var(--surface);padding:12px 8px;text-align:center"><div style="font-size:20px;font-weight:700">${nf(v)}</div><div style="font-size:10px;color:var(--t2);margin-top:2px">${l}</div></div>`;
+    let igHtml;
+    if(!linked){
+      igHtml=`<div style="padding:14px;font-size:13px;color:var(--t2);line-height:1.5">Conecta este móvil para ver aquí tu Instagram real: alcance, guardados y lo que mejor funciona.
+        <div><button onclick="openLink()" style="margin-top:10px;background:var(--text);color:#fff;border:none;border-radius:999px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer">Conectar con un código de Telegram</button></div></div>`;
+    } else if(!B){
+      igHtml=`<div style="padding:14px;font-size:13px;color:var(--t3)">Leyendo tu Instagram…</div>`;
+    } else if(!ig||!ig.ok){
+      igHtml=`<div style="padding:14px;font-size:13px;color:var(--t2)">No pude leer tu Instagram ahora mismo${ig&&ig.error?` (${escHtml(ig.error)})`:''}.</div>`;
+    } else {
+      const p=ig.profile||{}, acc=ig.account||{};
+      const posts=ig.recent_posts||[];
+      const lastDate=posts.map(x=>x.date).filter(Boolean).sort().pop();
+      const daysSince=lastDate?Math.floor((Date.now()-new Date(lastDate+'T12:00:00'))/864e5):null;
+      const best=(ig.best&&ig.best.by_saves&&ig.best.by_saves.length?ig.best.by_saves:(ig.best&&ig.best.by_reach)||[]).slice(0,3);
+      igHtml=`
+      <div style="padding:12px 14px 4px;font-size:13px;color:var(--t2)">@${escHtml(p.username||'')} · ${nf(p.followers)} seguidores · ${nf(p.posts_total)} publicaciones</div>
+      ${daysSince!==null?`<div style="padding:0 14px 10px;font-size:12px;color:${daysSince>7?'#A32D2D':daysSince>3?'#854F0B':'#0F6E56'}">Última publicación: ${daysSince===0?'hoy':daysSince===1?'ayer':'hace '+daysSince+' días'}</div>`:''}
+      ${acc.available?`<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);padding:4px 14px 6px">Últimos 28 días</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);border-top:1px solid var(--border)">
+        ${stat(acc.reach,'alcance')}${stat(acc.views,'visualizaciones')}${stat(acc.total_interactions,'interacciones')}
+      </div>`:''}
+      ${best.length?`<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);padding:12px 14px 4px">Lo que mejor te funciona</div>
+      ${best.map(x=>`<a href="${escHtml(x.permalink||'#')}" target="_blank" rel="noopener" style="display:block;text-decoration:none;padding:9px 14px;border-top:1px solid var(--border)">
+        <div style="font-size:13px;color:var(--text);line-height:1.4">${escHtml(x.caption||'(sin texto)')}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px">${escHtml(x.type||'')} · ${escHtml(x.date||'')}${typeof x.saved==='number'?` · ${nf(x.saved)} guardados`:''}${typeof x.reach==='number'?` · ${nf(x.reach)} de alcance`:''}</div>
+      </a>`).join('')}`:''}`;
+    }
+    const strategy=String(a.ia_context||'').trim();
+    const open=S.brandStrategyOpen;
     return `
-    <div style="background:#EEEDFE;border-radius:var(--r-sm);padding:10px 12px;margin-bottom:10px;font-size:12px;color:#534AB7;display:flex;align-items:center;gap:8px">
-      <i class="ti ti-info-circle" style="font-size:15px;flex-shrink:0"></i>
-      <span>Fase 0 · Instagram Stories primero · TikTok cuando tengas audiencia base</span>
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">📸</span><span class="ch-label">Instagram</span></div>
+      ${igHtml}
     </div>
     <div class="card" style="margin-bottom:10px">
-      <div class="card-head"><span class="ch-icon">📊</span><span class="ch-label">Métricas que importan</span></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)">
-        <div style="background:var(--surface);padding:14px 12px;text-align:center">
-          <div style="font-size:26px;font-weight:700;color:${posts&&parseInt(posts.value)>=3?'#993556':'#854F0B'}">${posts?posts.value:'0'}<span style="font-size:12px;color:var(--t2);font-weight:400"> / 3</span></div>
-          <div style="font-size:10px;color:var(--t2);margin-top:2px">posts esta semana</div>
-        </div>
-        <div style="background:var(--surface);padding:14px 12px;text-align:center">
-          <div style="font-size:26px;font-weight:700;color:${diasVal>5?'#A32D2D':diasVal>0?'#854F0B':'#0F6E56'}">${diasVal}</div>
-          <div style="font-size:10px;color:var(--t2);margin-top:2px">días sin publicar</div>
-        </div>
-        <div style="background:var(--surface);padding:14px 12px;text-align:center">
-          <div style="font-size:26px;font-weight:700">${replies?replies.value:'0'}</div>
-          <div style="font-size:10px;color:var(--t2);margin-top:2px">respuestas stories</div>
-        </div>
-        <div style="background:var(--surface);padding:14px 12px;text-align:center">
-          <div style="font-size:26px;font-weight:700">${saves?saves.value:'0'}</div>
-          <div style="font-size:10px;color:var(--t2);margin-top:2px">saves este mes</div>
-        </div>
-      </div>
+      <div class="card-head"><span class="ch-icon">🎯</span><span class="ch-label">Tu estrategia</span></div>
+      ${strategy
+        ?`<div onclick="toggleBrandStrategy()" style="padding:12px 14px;font-size:13px;color:var(--text);line-height:1.55;white-space:pre-wrap;cursor:pointer;${open?'':'display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden;'}">${mdLite(strategy)}</div>
+          <div style="padding:0 14px 12px;font-size:11px;color:var(--t3)">${open?'Toca para cerrar':'Toca para leerla entera'}</div>`
+        :`<div style="padding:14px;font-size:13px;color:var(--t2)">Todavía no hay estrategia guardada.</div>`}
     </div>
-    <div class="card" style="margin-bottom:10px">
-      <div class="card-head"><span class="ch-icon">🎯</span><span class="ch-label">Sistema de contenido</span></div>
-      ${capas.map(c=>`
-      <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-top:1px solid var(--border)">
-        <span style="font-size:20px">${c.icon}</span>
-        <div>
-          <div style="font-size:13px;font-weight:600">${c.label}</div>
-          <div style="font-size:12px;color:var(--t2);margin-top:2px">${c.desc}</div>
-        </div>
-      </div>`).join('')}
-    </div>`;
+    <button onclick="openIsabel()" style="width:100%;padding:13px;border:none;background:var(--text);color:#fff;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:10px">Pedirle ideas de contenido a Isabel →</button>`;
   }:'';
 
   const gymView=isGym?()=>{
@@ -2010,8 +2204,15 @@ function areaView() {
     const dias=get('dias_sin_sintomas');
     const dolor=get('dolor_hoy');
     const itu=get('iti_año');
-    const meds=['Hiprex 1g (noche)','D-manosa diaria','Probióticos','Vitamina C','Cranberry PAC 36','NAC 600mg (noche)','L-glutamina','GABA + L-teanina + B6','Creatina'];
-    const conds=['Vejiga dolorosa (crónica)','HPV — seguimiento activo','Hernia lumbar + ciática','Escoliosis dorsolumbar','Posible endometriosis (sin confirmar)','Hiperreactividad respiratoria'];
+    // Protocolo y condiciones: del servidor, con el token de app (D57). Antes
+    // iban escritos aquí, dentro del JS que se sirve a cualquiera.
+    const linkedHP=appClient().isLinked();
+    if(linkedHP&&!S.healthProfile&&!S._healthProfileLoading) loadHealthProfile();
+    const meds=(S.healthProfile&&S.healthProfile.protocol)||[];
+    const conds=(S.healthProfile&&S.healthProfile.conditions)||[];
+    const hpNote=!linkedHP?`<div style="padding:12px 14px;border-top:1px solid var(--border);font-size:12px;color:var(--t2)">Conecta este móvil para verlo. <button onclick="openLink()" style="border:none;background:none;padding:0;font-size:12px;font-weight:600;color:var(--text);cursor:pointer">Conectar →</button></div>`:!S.healthProfile?`<div style="padding:12px 14px;border-top:1px solid var(--border);font-size:12px;color:var(--t3)">Cargando…</div>`:S.healthProfile.error?`<div style="padding:12px 14px;border-top:1px solid var(--border);font-size:12px;color:var(--t2)">No se pudo cargar.</div>`:'';
+    const manualDate=[dias,dolor,itu].map(x=>x&&x.updated_at).filter(Boolean).sort().pop();
+
     const sleepEntries=(S.sleep?.entries||[]).filter(entry=>formatSleepMinutes(entry.minutes)!==null);
     const latestSleep=sleepEntries[0]||null;
     return `
@@ -2024,6 +2225,7 @@ function areaView() {
     </div>
     <div class="card" style="margin-bottom:10px">
       <div class="card-head"><span class="ch-icon">📊</span><span class="ch-label">Seguimiento</span></div>
+      ${manualDate?`<div style="padding:8px 14px 0;font-size:11px;color:var(--t3)">Se apunta a mano aquí (Isabel no lo ve). Último cambio: ${new Date(manualDate).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}.</div>`:''}
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border)">
         <div style="background:var(--surface);padding:14px 10px;text-align:center">
           <div style="font-size:26px;font-weight:700;color:#0F6E56">${dias?dias.value:'0'}</div>
@@ -2044,12 +2246,12 @@ function areaView() {
     </div>
     <div class="card" style="margin-bottom:10px">
       <div class="card-head"><span class="ch-icon">💊</span><span class="ch-label">Protocolo diario</span></div>
-      ${meds.map(m=>`<div style="padding:9px 14px;border-top:1px solid var(--border);font-size:13px;color:var(--text)">${m}</div>`).join('')}
+      ${meds.map(m=>`<div style="padding:9px 14px;border-top:1px solid var(--border);font-size:13px;color:var(--text)">${escHtml(m)}</div>`).join('')}${hpNote}
     </div>
-    <div class="card" style="margin-bottom:10px">
+    ${conds.length?`<div class="card" style="margin-bottom:10px">
       <div class="card-head"><span class="ch-icon">🩺</span><span class="ch-label">Condiciones activas</span></div>
       ${conds.map(c=>`<div style="padding:9px 14px;border-top:1px solid var(--border);font-size:13px;color:var(--text);display:flex;align-items:center;gap:8px"><span style="width:6px;height:6px;border-radius:50%;background:#0F6E56;flex-shrink:0;display:inline-block"></span>${c}</div>`).join('')}
-    </div>`;
+    </div>`:''}`;
   }:'';
 
   const finView=isFin?()=>{
@@ -2236,7 +2438,13 @@ function areaView() {
       </div>`;
     }
 
+    // Finanzas solo sabe lo que se importó a mano (D57): si el último
+    // movimiento es viejo, se dice arriba en vez de dar el mes por "tranquilo".
+    const lastTxDate=S.transactions.reduce((m,t)=>t.date&&t.date>m?t.date:m,'');
+    const staleFin=lastTxDate&&(Date.now()-new Date(lastTxDate+'T12:00:00'))>7*864e5;
+
     return `
+    ${staleFin?`<div style="background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;line-height:1.5">Datos hasta el ${new Date(lastTxDate+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'long'})}: desde entonces no ha entrado ningún movimiento. Lo que ves aquí no incluye tus gastos recientes.</div>`:''}
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <button onclick="finPrev()" style="border:none;background:var(--surface);padding:8px 12px;border-radius:8px;cursor:pointer;font-size:16px">‹</button>
       <span style="font-size:14px;font-weight:600;text-transform:capitalize">${monthName}</span>
@@ -4580,6 +4788,8 @@ async function invCloseSession() {
 Object.assign(window, {
   showPin, pinPress,
   go, toggleMode, openAdd, openIsabel,
+  openLink, linkStart, linkVerify, toggleIsabelMsg, logHabitToday,
+  focusDone, focusTomorrow, focusDiscard, toggleBrandStrategy,
   retryLoad, gymLogSession,
   done, closeModal,
   checkinSueno, checkinDolor, checkinVJ, completeCheckin,
@@ -4637,6 +4847,7 @@ const surfaceRevalidator = createSurfaceRevalidator({
   refreshReminders: loadReminders,
   refreshHabits: loadHabits,
   refreshPriority: () => loadIsabelNow({ silent: true }),
+  refreshPrivate: loadAppToday,
   render,
 });
 
