@@ -10,7 +10,7 @@ No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí
 ## 2026-09-21, noche (Marca Personal con Instagram y estrategia propia — D54)
 
 - **Nueva tool `brand_content_context`** (privada). Junta su estrategia de contenido (`areas.ia_context` de Marca Personal), su Instagram de solo lectura (API oficial) y lo que está viviendo, para que Isabel le proponga contenido con datos reales. `isabel-api` `01b40b3`, migración `instagram_credentials.sql` sin aplicar todavía.
-- **Esperando a Estefanía:** el texto de ChatGPT con su idea de contenido, la cuenta de Instagram en profesional, la app de Meta y `INSTAGRAM_ACCESS_TOKEN` en Railway.
+- **Conectado el mismo día:** Instagram con un enlace propio (`/oauth/instagram/start`, `isabel-api` `5c3b269`), porque la ventana de tokens de Meta entra en bucle con la verificación en dos pasos. `instagram_credentials` aplicada. Estrategia de ChatGPT cargada, sin datos sensibles. Verificado con sus datos reales, sin errores de métricas.
 
 ## 2026-09-21, noche (ON/OFF desde el chat, standby como rotación y MCP que sobrevive a los deploys — D53)
 

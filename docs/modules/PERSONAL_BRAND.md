@@ -1,4 +1,4 @@
-Estado: parcial — la tool de Isabel está desplegada; faltan la estrategia y el token de Instagram
+Estado: implementado para Isabel (estrategia + Instagram + su vida); sin vista propia en la app
 Última verificación: 2026-09-21
 Verificado en: isabel-api `01b40b3` (en producción con `993c98e`), llamada real a `brand_content_context` por `/mcp/http`
 Fuente de verdad de datos: `areas.ia_context` (estrategia) · Instagram por la API oficial · `instagram_credentials` (token cifrado)
@@ -15,14 +15,10 @@ Presencia pública (Instagram) sostenible según energía y modo. Lo que ella pi
   3. **Su vida:** VistaJet (estado y día de rotación, nunca la matrícula), rachas de leer, escribir y gym, agenda de los próximos 7 días y tareas abiertas de Marca Personal.
 - **App:** sigue siendo el área genérica (`areaView()`), sin vista propia. La estrategia y las métricas todavía no se ven en LIFEOS.
 
-# Cómo conectar Instagram (lo hace ella; es su cuenta)
-1. Instagram en profesional: Configuración → Tipo de cuenta y herramientas → Cambiar a cuenta profesional → Creador. Las cuentas personales no tienen API desde diciembre de 2024.
-2. developers.facebook.com → Crear app → caso de uso de Instagram (API con inicio de sesión de Instagram). No hace falta página de Facebook.
-3. En la app: Instagram → configuración de la API con inicio de sesión empresarial de Instagram → Generar tokens de acceso → Añadir cuenta. Si pide rol de tester, aceptarlo en la configuración web de Instagram.
-4. Railway → `isabel-api` → Variables → `INSTAGRAM_ACCESS_TOKEN` → **Deploy**. Sin pulsar Deploy, la variable se queda en espera.
-5. Aplicar `isabel-api/migrations/instagram_credentials.sql` en el SQL Editor de Supabase para que el token se renueve solo. Sin la tabla caduca a los 60 días.
+# Cómo conectar o reconectar Instagram
+Abrir `https://isabel-api-production.up.railway.app/oauth/instagram/start?api_key=<API key pública>` en el navegador donde tenga Instagram abierto y pulsar **Permitir**. La respuesta debe ser "Conectado ✅". **No usar "Generar identificador" del panel de Meta:** con la verificación en dos pasos entra en bucle pidiendo iniciar sesión.
 
-Permisos que hacen falta: `instagram_business_basic` para el perfil y las publicaciones, y `instagram_business_manage_insights` para las métricas. Sin el segundo, las métricas vuelven como `instagram_permission_missing` y el resto funciona. Con menos de 100 seguidores, Meta no da algunas métricas de cuenta.
+Requisitos, todos hechos el 2026-09-21: cuenta profesional (es `MEDIA_CREATOR`); app de Meta "Isabel" (`4038517622945123`, app de Instagram "Isabel-IG" `28224686620523394`) con los permisos `instagram_business_basic` e `instagram_business_manage_insights`; @estefaniaolcese como tester de Instagram, aceptado; URL de redireccionamiento `…/oauth/instagram/callback` registrada; `INSTAGRAM_APP_SECRET` en Railway; `instagram_credentials` aplicada. El token dura 60 días y `isabel-api` lo renueva cada semana; si se pierde (contraseña cambiada, permiso quitado), basta con volver a abrir el enlace.
 
 # Reglas de la tool (van en la respuesta, `how_to_suggest`)
 - Tres ideas concretas con formato y gancho, cada una apoyada en un dato real.
@@ -35,8 +31,7 @@ Permisos que hacen falta: `instagram_business_basic` para el perfil y las public
 `isabel-api/src/core/instagram.js`, `isabel-api/src/core/specialists/brand.js`, `isabel-api/src/mcp.js` (`brand_content_context`), `isabel-api/migrations/instagram_credentials.sql`, `isabel-api/src/__tests__/brand.test.js`.
 
 # Pendiente
-- Su texto de ChatGPT → destilar → que ella lo revise → `areas.ia_context`.
-- Token de Instagram, migración y verificación de las métricas contra su cuenta real. Los nombres de métricas de Meta no se pudieron probar sin token.
+- Que ella revise la estrategia cargada (`LIFE OS/marca-personal/isabel-estrategia.md`, igual a `areas.ia_context`).
 - Empujón semanal de contenido (cron del Gateway) cuando haya estrategia y métricas.
 - Que Isabel pueda anotar cambios de estrategia que ella le cuente (hoy solo se escribe desde una sesión de desarrollo).
 - Vista propia en la app.
