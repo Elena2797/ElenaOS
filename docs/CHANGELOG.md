@@ -7,6 +7,12 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-09-21, noche (ON/OFF desde el chat, standby como rotación y MCP que sobrevive a los deploys — D53)
+
+- **La app decía OFF y "Fuera de rotación"** en su primer día de rotación (standby, sin avión). Isabel no podía cambiar el ON/OFF, y la app solo reconocía `rotacion` con avión. Nueva tool `lifeos_set_mode`, un aviso en las tools de VistaJet, y standby enseñado como parte de la rotación.
+- **Cada deploy de `isabel-api` dejaba a Isabel sin tools** (sesión SSE en memoria, 404 "Sesión MCP no encontrada o expirada"). Nuevo `POST /mcp/http` sin estado; el Gateway lo usa con `transport: "streamable-http"`.
+- `isabel-api` `f3cf0e2`, `life-os-app` `df9c90b`. El hash de `index.js` del guard O5, que fallaba desde el webhook de Outlook (`1e19184`), se movió a conciencia.
+
 ## 2026-09-21, última hora (hábitos con racha — D52; OpenRouter en el informe; OAuth viejo retirado)
 
 - **Hábitos con racha (D52):** leer y escribir en días, gym en semanas cumpliendo su objetivo. Tools `habits_status`/`habits_log`, `GET /v1/habits`, y las rachas en los tres mensajes de coach (`isabel-api` `d0a3240`, `isabel-gateway` `a583c3a`). En la app, en la tarjeta 🌱 Hábitos de Vida Personal (`life-os-app` `362a711`).
