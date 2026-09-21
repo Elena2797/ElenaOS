@@ -8,7 +8,6 @@
 | `main.css` | Todos los estilos. Variables CSS globales, layout, componentes visuales. |
 | `config.js` | Lee variables de entorno (`import.meta.env`). Exporta constantes: `SUPABASE_URL`, `SUPABASE_ANON_KEY`. |
 | `services/db.js` | Único punto de acceso a Supabase. 19 funciones con nombre orientado a intención. Ningún otro módulo llama a `.from()` directamente. |
-| `services/isabel.js` | Único punto de contacto con el bridge de Isabel. Resuelve URL y token, expone `sendMessage`, `isAvailable`, `getAgentUrl`. |
 
 ## Arrancar en local
 
@@ -36,6 +35,6 @@ En Vercel: Settings → Environment Variables.
 ## Reglas de arquitectura
 
 - La UI no habla directamente con Supabase. Todo pasa por `services/db.js`.
-- La UI no habla directamente con el bridge de Isabel. Todo pasa por `services/isabel.js`.
+- La app no tiene chat propio: con Isabel se habla por Telegram (D55). Los botones "Hablar con Isabel" abren `https://t.me/Isabellifeosbot`.
 - Toda nueva integración externa → nuevo archivo en `services/`.
 - Toda nueva configuración o clave → `config.js` + `.env.local`.

@@ -12,8 +12,9 @@ const MAIN_URL = new URL('../../main.js', import.meta.url);
 // recordatorios y se recalcula al volver de Telegram (D50). Standby se enseña
 // como parte de la rotación (D53). La tarjeta Hábitos de Vida Personal enseña
 // las rachas de leer, escribir y gym que da GET /v1/habits (D52). Sin O5, sin
-// fixtures.
-const MAIN_CHECKPOINT_SHA256 = '25D44D275E72ECAFE6D4197196FF9FA13882DE54BE4F93EB387B99293199F472';
+// fixtures. Y otra vez (D55): sin chat propio; "Hablar con Isabel" abre
+// Telegram. Solo se quita código; sin O5.
+const MAIN_CHECKPOINT_SHA256 = '1AFE4F98FBE0DF54DA8CA7FAC94E656E1E5DE1CFF52F79BB822C553756FCBF1D';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

@@ -2,7 +2,6 @@
 import { createClient } from '@supabase/supabase-js';
 import * as dbSvc from './services/db.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
-import * as isabelSvc from './services/isabel.js';
 import * as invSvc from './services/inventory.js';
 import * as hotoSvc from './services/hoto.js';
 import * as llcSvc from './services/laundryCleaning.js';
@@ -167,7 +166,7 @@ function pinPress(v) {
   }
 }
 
-let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], chatHistory:[], transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, finance:null, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'}, pendingQuestions:[], reminders:null, gym:null, sleep:null, _gymLoaded:false, _gymLoading:false, _gymSaving:false, _sleepLoading:false, _financeRequestToken:0 };
+let db, S = { mode:'OFF', view:'home', areaId:null, projectId:null, avanzarCtx:null, areas:[], tasks:[], wf:[], dec:[], metrics:[], operators:[], transactions:[], finMonth: new Date().toISOString().slice(0,7), finCat: null, budgets: JSON.parse(localStorage.getItem('life_budgets')||'{}'), finHide: false, finance:null, vjState:{}, vjTasks:[], projects:[], eventos:[], alertas:[], vjHotoTab:'checklist', vjInventTab:'resumen', invSession:null, invItems:[], invChat:[], invSearch:'', invChatLoading:false, invProposal:null, loadStatus:'loading', loadError:null, isabelNow:{status:'loading'}, pendingQuestions:[], reminders:null, gym:null, sleep:null, _gymLoaded:false, _gymLoading:false, _gymSaving:false, _sleepLoading:false, _financeRequestToken:0 };
 
 async function initApp() {
   db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -175,7 +174,6 @@ async function initApp() {
   invSvc.setClient(db);
   hotoSvc.setClient(db);
   llcSvc.setClient(db);
-  isabelSvc.setUrlGetter(() => S.metrics.find(m => m.key === 'agent_url')?.value || '');
   const now = new Date();
   document.getElementById('td').textContent = now.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
   await reload();
@@ -405,7 +403,7 @@ function pendingQuestionsCard() {
   return '<div style="background:var(--surface);border-radius:14px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)">' +
     '<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:10px">Isabel te preguntó</div>' +
     rows +
-    '<button onclick="openChat()" style="background:none;border:none;padding:8px 0 0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer">Responder a Isabel →</button>' +
+    '<button onclick="openIsabel()" style="background:none;border:none;padding:8px 0 0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer">Responder a Isabel →</button>' +
     '</div>';
 }
 
@@ -962,7 +960,7 @@ function isabelHomeCard(priority, greeting) {
       <div style="font-size:15px;color:var(--text);line-height:1.7;margin-bottom:6px">${greeting}</div>
       ${staleNote}
       <div style="font-size:14px;font-weight:600;color:var(--ok)">✓ Nada requiere tu atención ahora.</div>
-      <button onclick="openChat()" style="background:none;border:none;padding:6px 0 0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer;display:block;margin-top:4px">Hablar con Isabel →</button>
+      <button onclick="openIsabel()" style="background:none;border:none;padding:6px 0 0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer;display:block;margin-top:4px">Hablar con Isabel →</button>
     </div>`;
   }
 
@@ -984,7 +982,7 @@ function isabelHomeCard(priority, greeting) {
       ${canIgnoreCount ? `<div style="font-size:11px;color:var(--t3);margin-bottom:${priority.area ? '10px' : '0'}">${canIgnoreCount} dominio${canIgnoreCount !== 1 ? 's' : ''} sin nada pendiente ahora — puedes dejarlo${canIgnoreCount !== 1 ? 's' : ''} para después.</div>` : ''}
       <div style="display:flex;gap:14px;align-items:center">
         ${priority.area ? `<button onclick="go('area','${priority.area.id}')" style="background:${style.fg};color:#fff;border:none;border-radius:999px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer">Ir a ${priority.area.name} →</button>` : ''}
-        <button onclick="openChat()" style="background:none;border:none;padding:0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer">Hablar con Isabel →</button>
+        <button onclick="openIsabel()" style="background:none;border:none;padding:0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer">Hablar con Isabel →</button>
       </div>
     </div>`;
   }
@@ -995,7 +993,7 @@ function isabelHomeCard(priority, greeting) {
   return `<div class="brief-card" style="margin-bottom:10px;border:0.5px solid var(--border)">
     ${header}
     <div style="font-size:15px;color:var(--text);line-height:1.7;margin-bottom:4px">${greeting}</div>
-    <button onclick="openChat()" style="background:none;border:none;padding:6px 0 0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer;display:block;margin-top:4px">Hablar con Isabel →</button>
+    <button onclick="openIsabel()" style="background:none;border:none;padding:6px 0 0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer;display:block;margin-top:4px">Hablar con Isabel →</button>
     ${priority.status === 'loading' ? `<div style="font-size:11px;color:var(--t3);margin-top:8px">Revisando tus dominios…</div>` : ''}
     ${priority.status === 'data_unavailable' ? `<div style="font-size:11px;color:var(--t3);margin-top:8px">⚠ Isabel no está disponible ahora mismo — evaluación parcial, no se puede confirmar que no haya algo urgente.</div>` : ''}
     ${priority.status === 'unreachable' ? `<div style="font-size:11px;color:var(--t3);margin-top:8px">Isabel no está disponible ahora mismo — el resto de Life OS funciona con normalidad.</div>` : ''}
@@ -1464,7 +1462,7 @@ function areaView() {
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <button onclick="readiToggleDetail()" style="border:none;background:var(--bg);color:var(--t2);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer">${S.readiDetail?'Ocultar evaluación':'Ver evaluación por módulos'}</button>
         ${primaryCTA?`<button onclick="go('${primaryCTA.view}')" style="border:none;background:var(--text);color:#fff;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer">${primaryCTA.label}</button>`:''}
-        <button onclick="openChat()" style="border:none;background:none;padding:0;font-size:12px;font-weight:500;color:var(--t2);cursor:pointer">Hablar con Isabel →</button>
+        <button onclick="openIsabel()" style="border:none;background:none;padding:0;font-size:12px;font-weight:500;color:var(--t2);cursor:pointer">Hablar con Isabel →</button>
       </div>
       ${detail}`;
     })();
@@ -1705,7 +1703,7 @@ function areaView() {
 
       <!-- Criterio de Isabel -->
       <div style="font-size:13px;color:var(--text);line-height:1.55;margin-bottom:12px">${isabelCriterion}</div>
-      <button onclick="openChat()" style="background:none;border:none;padding:0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer">Hablar con Isabel →</button>
+      <button onclick="openIsabel()" style="background:none;border:none;padding:0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer">Hablar con Isabel →</button>
     </div>
 
     <!-- ESPACIOS DE TRABAJO DERIVADOS DEL CRITERIO -->
@@ -1961,7 +1959,7 @@ function areaView() {
         (S._gymSaving ? '...' : 'Registrar') + '</button>' +
       '</div>' +
       '<div style="padding:0 14px 12px">' +
-        '<button onclick="openChat()" style="background:none;border:none;padding:0;font-size:12px;font-weight:500;color:var(--t2);cursor:pointer">Hablar con Isabel &rarr;</button>' +
+        '<button onclick="openIsabel()" style="background:none;border:none;padding:0;font-size:12px;font-weight:500;color:var(--t2);cursor:pointer">Hablar con Isabel &rarr;</button>' +
       '</div>' +
     '</div>' +
     (historial
@@ -2856,7 +2854,7 @@ function vjInventarioView(){
   <div style="background:var(--surface);border-radius:12px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
       <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3)">Contar inventario</div>
-      <button onclick="openChat()" style="margin-left:auto;background:none;border:none;padding:0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer">Hablar con Isabel →</button>
+      <button onclick="openIsabel()" style="margin-left:auto;background:none;border:none;padding:0;font-size:11px;font-weight:500;color:var(--t2);cursor:pointer">Hablar con Isabel →</button>
     </div>
     <div id="inv-chat-msgs" style="min-height:60px;max-height:300px;overflow-y:auto;margin-bottom:12px">
       ${S.invChat.length===0 && !S.invChatLoading
@@ -3028,7 +3026,7 @@ function vjFreshView(){
     <div style="font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px">Fresh Items Plan</div>
     <div style="font-size:12px;color:var(--t2);line-height:1.6">Las recomendaciones de catering fresco basadas en sectores y pasajeros estarán disponibles próximamente. Habla con Isabel para planificar el catering del próximo sector.</div>
   </div>
-  ${status==='rotacion'?`<button onclick="openChat()" style="width:100%;padding:14px;border:none;background:var(--text);color:#fff;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer">Planificar con Isabel →</button>`:''}`;
+  ${status==='rotacion'?`<button onclick="openIsabel()" style="width:100%;padding:14px;border:none;background:var(--text);color:#fff;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer">Planificar con Isabel →</button>`:''}`;
 }
 
 function vjStatusView(){
@@ -4012,109 +4010,14 @@ async function addTask() {
   if(data){S.tasks.unshift(data);render();}
 }
 
-function openChat() {
-  if(document.getElementById('chat-overlay')) return;
-  const ctxName = S.areaId ? (S.areas.find(a=>a.id===S.areaId)?.name||'Área') :
-    S.view==='home'?'Inicio':S.view==='global'?'Vista global':'Life OS';
-  const welcome = S.chatHistory.length===0 ?
-    `<div class="msg-a">Hola Estefanía 👋 Soy Isabel.\n\nPuedo consultar y actualizar tu estado real: VistaJet, tareas, salud... ¿en qué te ayudo?</div>` : '';
-  const msgs = S.chatHistory.map(m=>`<div class="${m.role==='user'?'msg-u':'msg-a'}">${m.content}</div>`).join('');
-  const ov=document.createElement('div');
-  ov.className='chat-overlay'; ov.id='chat-overlay';
-  ov.onclick=e=>{if(e.target===ov)closeChat()};
-  ov.innerHTML=`<div class="chat-panel">
-    <div class="chat-ph">
-      <div>
-        <div style="font-size:15px;font-weight:700">Isabel</div>
-        <div style="font-size:11px;color:var(--t2)">Contexto: ${ctxName}</div>
-      </div>
-      <button onclick="closeChat()" style="background:none;border:none;padding:4px;cursor:pointer;color:var(--t2);font-size:22px;line-height:1"><i class="ti ti-x"></i></button>
-    </div>
-    <div class="chat-msgs" id="chat-msgs">${welcome}${msgs}</div>
-    <div class="chat-input-row">
-      <!-- Adjuntar archivo retirado al migrar al canal único (D27): la ruta
-           nueva (isabel-api → adaptador → chat.send) todavía no transporta
-           adjuntos. Se prefiere no ofrecer el botón antes que aceptar un
-           archivo y descartarlo en silencio. Reponer cuando el adaptador
-           soporte adjuntos. -->
-      <input class="fi" id="chat-in" placeholder="Escribe algo..." autocomplete="off" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}" style="margin:0;flex:1">
-      <button class="btn btn-p" onclick="sendMsg()" style="flex:0;padding:11px 14px;min-width:46px"><i class="ti ti-send" style="font-size:15px"></i></button>
-    </div>
-  </div>`;
-  document.body.appendChild(ov);
-  scrollChat();
-  setTimeout(()=>document.getElementById('chat-in')?.focus(),300);
-}
-
-function closeChat() { const el=document.getElementById('chat-overlay'); if(el) el.remove(); }
-
-async function sendMsg() {
-  const input=document.getElementById('chat-in');
-  const msg=input?.value.trim();
-  if(!msg) return;
-  if(input) input.value='';
-  const userText=msg;
-  S.chatHistory.push({role:'user',content:userText});
-  const msgs=document.getElementById('chat-msgs');
-  if(msgs){
-    const u=document.createElement('div'); u.className='msg-u'; u.textContent=userText; msgs.appendChild(u);
-    const ld=document.createElement('div'); ld.className='msg-loading'; ld.id='chat-ld'; ld.textContent='Isabel está pensando...'; msgs.appendChild(ld);
-    scrollChat();
-  }
-  const surfaceCtx = currentSurfaceContext();
-  try {
-    // Una sola Isabel: la misma que atiende Telegram, vía isabel-api →
-    // red privada → adaptador → agente `main`. El navegador nunca ve
-    // ningún secreto del Gateway. Ver docs/DECISIONS.md D26/D27.
-    const res = await fetch(`${ISABEL_API}/v1/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': ISABEL_KEY },
-      body: JSON.stringify({ message: msg, surface: surfaceCtx.surface, context: surfaceCtx }),
-    });
-    const data = await res.json();
-    const reply = data.ok ? data.reply : (data.error || 'Isabel no pudo responder ahora mismo.');
-    S.chatHistory.push({ role: 'assistant', content: reply });
-    document.getElementById('chat-ld')?.remove();
-    if (msgs) { const a=document.createElement('div'); a.className='msg-a'; a.textContent=reply; msgs.appendChild(a); }
-    // Isabel puede haber escrito en Supabase vía sus tools MCP — se refresca
-    // el estado para que la UI no quede desincronizada con lo que acaba de pasar.
-    if (data.ok) { await reload(); if (S.view === 'home' || S.areaId) render(); }
-  } catch(e) {
-    document.getElementById('chat-ld')?.remove();
-    const errMsg='No pude contactar con Isabel. Inténtalo otra vez.';
-    S.chatHistory.push({role:'assistant',content:errMsg});
-    if(msgs){const a=document.createElement('div');a.className='msg-a';a.textContent=errMsg;msgs.appendChild(a);}
-  }
-  scrollChat();
-}
-
-// Contexto estructurado de la pantalla actual. NO se convierte a texto aquí:
-// se envía tal cual a isabel-api, que lo formatea en un único sitio
-// (composeMessage). Ver docs/core/ISABEL_SURFACES.md.
-// No crea agentes ni sesiones por módulo: es la MISMA Isabel `main` con una
-// pista de dónde está mirando Estefanía.
-function currentSurfaceContext() {
-  const areaName = S.areaId ? (S.areas.find(a => a.id === S.areaId)?.name || null) : null;
-  const aircraft = (S.vjState && S.vjState.aircraft) || null;
-
-  if (S.view === 'vj_inventario') {
-    return { domain:'vistajet', surface:'inventory', aircraft, inventory_session_id: S.invSession?.id || null };
-  }
-  if (S.view === 'vj_hoto') {
-    return { domain:'vistajet', surface:'hoto', aircraft, hoto_id: S.hoto?.id || null };
-  }
-  if (S.view === 'vj_laundry_cleaning') return { domain:'vistajet', surface:'laundry', aircraft };
-  if (S.view === 'vj_fresh') return { domain:'vistajet', surface:'fresh', aircraft };
-  if (S.view === 'vj_status') return { domain:'vistajet', surface:'aircraft_status', aircraft };
-  if (areaName === 'VistaJet') return { domain:'vistajet', surface:'vistajet', aircraft };
-  if (areaName === 'Gym') return { domain:'health', surface:'gym' };
-  if (areaName === 'Salud') return { domain:'health', surface:'salud' };
-  if (areaName) return { domain: areaName.toLowerCase().replace(/\s+/g,'_'), surface: areaName.toLowerCase().replace(/\s+/g,'_') };
-  return { surface: 'global' };
-}
-
-function scrollChat() {
-  setTimeout(()=>{const el=document.getElementById('chat-msgs');if(el)el.scrollTop=el.scrollHeight;},60);
+// Con Isabel se habla solo por Telegram (D55). La app enseña lo que Isabel
+// sabe y deja actuar con un toque, pero no tiene un segundo chat: el de aquí
+// era otra conversación distinta de la de Telegram y, con la API key pública
+// del bundle, una puerta a sus tools privadas (correo, agenda, Instagram).
+// Al volver de Telegram, SurfaceSync refresca la app con lo que haya cambiado.
+const ISABEL_TELEGRAM_URL = "https://t.me/Isabellifeosbot";
+function openIsabel() {
+  window.open(ISABEL_TELEGRAM_URL, "_blank", "noopener");
 }
 
 async function updateTxCat(id, category) {
@@ -4656,7 +4559,7 @@ async function invCloseSession() {
 // Expose functions to global scope for inline onclick handlers (required in ES module context)
 Object.assign(window, {
   showPin, pinPress,
-  go, toggleMode, openAdd, openChat, closeChat, sendMsg,
+  go, toggleMode, openAdd, openIsabel,
   retryLoad, gymLogSession,
   done, closeModal,
   checkinSueno, checkinDolor, checkinVJ, completeCheckin,
