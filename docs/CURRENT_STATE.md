@@ -9,7 +9,7 @@ Estado: fotografía operativa vigente
 - **Coste medido:** un mensaje de Telegram cuesta 0,0038 $ con DeepSeek, frente a 0,113 $ con Sonnet.
 - **Backend:** `isabel-api` `92ff51a` en `main` (código del proxy `b360282`), 630/630 tests. GitHub y producción coinciden.
 - **Pendiente:**
-  - revocar la clave antigua de Anthropic `97e63348…` (lo hace la usuaria, en la consola);
+  - la clave nueva de Anthropic **caduca el 2026-10-20**: renovarla antes, o Claude deja de servir de repuesto (la expuesta `97e63348…` ya está revocada, 401 verificado);
   - verificar el cron de sueño del 2026-09-22 a las 08:00;
   - llevar el gasto de OpenRouter a `budget-status`;
   - decidir el nivel de thinking de DeepSeek (hoy `high`).

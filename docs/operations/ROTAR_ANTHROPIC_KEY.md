@@ -1,4 +1,4 @@
-Estado: rotación HECHA — clave nueva `d7ff29a1…` solo en isabel-api; falta el paso 5 (revocar `97e63348…`, usuaria)
+Estado: COMPLETADA — `97e63348…` ya revocada (Anthropic responde 401 el 2026-09-21); la nueva `d7ff29a1…` (consola: `YDt…LQAA`) solo en isabel-api, **caduca el 2026-10-20**
 Última verificación: 2026-09-21
 Verificado en: escaneo de credenciales por huella SHA-256 sobre disco local, `.codex`, backups y los 4 servicios Railway, sin exponer valores
 Fuente de verdad de datos: ninguna
@@ -7,7 +7,8 @@ Fuente de verdad de datos: ninguna
 
 > **2026-09-21:** pasos 1–4 cumplidos. El Gateway también guardaba la clave vieja en su almacén de
 > perfiles de OpenClaw, que manda sobre la variable: ya sustituida por el token del proxy (ver
-> `INCIDENTE_SALDO_2026-08-11.md` §12, incluido cómo rotar ese token en el futuro). Solo falta el paso 5.
+> `INCIDENTE_SALDO_2026-08-11.md` §12, incluido cómo rotar ese token en el futuro). El paso 5 también: la clave expuesta ya devuelve `401 invalid`. Quedan en la consola dos claves de
+> junio (`CTg…jAAA` y `LIFE OS 98_…xwAA`) que **ningún componente de LIFEOS usa**.
 
 ## Por qué, actualizado el 2026-09-20
 

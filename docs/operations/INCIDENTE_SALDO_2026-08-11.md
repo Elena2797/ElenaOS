@@ -1,4 +1,4 @@
-Estado: resuelto — Telegram operativo desde 2026-09-21; solo falta revocar la clave antigua (usuaria)
+Estado: resuelto — Telegram operativo y clave expuesta revocada (401 verificado el 2026-09-21)
 Última verificación: 2026-09-21
 Verificado en: Railway (4 servicios por ID), volúmenes OpenClaw, Vercel, procesos Windows, huellas de credenciales, `npm test` 616/616, PGlite 20/20
 Fuente de verdad de datos: `ai_budget_state` en Supabase (tras aplicar la migración) y la consola de Anthropic para el gasto real
@@ -266,6 +266,6 @@ echo $ANTHROPIC_API_KEY | runuser -u node -- openclaw models auth paste-api-key 
 
 **Copias con la clave vieja que siguen en el volumen:** `openclaw-agent.sqlite.pre-token-20260921` y `openclaw-agent.sqlite-wal.pre-token-20260921` (en `agents/main/agent/`), además de los `archived-*` y `*.clobbered.*` de agosto. Son la red de seguridad del arreglo. **En cuanto se revoque `97e63348…` en la consola quedan inertes**, y entonces se pueden borrar.
 
-**Estado de la rotación:** hecha. La clave nueva (`d7ff29a1…`) está **solo** en `isabel-api` y hoy ha servido turnos reales por el proxy. Falta únicamente el paso 5 de `ROTAR_ANTHROPIC_KEY.md`: **revocar `97e63348…`**, que solo puede hacer la usuaria.
+**Estado de la rotación:** hecha. La clave nueva (`d7ff29a1…`) está **solo** en `isabel-api` y hoy ha servido turnos reales por el proxy. Y `97e63348…` **ya está revocada**: Anthropic responde `401 invalid` (comprobado el 2026-09-21 con `GET /v1/models`, sin coste). La nueva caduca el 2026-10-20.
 
 **Desde las 12:26 UTC Anthropic es el repuesto, no el principal** (D47): los turnos van a DeepSeek V4 Flash vía OpenRouter, fuera de este presupuesto y con su propio freno (prepago más límite de la clave). El cron de sueño, que el proxy bloqueaba (`kind_not_allowed`), ahora va por OpenRouter. **Queda por verificar la ejecución del 2026-09-22 a las 08:00.**
