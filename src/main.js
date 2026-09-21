@@ -186,6 +186,7 @@ async function initApp() {
   loadSleepState(); // representa el check-in persistido por Telegram/MCP
   loadFinanceState(); // lectura Core fail-closed; no participa en prioridad durante O4
   loadReminders(); // los recordatorios que ella le pidió a Isabel por Telegram
+  loadHabits(); // las rachas de leer, escribir y gym que Isabel apunta por Telegram (D52)
 }
 
 // ────── Recordatorios — los que ella le pide a Isabel por Telegram ──────────
@@ -202,6 +203,48 @@ async function loadReminders() {
     S.reminders = null;
   }
   if (S.view === 'home') render();
+}
+
+// ────── Hábitos con racha (D52) — lo que Isabel apunta por Telegram ─────────
+// La racha la calcula isabel-api (la misma que ve Isabel en habits_status):
+// la vista no cuenta días. null = no se pudo leer: la fila no se pinta.
+async function loadHabits() {
+  try {
+    const res = await fetch(`${ISABEL_API}/v1/habits`, { headers: { 'x-api-key': ISABEL_KEY } });
+    if (!res.ok) throw new Error('habits ' + res.status);
+    const data = await res.json();
+    S.habits = data.ok ? data.habits : null;
+  } catch (e) {
+    console.error('habits', e);
+    S.habits = null;
+  }
+  if (S.view === 'area') render();
+}
+
+function habitsStreakRow() {
+  const list = (S.habits || []).filter(h => h.known !== false);
+  if (!list.length) return '';
+  const icon = { leer: '📖', escribir: '✍️', gym: '🏋️' };
+  const cell = (h) => {
+    const weeks = h.unit === 'semanas';
+    const unit = weeks ? (h.streak === 1 ? 'semana seguida' : 'semanas seguidas') : (h.streak === 1 ? 'día seguido' : 'días seguidos');
+    let note;
+    if (h.habit === 'gym') {
+      const w = h.this_week || {};
+      note = h.target_sessions ? `${w.strength ?? 0}/${h.target_sessions} esta semana` : `${w.days_trained ?? 0} días esta semana`;
+    } else if (h.done_today === true) note = 'hoy ✓';
+    else if (h.at_risk) note = 'se rompe hoy';
+    else if (h.done_today === false) note = 'hoy no';
+    else note = 'hoy sin apuntar';
+    const color = h.at_risk ? '#854F0B' : h.streak > 0 ? '#0F6E56' : 'var(--text)';
+    return `<div style="background:var(--surface);padding:12px 6px;text-align:center">
+        <div style="font-size:11px;color:var(--t2)">${icon[h.habit] || '•'} ${h.label}</div>
+        <div style="font-size:24px;font-weight:700;color:${color};margin-top:2px">${h.streak ?? '—'}</div>
+        <div style="font-size:10px;color:var(--t2)">${unit}</div>
+        <div style="font-size:9px;color:var(--t3);margin-top:2px">${note}</div>
+      </div>`;
+  };
+  return `<div style="display:grid;grid-template-columns:repeat(${list.length},1fr);gap:1px;background:var(--border);border-top:1px solid var(--border)">${list.map(cell).join('')}</div>`;
 }
 
 function remindersCard() {
@@ -1775,6 +1818,7 @@ function areaView() {
           </div>
         </div>
       </div>
+      ${habitsStreakRow()}
     </div>
     <div class="card" style="margin-bottom:10px">
       <div class="card-head"><span class="ch-icon">👥</span><span class="ch-label">Relaciones</span></div>
@@ -4665,6 +4709,7 @@ const surfaceRevalidator = createSurfaceRevalidator({
   refreshSleepState: loadSleepState,
   refreshFinanceState: () => loadFinanceState(S.finMonth),
   refreshReminders: loadReminders,
+  refreshHabits: loadHabits,
   refreshPriority: () => loadIsabelNow({ silent: true }),
   render,
 });

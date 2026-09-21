@@ -10,8 +10,10 @@ const MAIN_URL = new URL('../../main.js', import.meta.url);
 // el runtime. Actualizado el 2026-09-21: Dominios y VistaJet muestran las tareas
 // de `tasks` que apunta Isabel, y Home refleja la prioridad declarada, los
 // recordatorios y se recalcula al volver de Telegram (D50). Standby se enseña
-// como parte de la rotación (D53). Sin O5, sin fixtures.
-const MAIN_CHECKPOINT_SHA256 = 'D621FC7B54D2C8ABCE9A62BFC7AC707EFAB137D9E93FF70D0C890A0C6644373F';
+// como parte de la rotación (D53). La tarjeta Hábitos de Vida Personal enseña
+// las rachas de leer, escribir y gym que da GET /v1/habits (D52). Sin O5, sin
+// fixtures.
+const MAIN_CHECKPOINT_SHA256 = '25D44D275E72ECAFE6D4197196FF9FA13882DE54BE4F93EB387B99293199F472';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

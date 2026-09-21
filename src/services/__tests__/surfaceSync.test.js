@@ -37,12 +37,13 @@ describe('Telegram ↔ LIFEOS: revalidación de una app abierta', () => {
       refreshFinanceState: async () => { calls.push('finance'); },
       refreshReminders: async () => { calls.push('reminders'); },
       refreshPriority: async () => { calls.push('priority'); },
+      refreshHabits: async () => { calls.push('habits'); },
       render: () => { calls.push('render'); },
     });
     const result = await sync.revalidate({ reason: 'visible' });
     assert.equal(result.status, 'revalidated');
     assert.equal(calls[0], 'domain');
-    assert.deepEqual(new Set(calls.slice(1, 8)), new Set(['primary', 'pending', 'gym', 'sleep', 'finance', 'reminders', 'priority']));
+    assert.deepEqual(new Set(calls.slice(1, 9)), new Set(['primary', 'pending', 'gym', 'sleep', 'finance', 'reminders', 'priority', 'habits']));
     assert.equal(calls.at(-1), 'render');
     assert.equal(result.sources.priority, 'fulfilled');
 
@@ -56,6 +57,7 @@ describe('Telegram ↔ LIFEOS: revalidación de una app abierta', () => {
     const wiring = main.slice(main.indexOf('createSurfaceRevalidator({'));
     assert.match(wiring, /refreshPriority: \(\) => loadIsabelNow\(\{ silent: true \}\)/);
     assert.match(wiring, /refreshReminders: loadReminders/);
+    assert.match(wiring, /refreshHabits: loadHabits/);
   });
 
   test('coalesce eventos simultáneos y limita rebotes de visibilidad', async () => {

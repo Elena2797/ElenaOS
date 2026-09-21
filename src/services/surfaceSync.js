@@ -17,6 +17,7 @@ export function createSurfaceRevalidator({
   refreshSleepState = async () => {},
   refreshFinanceState = async () => {},
   refreshReminders = async () => {},
+  refreshHabits = async () => {},
   refreshPriority = async () => {},
   render = () => {},
   now = () => Date.now(),
@@ -42,6 +43,7 @@ export function createSurfaceRevalidator({
       refreshFinanceState(),
       refreshReminders(),
       refreshPriority(),
+      refreshHabits(),
     ]);
     render();
     return {
@@ -56,6 +58,7 @@ export function createSurfaceRevalidator({
         finance_state: primary[4].status,
         reminders: primary[5].status,
         priority: primary[6].status,
+        habits: primary[7].status,
       },
     };
   }
