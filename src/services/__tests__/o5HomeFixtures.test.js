@@ -21,8 +21,10 @@ const MAIN_URL = new URL('../../main.js', import.meta.url);
 // Salud sin medicación en el bundle, JETMI sin voz inventada. Sin O5. Y otra
 // (D58): JETMI enseña "Dónde está JETMI" (areas.ia_context). Sin O5. Y otra
 // (D59): Inicio = saludo, "Hoy" (ahora + siguiente + su día) y progreso con
-// rachas; sin lo que Isabel dijo/hizo/preguntó ni los dominios. Sin O5.
-const MAIN_CHECKPOINT_SHA256 = 'BD9BEDA628A06A6A6F0C8480694B1468871701868B28A541708912048644E757';
+// rachas; sin lo que Isabel dijo/hizo/preguntó ni los dominios. Sin O5. Y otra
+// (D60): VistaJet cuenta tareas reales y documentos; el día de rotación avanza
+// solo; sin contador de cannabis. Sin O5.
+const MAIN_CHECKPOINT_SHA256 = '16265EA07679CE070D62B18E45A577AFB19805832FAD3352198E4BD9AE83E906';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

@@ -769,7 +769,7 @@ async function reload() {
     if(c.data&&c.data[0]) S.mode=c.data[0].mode;
     S.areas=a.data||[]; S.tasks=t.data||[]; S.wf=w.data||[]; S.dec=d.data||[];
     S.metrics=m.data||[]; S.operators=op.data||[]; S.transactions=tr.data||[];
-    S.vjState=vjs.data&&vjs.data[0]||{}; S.vjTasks=vjt.data||[];
+    S.vjState=withRotationDay(vjs.data&&vjs.data[0]||{}); S.vjTasks=vjt.data||[];
     S.projects=pj.data||[]; S.eventos=ev.data||[]; S.alertas=al.data||[];
     // Rebuild budgets from metrics (key prefix 'budget_')
     S.budgets={};
@@ -988,6 +988,27 @@ function domainCard(a) {
 // todavía: ella está trabajando. La app lo llamaba "Fuera de rotación" porque
 // solo miraba status === 'rotacion' (con avión). Una sola línea de contexto
 // para todas las pantallas de VistaJet que no tienen avión que enseñar.
+// ── VistaJet: lo pendiente y el día de rotación reales (D60) ──
+// Las tarjetas leían solo `vj_tasks`, que está vacía: Isabel apunta en
+// `tasks` (D50). Por eso los eLearnings salían "Al día" con uno vencido.
+function vjOpenTasks() {
+  const vjArea = S.areas.find(a => a.name === 'VistaJet');
+  const fromTasks = vjArea ? S.tasks.filter(t => t.area_id === vjArea.id && t.status !== 'done' && t.status !== 'discarded') : [];
+  return [...(S.vjTasks || []).filter(t => t.status !== 'done'), ...fromTasks];
+}
+const VJ_DOCS_RE = /visa|visado|embajada|consulado|pasaporte|passport|\bcrc\b|criminal record|antecedentes|documentaci/i;
+
+// El día de rotación avanza solo desde rotation_start (el día 1), igual que
+// en isabel-api (vistajetRotation.js). Sin fecha de inicio, el número guardado.
+function withRotationDay(vj) {
+  if (!vj || !vj.rotation_start || !['rotacion', 'standby'].includes(vj.status)) return vj || {};
+  const start = Date.parse(String(vj.rotation_start).slice(0, 10) + 'T00:00:00Z');
+  const today = Date.parse(madridDate(0) + 'T00:00:00Z');
+  const day = Math.floor((today - start) / 864e5) + 1;
+  if (!Number.isFinite(day) || day < 1) return vj;
+  return { ...vj, rotation_day: vj.rotation_total ? Math.min(day, vj.rotation_total) : day };
+}
+
 function vjDutyLine(vj) {
   if (vj.status !== 'standby') return '';
   const day = vj.rotation_day ? `Día ${vj.rotation_day}${vj.rotation_total ? '/' + vj.rotation_total : ''} de rotación` : 'De rotación';
@@ -1498,7 +1519,7 @@ function areaView() {
       S._readiLoaded=true;
       (async()=>{
         try{
-          const sig=await readiSvc.collectSignals({hotoSvc,invSvc,llcSvc,vjTasks:S.vjTasks,vjState:vj});
+          const sig=await readiSvc.collectSignals({hotoSvc,invSvc,llcSvc,vjTasks:vjOpenTasks(),vjState:vj});
           S.vjSignals=sig;                 // crudas: ya correlacionadas por avión
           S.vjReadiness=readiSvc.assess(sig);
         }catch(e){ console.error('readiness',e); S.vjReadiness={error:e.message}; }
@@ -1507,7 +1528,7 @@ function areaView() {
     }
     const statusMap={rotacion:{label:'En rotación',bg:'#FAEEDA',color:'#854F0B'},libre:{label:'Libre',bg:'#E1F5EE',color:'#0F6E56'},standby:{label:'Standby',bg:'#EEEDFE',color:'#534AB7'}};
     const st=statusMap[status]||statusMap.libre;
-    const pendTasks=S.vjTasks.filter(t=>t.status!=='done');
+    const pendTasks=vjOpenTasks();
 
     const isAircraftTask=t=>/\bho\b|hoto|hand.?over|inventar|laundry|lavand|uplift|catering|amenities|defect|kettle|polish|leather|drawer/i.test(t.title);
     const isAdminTask=t=>/factura|elearning|e.?learning|visa|revis|correo|revista/i.test(t.title);
@@ -1573,6 +1594,9 @@ function areaView() {
     const inventTasks=pendTasks.filter(t=>/inventar|catering|amenities|uplift/i.test(t.title));
     const elearningTasks=pendTasks.filter(t=>/elearning|e.?learning/i.test(t.title));
     const facturaTasks=pendTasks.filter(t=>/factura/i.test(t.title));
+    // Visas y documentos (D60): tareas de VistaJet y recordatorios de visas,
+    // embajadas, pasaporte o CRC, además de la fecha del pasaporte.
+    const docItems=[...pendTasks.filter(t=>VJ_DOCS_RE.test(t.title||'')).map(t=>t.title),...(S.reminders||[]).filter(r=>VJ_DOCS_RE.test(r.text||'')).map(r=>r.text)];
     const passportDays=vj.passport_exp?Math.ceil((new Date(vj.passport_exp)-now)/864e5):null;
     const bagTemplates=JSON.parse(localStorage.getItem('vj_bag_templates')||'null')||[{id:'standard',name:'Rotación estándar',items:['Uniforme completo','Zapatos negros','Medias/calcetines','Documentos de identidad','Pasaporte','Licencia','Manuals tablet','Cargadores','Neceser','Medicación','Ropa casual (3 días)','Pijama']},{id:'long',name:'Rotación larga (+7 días)',items:['Todo de estándar','Ropa extra (4 días)','Vitaminas','Snacks','Auriculares','Libro/tablet personal']},{id:'visa',name:'Destino con visa',items:['Pasaporte vigente','Visa/permiso entrada','Seguro viaje','Formularios entrada','Fotos carnet']}];
     const activeBag=vj.active_bag||null;
@@ -1645,10 +1669,11 @@ function areaView() {
     const factSB=facturaTasks.length>0?'#FAEEDA':'#E1F5EE';
     const factSummary=facturaTasks.length>0?facturaTasks[0].title.slice(0,38):'Sin facturas pendientes';
 
-    const visaSL=passportDays===null?'Sin datos':passportDays<=30?'Urgente':passportDays<=90?'Revisar':'En orden';
-    const visaSC=passportDays===null?'#9CA3AF':passportDays<=30?'#A32D2D':passportDays<=90?'#854F0B':'#0F6E56';
-    const visaSB=passportDays===null?'#F5F5F5':passportDays<=30?'#FCEBEB':passportDays<=90?'#FAEEDA':'#E1F5EE';
-    const visaSummary=passportDays===null?'Fecha no registrada':'Pasaporte: '+passportDays+' días';
+    const passportUrgent=passportDays!==null&&passportDays<=30;
+    const visaSL=passportUrgent?'Urgente':docItems.length?docItems.length+' pendiente'+(docItems.length>1?'s':''):passportDays===null?'Sin datos':passportDays<=90?'Revisar':'En orden';
+    const visaSC=passportUrgent?'#A32D2D':docItems.length?'#854F0B':passportDays===null?'#9CA3AF':passportDays<=90?'#854F0B':'#0F6E56';
+    const visaSB=passportUrgent?'#FCEBEB':docItems.length?'#FAEEDA':passportDays===null?'#F5F5F5':passportDays<=90?'#FAEEDA':'#E1F5EE';
+    const visaSummary=docItems.length?docItems[0].slice(0,38):passportDays===null?'Fecha de pasaporte no registrada':'Pasaporte: '+passportDays+' días';
 
     const maletaSL=!activeTpl?'Sin plantilla':bagDone===bagTotal?'Lista':bagDone===0?'Por preparar':bagDone+'/'+bagTotal;
     const maletaSC=!activeTpl?'#9CA3AF':bagDone===bagTotal?'#0F6E56':bagDone===0?'#854F0B':'#185FA5';
@@ -2005,23 +2030,13 @@ function areaView() {
   // rachas se marcan con un toque. Las listas fijas de relaciones y planes se
   // quitaron: no cambiaban nunca y VISION dice que esto no es un CRM.
   const vidaView=isVida?()=>{
-    const m=S.metrics.filter(x=>x.area_id===a.id);
-    const get=k=>m.find(x=>x.key===k);
-    const cannabisStart=get('cannabis_start_date');
-    const diasSinCannabis=cannabisStart?Math.floor((Date.now()-new Date(cannabisStart.value))/(864e5)):0;
-    const cannabisColor=diasSinCannabis>30?'#0F6E56':diasSinCannabis>7?'#854F0B':'#A32D2D';
+    // Sin contador de cannabis desde D60: ella prefirió quitarlo de la app.
     const sleepEntries=(S.sleep?.entries||[]).filter(entry=>formatSleepMinutes(entry.minutes)!==null);
     const latestSleep=sleepEntries[0]||null;
     return `
     <div class="card" style="margin-bottom:10px">
       <div class="card-head"><span class="ch-icon">🌱</span><span class="ch-label">Hábitos</span></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)">
-        <div style="background:var(--surface);padding:14px 12px;text-align:center">
-          <div style="font-size:28px;font-weight:700;color:${cannabisColor}">${diasSinCannabis}</div>
-          <div style="font-size:10px;color:var(--t2);margin-top:2px">días sin cannabis</div>
-          ${cannabisStart?`<div style="font-size:9px;color:var(--t3);margin-top:2px">desde ${new Date(cannabisStart.value).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</div>`:''}
-          <button onclick="resetCannabis()" style="margin-top:6px;padding:4px 10px;border-radius:6px;background:var(--bg);border:1px solid var(--border);font-size:11px;cursor:pointer">Reiniciar</button>
-        </div>
+      <div style="display:grid;grid-template-columns:1fr;gap:1px;background:var(--border)">
         <div style="background:var(--surface);padding:14px 12px;text-align:center">
           <div style="font-size:28px;font-weight:700">${latestSleep?formatSleepMinutes(latestSleep.minutes):'—'}</div>
           <div style="font-size:10px;color:var(--t2);margin-top:2px">sueño</div>
@@ -3909,7 +3924,7 @@ async function refreshVjContext(){
         S._invLoaded=false; S.invSession=null; S.invItems=[]; S.invChat=[];
         S._readiLoaded=false; S.vjReadiness=null; S.vjSignals=null;
       }
-      S.vjState=fresh;
+      S.vjState=withRotationDay(fresh);
     }
   }catch(e){ console.error('vj state refresh',e); }
   finally{ _vjRefreshInFlight=false; render(); }
@@ -4084,12 +4099,18 @@ function openVjState() {
 
 function saveVjStateForm() {
   const toNull=v=>v===''?null:v;
+  // Si escribe el día y no cambia la fecha de inicio, el día 1 se recalcula
+  // para que a partir de ahí avance solo (D60).
+  const dayIn=parseInt(document.getElementById('vj-rday').value,10);
+  const startIn=toNull(document.getElementById('vj-rstart').value);
+  const startUnchanged=!startIn||startIn===String(S.vjState.rotation_start||'').slice(0,10);
+  const rotationStart=Number.isInteger(dayIn)&&dayIn>=1&&startUnchanged?madridDate(-(dayIn-1)):startIn;
   saveVjState({
     status:document.getElementById('vj-status').value,
     aircraft:document.getElementById('vj-aircraft').value.trim()||null,
     rotation_day:toNull(document.getElementById('vj-rday').value)||null,
     rotation_total:toNull(document.getElementById('vj-rtotal').value)||null,
-    rotation_start:toNull(document.getElementById('vj-rstart').value),
+    rotation_start:rotationStart,
     hours_month:toNull(document.getElementById('vj-hmonth').value)||0,
     hours_year:toNull(document.getElementById('vj-hyear').value)||0,
     passport_exp:toNull(document.getElementById('vj-passport').value),

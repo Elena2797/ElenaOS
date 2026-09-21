@@ -95,3 +95,17 @@ test('standby se enseña como parte de la rotación, no como "Fuera de rotación
   assert.match(source, /const acSL=status==='standby'\?'Standby':/);
   assert.match(source, /const ctrlLabel=status==='standby'\?/);
 });
+
+// D60: las tarjetas de VistaJet (eLearnings, Visas y documentos, tareas del
+// avión) leían solo `vj_tasks`, vacía; los eLearnings salían "Al día" con uno
+// vencido. Y el día de rotación no avanzaba.
+test('VistaJet cuenta las tareas reales y los documentos, y el día de rotación avanza', () => {
+  assert.match(functionBody('vjOpenTasks'), /S\.tasks\.filter/);
+  assert.match(source, /const pendTasks=vjOpenTasks\(\);/);
+  assert.match(source, /collectSignals\(\{hotoSvc,invSvc,llcSvc,vjTasks:vjOpenTasks\(\)/);
+  assert.match(source, /const docItems=\[\.\.\.pendTasks\.filter\(t=>VJ_DOCS_RE\.test/);
+  assert.match(source, /S\.reminders\|\|\[\]\)\.filter\(r=>VJ_DOCS_RE\.test/);
+  assert.match(functionBody('withRotationDay'), /rotation_start/);
+  assert.match(source, /S\.vjState=withRotationDay\(/);
+  assert.doesNotMatch(source, /días sin cannabis/);
+});
