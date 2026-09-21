@@ -533,3 +533,14 @@ Entregar por `chat.send` habría hecho que **cada notificación costara un turno
 - **Se mantiene** el chat de la pantalla de Inventario (`/v1/message`). No es Isabel conversando, sino el parser determinista del especialista de inventario, sin acceso a correo ni agenda.
 **Revoca:** la "superficie de chat en LIFEOS" de `MASTER_PLAN.md` §3 y la parte de D26/D27 que la sostenía (el adaptador del Gateway sigue existiendo).
 **Estado:** vigente. `life-os-app` `2d4e048` (43/43, build OK; el botón abre el bot, comprobado en una vista local sin PIN), `isabel-api` `96b0b67` (774/775; la que falla es la prueba que lee `../life-os-app` y solo falla fuera de la carpeta del repo). **Verificado en producción** a las 20:55Z: `POST /v1/chat` con la llave pública da 404; `/health`, `/v1/now`, `/v1/reminders` y `/v1/habits` responden 200; el bundle de Vercel trae el enlace de Telegram y ya no trae `/v1/chat`.
+
+### D56 — La app enseña lo que Isabel hizo sin el registro de coste, y se actualiza sola
+**Fecha:** 2026-09-21
+**Contexto:** `eventos` es a la vez el rastro de lo que Isabel hace y el registro de coste que ella pidió para saber cuánto cuesta Isabel (una fila por llamada a modelo, `ai:*`, y otra por cada revisión de 15 minutos, `proactive:*`). En 7 días había 449 filas: 414 de coste o revisión y 35 acciones reales. La app leía las 50 últimas, que cubrían 2 horas, y el saludo decía "avancé en 50 puntos". Además, ella no veía los cambios de D55: la PWA instalada solo buscaba versión nueva al abrirse desde cero.
+**Decisión:**
+- **El registro de coste no se toca**: lo leen el control de gasto (`aiUsage.js`, `proactiveBudget.js`) y el informe de coste. Ella lo quiere conservar. La app lo excluye al leer (`services/db.js`: `herramienta` nula o que no empiece por `ai:` ni `proactive:`).
+- **"Desde tu última visita"** se fija una vez al arrancar (`S.prevOpenAt`), y el saludo y la tarjeta de JETMI cuentan solo lo hecho después.
+- **La PWA busca versión nueva al volver de segundo plano** y se recarga una vez si la hay (`services/appUpdate.js`; la primera instalación no recarga). El PIN no se vuelve a pedir: vive en `sessionStorage`.
+- Quitado el "+" fijo de `index.html`, que duplicaba el de `renderFab()` y seguía saliendo en HOTO e inventario.
+**Estado:** vigente. `life-os-app` `6783ec9` (47/47, build OK). Verificado en producción: el bundle publicado trae el filtro y la página ya no trae el "+" fijo. Con sus datos, la consulta nueva devuelve 44 acciones reales entre el 5 de agosto y el 21 de septiembre.
+**Para que lo vea la primera vez:** la versión que ella tiene instalada todavía no trae la actualización automática, así que tiene que cerrar la app del todo (quitarla del multitarea) y volver a abrirla, a veces dos veces. A partir de ahí se actualiza sola.
