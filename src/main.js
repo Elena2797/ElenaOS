@@ -315,6 +315,16 @@ async function loadAppBrand() {
 
 function toggleBrandStrategy() { S.brandStrategyOpen = !S.brandStrategyOpen; render(); }
 function toggleJetmiContext() { S.jetmiContextOpen = !S.jetmiContextOpen; render(); }
+function toggleMarcaPropia() { S.marcaPropiaOpen = !S.marcaPropiaOpen; render(); }
+
+// Su libro (D61): índice y progreso, con el token de app.
+async function loadAppBook() {
+  S._bookLoading = true;
+  const r = await appClient().get('/v1/app/book');
+  S.appBook = r.ok ? r : { ok: false, error: r.error };
+  S._bookLoading = false;
+  render();
+}
 
 // Salud: su protocolo y sus condiciones ya no van dentro del JS público de la
 // app; vienen del servidor con el token de app.
@@ -849,7 +859,7 @@ function renderFab() {
 }
 
 function visibleDomains() {
-  return S.areas.filter(a=>['VistaJet','JETMI','Finanzas','Salud','Gym','Marca Personal','Vida Personal'].includes(a.name));
+  return S.areas.filter(a=>['VistaJet','JETMI','Finanzas','Salud','Gym','Marca Personal','Marca Propia','Libro','Vida Personal'].includes(a.name));
 }
 
 // D24 retiró de la UI las etiquetas de PRD y de "especialista" por ser
@@ -867,6 +877,8 @@ function domainBlueprint(name) {
     'Gym':{icon:'🏋️',purpose:'Sesiones, pesos de referencia y restricciones de entrenamiento.',tone:'#3B6D11'},
     'Marca Personal':{icon:'📣',purpose:'Presencia pública sostenible según energía y modo.',tone:'#993556'},
     'Vida Personal':{icon:'🌱',purpose:'Viajes, hábitos y asuntos personales que no deben quedarse flotando.',tone:'#993C1D'},
+    'Marca Propia':{icon:'🧪',purpose:'Tu proyecto de producto: de la idea a la primera venta.',tone:'#085041'},
+    'Libro':{icon:'📖',purpose:'Tu libro: escribirlo sección a sección, con Isabel.',tone:'#3C3489'},
   };
   return data[name]||{icon:'•',purpose:'Dominio activo de LIFEOS.',tone:'#6b6b6b'};
 }
@@ -1020,6 +1032,13 @@ function domainSignal(area) {
   const health = areaHealth(area.id);
   const areaProjects = S.projects.filter(p => p.area_id === area.id && p.status === 'active');
   const projectIds = areaProjects.map(p => p.id);
+
+  // Libro (D61): el progreso solo si ya se cargó con el token de app.
+  if (name === 'Libro') {
+    const B = S.appBook;
+    if (B && B.ok) return B.next ? `${B.written}/${B.total} secciones · sigue: ${clip(B.next.title, 28)}` : `${B.written}/${B.total} secciones`;
+    return 'Tu libro';
+  }
 
   if (name === 'VistaJet') {
     if (S.vjState.status === 'rotacion') {
@@ -1507,6 +1526,8 @@ function areaView() {
   const isGym=a.name==='Gym';
   const isMarca=a.name==='Marca Personal';
   const isVida=a.name==='Vida Personal';
+  const isLibro=a.name==='Libro';
+  const isMarcaPropia=a.name==='Marca Propia';
   const domainIntroHtml=domainDashboardIntro(a,{heroOnly:isVJ||isJETMI});
 
   const vjView=isVJ?()=>{
@@ -2023,6 +2044,63 @@ function areaView() {
         ${met.length?`<div style="padding:10px 0 4px;border-top:0.5px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:8px">${met.slice(0,4).map(x=>`<div style="background:var(--bg);border-radius:8px;padding:8px 10px"><div style="font-size:15px;font-weight:700">${x.value}<span style="font-size:10px;color:var(--t2);font-weight:400"> ${x.unit||''}</span></div><div style="font-size:10px;color:var(--t3);margin-top:1px">${x.label||x.key}</div></div>`).join('')}</div>`:''}
       </div>
     </details>`;
+  }:'';
+
+  // Libro (D61): su libro. El índice y el progreso vienen del
+  // servidor con el token de app (el libro es íntimo: nada de esto va en las
+  // tablas públicas ni en el JS). Se escribe con Isabel en Telegram.
+  const libroView=isLibro?()=>{
+    const linked=appClient().isLinked();
+    if(linked&&!S.appBook&&!S._bookLoading) loadAppBook();
+    const B=S.appBook;
+    if(!linked) return `<div class="card" style="margin-bottom:10px"><div style="padding:14px;font-size:13px;color:var(--t2);line-height:1.5">Conecta este móvil para ver tu libro: es privado.
+      <div><button onclick="openLink()" style="margin-top:10px;background:var(--text);color:#fff;border:none;border-radius:999px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer">Conectar con un código de Telegram</button></div></div></div>`;
+    if(!B) return `<div class="card" style="margin-bottom:10px"><div style="padding:14px;font-size:13px;color:var(--t3)">Abriendo tu libro…</div></div>`;
+    if(!B.ok) return `<div class="card" style="margin-bottom:10px"><div style="padding:14px;font-size:13px;color:var(--t2)">No pude cargar tu libro ahora mismo.</div></div>`;
+    const pct=B.total?Math.round((B.written/B.total)*100):0;
+    const icon={written:'✓',draft:'◐',pending:'○'};
+    const color={written:'#0F6E56',draft:'#854F0B',pending:'var(--t3)'};
+    const nextHtml=B.next?`<div style="padding:14px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--t3);margin-bottom:4px">${B.next.status==='draft'?'Tienes un borrador en':'Lo siguiente que toca'}</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);line-height:1.35">${escHtml(B.next.title)}</div>
+        <button onclick="openIsabel()" style="width:100%;margin-top:12px;height:44px;border:none;border-radius:12px;background:#3C3489;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Escribir con Isabel →</button>
+        <div style="font-size:11px;color:var(--t3);margin-top:6px;text-align:center">Dile "quiero escribir" y te ayuda con esta sección.</div>
+      </div>`:`<div style="padding:14px;border-top:1px solid var(--border);font-size:14px;font-weight:600;color:#0F6E56">✓ Todas las secciones escritas</div>`;
+    return `
+    <div class="card" style="margin-bottom:10px">
+      <div style="padding:16px 14px 12px">
+        <div style="font-size:18px;font-weight:700;color:var(--text)">${escHtml(B.title)}</div>
+        <div style="font-size:12px;color:var(--t3);margin-top:2px">${escHtml(B.subtitle||'')}</div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--t2);margin:14px 0 6px">
+          <span>${B.written} de ${B.total} secciones${B.draft?` · ${B.draft} en borrador`:''}</span><span style="font-weight:600;color:var(--text)">${(B.words||0).toLocaleString('es-ES')} palabras</span>
+        </div>
+        <div style="height:8px;background:var(--bg);border-radius:99px;overflow:hidden"><div style="width:${pct}%;height:100%;background:#3C3489;border-radius:99px"></div></div>
+      </div>
+      ${nextHtml}
+    </div>
+    ${B.parts.map(p=>{
+      const done=p.sections.filter(s=>s.status==='written').length;
+      return `<div class="card" style="margin-bottom:10px">
+        <div class="card-head"><span class="ch-label">${escHtml(p.title)}${p.subtitle?' — '+escHtml(p.subtitle):''}</span><span style="margin-left:auto;font-size:11px;color:var(--t3)">${done}/${p.sections.length}</span></div>
+        ${p.sections.map(s=>`<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 14px;border-top:1px solid var(--border);font-size:13px;line-height:1.4">
+          <span style="color:${color[s.status]};font-weight:700;width:12px;flex-shrink:0">${icon[s.status]||'○'}</span>
+          <span style="flex:1;color:${s.status==='pending'?'var(--t2)':'var(--text)'}">${escHtml(s.title)}</span>
+        </div>`).join('')}
+      </div>`;
+    }).join('')}`;
+  }:'';
+
+  // Marca Propia (D61): su proyecto de producto. La idea, la estrategia, los
+  // proveedores y lo siguiente viven en areas.ia_context (cargado de su
+  // proyecto MARCA de ChatGPT); las tareas salen debajo, como en todo dominio.
+  const marcaPropiaView=isMarcaPropia?()=>{
+    const ctx=String(a.ia_context||'').trim();
+    if(!ctx) return '';
+    return `<div class="card" style="margin-bottom:10px">
+      <div class="card-head"><span class="ch-icon">🧭</span><span class="ch-label">El proyecto</span></div>
+      <div onclick="toggleMarcaPropia()" style="padding:12px 14px;font-size:13px;color:var(--text);line-height:1.55;white-space:pre-wrap;cursor:pointer;${S.marcaPropiaOpen?'':'display:-webkit-box;-webkit-line-clamp:9;-webkit-box-orient:vertical;overflow:hidden;'}">${mdLite(ctx)}</div>
+      <div style="padding:0 14px 12px;font-size:11px;color:var(--t3)">${S.marcaPropiaOpen?'Toca para cerrar':'Toca para leerlo entero'}</div>
+    </div>`;
   }:'';
 
   // Vida Personal (D57): solo lo que está vivo. El sueño es el que ella le
@@ -2545,6 +2623,8 @@ function areaView() {
   ${isGym?gymView():''}
   ${isMarca?marcaView():''}
   ${isVida?vidaView():''}
+  ${isLibro?libroView():''}
+  ${isMarcaPropia?marcaPropiaView():''}
   ${areaProjects.length?`<div class="card" style="margin-bottom:10px">
     <div class="card-head"><span class="ch-icon">📁</span><span class="ch-label">Proyectos</span><span class="ch-count">${areaProjects.length}</span>
       <button onclick="openProjectAdd()" style="border:none;background:var(--text);color:#fff;border-radius:999px;padding:4px 11px;font-size:11px;font-weight:600;cursor:pointer;margin-left:6px">+ Nuevo</button>
@@ -4787,7 +4867,7 @@ Object.assign(window, {
   showPin, pinPress,
   go, toggleMode, openAdd, openIsabel,
   openLink, linkStart, linkVerify, toggleIsabelMsg, logHabitToday,
-  focusDone, focusTomorrow, focusDiscard, focusNext, toggleBrandStrategy, toggleJetmiContext,
+  focusDone, focusTomorrow, focusDiscard, focusNext, toggleBrandStrategy, toggleJetmiContext, toggleMarcaPropia,
   retryLoad, gymLogSession,
   done, closeModal,
   checkinSueno, checkinDolor, checkinVJ, completeCheckin,

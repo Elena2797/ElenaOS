@@ -109,3 +109,13 @@ test('VistaJet cuenta las tareas reales y los documentos, y el día de rotación
   assert.match(source, /S\.vjState=withRotationDay\(/);
   assert.doesNotMatch(source, /días sin cannabis/);
 });
+
+// D61: dos dominios nuevos. El libro es íntimo: su índice viene del servidor
+// con el token de app, nunca de las tablas públicas ni del JS.
+test('Libro y Marca Propia son dominios; el libro se pide con token de app', () => {
+  assert.match(functionBody('visibleDomains'), /'Marca Propia','Libro'/);
+  assert.match(functionBody('loadAppBook'), /\/v1\/app\/book/);
+  assert.match(source, /const libroView=isLibro\?/);
+  assert.match(source, /const marcaPropiaView=isMarcaPropia\?/);
+  assert.doesNotMatch(source, /Chaclacayo|cistitis intersticial|Vejigas Felices"|'Vejigas Felices/);
+});
