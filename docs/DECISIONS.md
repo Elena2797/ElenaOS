@@ -433,3 +433,18 @@ Entregar por `chat.send` habría hecho que **cada notificación costara un turno
 **El freno de gasto de esta ruta no es el ledger:** es el **prepago** de OpenRouter (10 $ cargados, sin recarga automática) más el límite propio de la clave. Ambos cortan antes de cobrar. Es un freno más grueso que el del proxy (no hay tope por llamada ni bloqueo de heartbeat por contenido), y el heartbeat sigue apagado por configuración.
 **Evidencia:** smoke de 9 casos × 8 modelos, 0,21 $ (`run-openrouter.mjs`, `isabel-api` `92ff51a`). Primer mensaje real de Telegram: 3 llamadas, **0,0038 $** (~30× menos que con Sonnet).
 **Estado:** vigente desde 2026-09-21 12:26 UTC. Pendiente: meter el gasto de OpenRouter en `budget-status` y decidir el nivel de thinking (hoy `high`).
+
+### D48 — Isabel cierra sesiones de inventario desde el chat, con propuesta y confirmación (revoca parte de D39)
+**Fecha:** 2026-09-21
+**Contexto:** Estefanía le dijo a Isabel que no tenía ningún avión abierto, y LIFEOS le seguía mostrando dos: sesiones de inventario de 9H-VCQ del 5 y 7 de julio que nunca se cerraron. La pregunta de Home (`stale_open_context`, pendiente desde el 10 de agosto) decía "¿los cierro o los dejas así?", pero D39 impedía que Isabel cerrara nada: un "sí" solo marcaba la pregunta y la mandaba a la app. Ella pidió: "quiero que lo haga Isabel al entender el chat".
+**Decisión:** tres tools (`vistajet_open_inventory_sessions`, `vistajet_propose_close_inventory_sessions`, `vistajet_confirm_close_inventory_sessions`). La propuesta no toca nada y devuelve un `proposal_id` de un solo uso que caduca a los 30 minutos. La confirmación cierra solo lo que siga abierto, igual que el botón de la app (`status: 'closed'` + `closed_at`, sin borrar ítems), deja un evento y recalcula en el acto la pregunta de Home. Sin ids, solo se proponen las sesiones antiguas, nunca la del avión actual.
+**Lo que se mantiene de D39:** responder a la pregunta no ejecuta nada. Cerrar es siempre propuesta → confirmación.
+**Estado:** vigente, `isabel-api` `4ba3d82`. Primer uso real el mismo día: las dos sesiones de julio cerradas a las 13:19 UTC y la pregunta de Home, `superseded`.
+
+### D49 — Isabel empuja: tres mensajes diarios en modo "sin piedad"
+**Fecha:** 2026-09-21
+**Contexto:** Estefanía siente a Isabel pasiva, y tiene razón: solo escribía por su cuenta a las 08:00 (sueño) o ante una urgencia real (tarea vencida o que vence hoy), y como ninguna de sus tareas tiene fecha, casi nunca. Sus palabras: "tengo TDAH, ella tiene que ser el cerebro que me haga no procrastinar". Tono pedido: "sin piedad".
+**Decisión:** tres cron `agentTurn` en el Gateway con entrega `announce` a su Telegram, con el mismo esquema que el job de sueño: `coach-manana-0830` (qué toca hoy y compromiso de por dónde empieza), `coach-tarde-1700` (lo importante que siga sin hacer y qué la frena) y `coach-cierre-2130` (qué hizo, hábitos de leer/escribir/gym y lo primero de mañana). Se crean con `isabel-gateway/ensure-coach-crons.mjs`, que es idempotente. **Sin piedad con la procrastinación, nunca con ella:** sin insultos ni culpa, y bajando el tono si ha dicho que está mal. Ese mismo día contó que se había deprimido por sentirse dispersa.
+**Coste:** ~0,005 $ por mensaje con DeepSeek (D47), ~0,45 $/mes los tres.
+**Pendiente, por orden:** recordatorios a una hora concreta ("recuérdame X a las 18:00"), Google Calendar (es el que usa) y seguimiento de hábitos con racha. Hoy los hábitos solo se preguntan en el cierre del día; no se guardan, salvo el gym.
+**Estado:** vigente desde 2026-09-21. Primer disparo previsto: 17:00 Europe/Madrid del mismo día.

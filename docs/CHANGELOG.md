@@ -7,6 +7,13 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-09-21, tarde (Isabel apunta tareas, cierra inventarios y empuja — D48, D49)
+
+- **Tareas desde Telegram:** tools `tasks_list`, `tasks_create` y `tasks_complete` (`isabel-api` `4b3f7d1`). Escriben en `tasks` con los mismos valores que el formulario de la app y `source: 'isabel'`. Hasta hoy Isabel no tenía ninguna tool de tareas: lo que le contaba se quedaba en la memoria de la conversación, que LIFEOS no ve.
+- **Inventarios abiertos (D48):** Isabel ve y cierra, con propuesta y confirmación, las sesiones de inventario que LIFEOS muestra abiertas. Primer uso: las dos de 9H-VCQ de julio.
+- **Isabel empuja (D49):** tres mensajes diarios en modo sin piedad (08:30, 17:00, 21:30).
+- Calendario: **no hay ninguno conectado**. Ella usa Google Calendar; queda pendiente, junto con los recordatorios a una hora concreta.
+
 ## 2026-09-21 (Telegram reparado y primer cerebro fuera de Anthropic — D46, D47)
 
 - **Telegram llevaba roto desde el cambio al proxy**, con "Consumidor no reconocido". Causa demostrada con un diagnóstico de huellas en el 401: OpenClaw presentaba la **clave antigua de Anthropic** (`97e63348…`), guardada en su almacén de perfiles (`agents/main/agent/openclaw-agent.sqlite`, perfil `anthropic:default`), que **manda sobre `openclaw.json` y sobre `ANTHROPIC_API_KEY`**. Arreglado con `openclaw models auth paste-api-key` desde el propio entorno. La afirmación del 2026-09-20 de que "la clave real vive en un solo servicio" era falsa hasta ese momento.
