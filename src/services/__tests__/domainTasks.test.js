@@ -64,3 +64,13 @@ test('Home enseña los recordatorios pedidos por Telegram', () => {
   assert.match(functionBody('homeView'), /remindersCard\(\)/);
   assert.match(functionBody('loadReminders'), /\/v1\/reminders/);
 });
+
+// D53: standby es estar de rotación sin volar, a menudo sin avión. La app lo
+// llamaba "Fuera de rotación" porque solo miraba status === 'rotacion'.
+test('standby se enseña como parte de la rotación, no como "Fuera de rotación"', () => {
+  const vj = functionBody('domainSignal');
+  assert.match(vj.slice(vj.indexOf("if (name === 'VistaJet')")), /status === 'standby'[\s\S]*Standby · Día \$\{day\} de rotación/);
+  assert.match(functionBody('vjDutyLine'), /sin avión asignado/);
+  assert.match(source, /const acSL=status==='standby'\?'Standby':/);
+  assert.match(source, /const ctrlLabel=status==='standby'\?/);
+});

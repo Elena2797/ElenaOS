@@ -9,8 +9,9 @@ const MAIN_URL = new URL('../../main.js', import.meta.url);
 // deterministas de sueño y Finanzas. O5 sigue sin poder modificar ni importar
 // el runtime. Actualizado el 2026-09-21: Dominios y VistaJet muestran las tareas
 // de `tasks` que apunta Isabel, y Home refleja la prioridad declarada, los
-// recordatorios y se recalcula al volver de Telegram (D50). Sin O5, sin fixtures.
-const MAIN_CHECKPOINT_SHA256 = '4E25CE780CCFCAF72D3C2E085F8A5AF77F0992CC290A4C84084467B9A985D429';
+// recordatorios y se recalcula al volver de Telegram (D50). Standby se enseña
+// como parte de la rotación (D53). Sin O5, sin fixtures.
+const MAIN_CHECKPOINT_SHA256 = 'D621FC7B54D2C8ABCE9A62BFC7AC707EFAB137D9E93FF70D0C890A0C6644373F';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

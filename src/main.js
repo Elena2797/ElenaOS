@@ -619,6 +619,16 @@ function domainCard(a) {
   </button>`;
 }
 
+// Standby es estar de rotación sin volar, muchas veces sin avión asignado
+// todavía: ella está trabajando. La app lo llamaba "Fuera de rotación" porque
+// solo miraba status === 'rotacion' (con avión). Una sola línea de contexto
+// para todas las pantallas de VistaJet que no tienen avión que enseñar.
+function vjDutyLine(vj) {
+  if (vj.status !== 'standby') return '';
+  const day = vj.rotation_day ? `Día ${vj.rotation_day}${vj.rotation_total ? '/' + vj.rotation_total : ''} de rotación` : 'De rotación';
+  return vj.aircraft ? `Standby · ${day}` : `Standby · ${day} · sin avión asignado`;
+}
+
 function domainSignal(area) {
   const name = area.name;
   const health = areaHealth(area.id);
@@ -629,6 +639,10 @@ function domainSignal(area) {
     if (S.vjState.status === 'rotacion') {
       const day = S.vjState.rotation_day;
       return day ? `Rotación activa · Día ${day}` : 'Rotación activa';
+    }
+    if (S.vjState.status === 'standby') {
+      const day = S.vjState.rotation_day;
+      return day ? `Standby · Día ${day} de rotación` : 'Standby';
     }
     const next = nextDomainTask(area);
     if (next) return clip(next.title, 45);
@@ -1321,7 +1335,7 @@ function areaView() {
     const hotoSL=hotoCompleted===hotoTotal?'Completado':status!=='rotacion'?'Preparado':hotoCompleted===0?'Pendiente':'En progreso';
     const hotoSC=hotoCompleted===hotoTotal?'#0F6E56':status!=='rotacion'?'#9CA3AF':hotoCompleted===0?'#854F0B':'#185FA5';
     const hotoSB=hotoCompleted===hotoTotal?'#E1F5EE':status!=='rotacion'?'#F5F5F5':hotoCompleted===0?'#FAEEDA':'#EEF4FD';
-    const hotoSummary=status!=='rotacion'&&hotoCompleted===0?'Disponible durante rotación':hotoCompleted===0?(hotoTasks.length>0?hotoTasks.length+' tarea'+(hotoTasks.length>1?'s':'')+' pendiente'+(hotoTasks.length>1?'s':''):'Checklist no iniciado'):hotoCompleted+'/'+hotoTotal+' completado'+(hotoCompleted>1?'s':'');
+    const hotoSummary=status!=='rotacion'&&hotoCompleted===0?(status==='standby'?'Cuando te asignen avión':'Disponible durante rotación'):hotoCompleted===0?(hotoTasks.length>0?hotoTasks.length+' tarea'+(hotoTasks.length>1?'s':'')+' pendiente'+(hotoTasks.length>1?'s':''):'Checklist no iniciado'):hotoCompleted+'/'+hotoTotal+' completado'+(hotoCompleted>1?'s':'');
 
     // La tarjeta de Inventario derivaba su estado SOLO de títulos de `vj_tasks`
     // que contuvieran "inventar" — nunca de la sesión real del avión actual.
@@ -1346,7 +1360,7 @@ function areaView() {
     const llcSL=!S.llcRec?(status==='rotacion'?'Hoy pendiente':'No activo'):(llcFilledCount>0?llcFilledCount+'/'+llcTotal:'En blanco');
     const llcSC=!S.llcRec&&status==='rotacion'?'#854F0B':!S.llcRec?'#9CA3AF':'#185FA5';
     const llcSB=!S.llcRec&&status==='rotacion'?'#FAEEDA':!S.llcRec?'#F5F5F5':'#EEF4FD';
-    const llcSummary=S.llcRec&&llcFilledCount>0?'Registrado: '+llcFilledCount+' de '+llcTotal+' ítems':status==='rotacion'?'Se completa durante la rotación':'Disponible en rotación';
+    const llcSummary=S.llcRec&&llcFilledCount>0?'Registrado: '+llcFilledCount+' de '+llcTotal+' ítems':status==='rotacion'?'Se completa durante la rotación':status==='standby'?'Cuando te asignen avión':'Disponible en rotación';
 
     const freshSL=status==='rotacion'?'Recomendado':'No activo';
     const freshSC=status==='rotacion'?'#185FA5':'#9CA3AF';
@@ -1380,7 +1394,8 @@ function areaView() {
         <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3)">Isabel · copiloto de entrega</div>
         <button onclick="openVjState()" style="border:none;background:var(--bg);border-radius:8px;padding:4px 10px;font-size:11px;font-weight:500;cursor:pointer;color:var(--t2)">${st.label}</button>
       </div>
-      ${vj.aircraft?`<div style="font-size:11px;color:var(--t3);margin-bottom:8px">${vj.aircraft}${status==='rotacion'&&vj.rotation_day&&vj.rotation_total?' · Día '+vj.rotation_day+'/'+vj.rotation_total:''}</div>`:''}`;
+      ${vj.aircraft?`<div style="font-size:11px;color:var(--t3);margin-bottom:8px">${vj.aircraft}${status==='rotacion'&&vj.rotation_day&&vj.rotation_total?' · Día '+vj.rotation_day+'/'+vj.rotation_total:''}</div>`:''}
+      ${!vj.aircraft&&vjDutyLine(vj)?`<div style="font-size:11px;color:var(--t3);margin-bottom:8px">${vjDutyLine(vj)}</div>`:''}`;
       if(!R) return `${head}<div style="font-size:13px;color:var(--t3);padding:4px 0">Evaluando el estado real de los módulos…</div>`;
       if(R.error) return `${head}<div style="font-size:13px;color:var(--t2)">No pude evaluar el estado: ${R.error}</div>`;
       // 'unknown' = no hay avión asignado (D34): no es un veredicto de entrega,
@@ -1433,10 +1448,10 @@ function areaView() {
         : [];
       const noCoreEvidence=status==='rotacion'&&R0&&!R0.error&&coreMissing.length>0;
       const hasProblems=allAircraftPend.length>0;
-      const acSL=status!=='rotacion'?'Fuera de rotación':noCoreEvidence?'Sin evidencia':hasProblems?allAircraftPend.length+' pendiente'+(allAircraftPend.length>1?'s':''):'Bajo control';
+      const acSL=status==='standby'?'Standby':status!=='rotacion'?'Fuera de rotación':noCoreEvidence?'Sin evidencia':hasProblems?allAircraftPend.length+' pendiente'+(allAircraftPend.length>1?'s':''):'Bajo control';
       const acSC=status!=='rotacion'?'#9CA3AF':noCoreEvidence?'#9CA3AF':hasProblems?'#854F0B':'#0F6E56';
       const acSB=status!=='rotacion'?'#F5F5F5':noCoreEvidence?'#F5F5F5':hasProblems?'#FAEEDA':'#E1F5EE';
-      const acSummary=status!=='rotacion'?'Disponible durante rotación':noCoreEvidence?`Falta ${coreMissing.join(' y ')} para ${vj.aircraft||'este avión'}`:hasProblems?allAircraftPend.slice(0,2).map(t=>t.title).join(' · ')+(allAircraftPend.length>2?' · …':''):'HOTO, inventario y tareas al día';
+      const acSummary=status==='standby'?(vj.aircraft?'Disponible cuando vueles':'Sin avión asignado todavía'):status!=='rotacion'?'Disponible durante rotación':noCoreEvidence?`Falta ${coreMissing.join(' y ')} para ${vj.aircraft||'este avión'}`:hasProblems?allAircraftPend.slice(0,2).map(t=>t.title).join(' · ')+(allAircraftPend.length>2?' · …':''):'HOTO, inventario y tareas al día';
       return `<button onclick="go('vj_status')" style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:10px">
           <span style="font-size:20px">✈️</span>
@@ -3016,7 +3031,7 @@ function vjStatusView(){
   // tareas/discrepancias — ambos confirmados ausentes (no "todavía cargando").
   const noCoreEvidence=status==='rotacion'&&S._hotoSummaryLoaded&&S._invLoaded&&!S.hotoSummaryRec&&!sess;
   const hasProblems=aircraftPend.length>0||invDisc>0;
-  const ctrlLabel=status!=='rotacion'?'Fuera de rotación':noCoreEvidence?`HOTO e inventario sin cargar para ${vj.aircraft||'este avión'}`:hasProblems?(aircraftPend.length+invDisc)+' elemento'+(aircraftPend.length+invDisc>1?'s':'')+' requieren atención':'El avión está bajo control';
+  const ctrlLabel=status==='standby'?(vj.aircraft?'Standby':'Standby · sin avión asignado'):status!=='rotacion'?'Fuera de rotación':noCoreEvidence?`HOTO e inventario sin cargar para ${vj.aircraft||'este avión'}`:hasProblems?(aircraftPend.length+invDisc)+' elemento'+(aircraftPend.length+invDisc>1?'s':'')+' requieren atención':'El avión está bajo control';
   const ctrlColor=status!=='rotacion'?'#9CA3AF':noCoreEvidence?'#9CA3AF':hasProblems?'#854F0B':'#0F6E56';
   const ctrlBg=status!=='rotacion'?'#F5F5F5':noCoreEvidence?'#F5F5F5':hasProblems?'#FAEEDA':'#E1F5EE';
 
@@ -3051,6 +3066,7 @@ function vjStatusView(){
       <span style="font-size:10px;font-weight:600;color:${st.color};background:${st.bg};border-radius:999px;padding:2px 8px">${st.label}</span>
     </div>
     ${vj.aircraft?`<div style="font-size:11px;color:var(--t3);margin-bottom:6px">${vj.aircraft}${status==='rotacion'&&vj.rotation_day&&vj.rotation_total?' · Día '+vj.rotation_day+'/'+vj.rotation_total:''}</div>`:''}
+    ${!vj.aircraft&&vjDutyLine(vj)?`<div style="font-size:11px;color:var(--t3);margin-bottom:6px">${vjDutyLine(vj)}</div>`:''}
     <div style="font-size:15px;font-weight:500;color:${ctrlColor}">${ctrlLabel}</div>
   </div>
 
