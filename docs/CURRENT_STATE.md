@@ -5,6 +5,7 @@ Estado: fotografía operativa vigente
 
 ## Actualización — 2026-09-21, noche (manda sobre la de abajo)
 
+- **Inicio solo con lo suyo (D59):** saludo, "Urgente" (si no es tarea), "Hoy" (ahora + siguiente + su día) y progreso con rachas. Sin lo que Isabel dijo/hizo/preguntó ni dominios. `life-os-app` `f420055`. Ella ya conectó el móvil.
 - **Home es "Hoy con Isabel" y la app se conecta con un código de Telegram (D57).** Lo privado (lo que dijo Isabel, agenda, Instagram, salud) solo con token de app. Sin pestaña Avanzar ni voz de Isabel inventada. `isabel-api` `fbec0f8`, `life-os-app` `a8d808f`. Falta que ella conecte el móvil.
 - **JETMI actualizado desde su proyecto de Cowork (D58):** contexto del área, próximos pasos de los 7 proyectos y operadores. `life-os-app` `297a27b`.
 - **La app enseña lo que Isabel hizo, sin el registro de coste, y se actualiza sola al volver (D56).** El registro de coste sigue igual en `eventos`. `life-os-app` `6783ec9`.

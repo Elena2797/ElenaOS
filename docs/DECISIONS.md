@@ -562,3 +562,15 @@ Entregar por `chat.send` habría hecho que **cada notificación costara un turno
 **Decisión:** se escribieron, con la anon key igual que la app, `areas.ia_context` de JETMI (resumen), `next_action` e `ia_context` de los 7 proyectos, y `status` + `notes` de los 6 operadores (las 4 copias de cada uno quedan iguales y la app las enseña como una). Queda un evento `origen:'ia'`, `herramienta:'claude_code'`. La pantalla de JETMI enseña "Dónde está JETMI" (`life-os-app` `297a27b`). **Sin datos sensibles**, porque todo eso se lee con la anon key (SECURITY #3): nada de su madre como titular, VistaJet, el pseudónimo ni el teléfono de GlobeAir. Copia previa en el scratchpad de la sesión (`jetmi-backup-2026-09-22.json`).
 **No se tocó:** `last_activity_at` de los proyectos (siguen "parados" desde junio en la señal `stale_projects`: el avance fue de investigación, no de los proyectos), las dos decisiones abiertas (ninguna es de JETMI) ni las tareas (no hay tareas de JETMI; los próximos pasos viven en los proyectos).
 **Pendiente:** Cowork y LIFEOS no se sincronizan solos; esto es una foto del 21 de septiembre. Si quiere que se mantenga, hace falta una tool de Isabel (`jetmi_context`, como `brand_content_context`) o repetir la carga. Borrar las copias repetidas de operadores es borrar filas: que lo decida ella.
+
+### D59 — Inicio enseña solo lo suyo: "Hoy" y progreso, sin la conversación ni los dominios
+**Fecha:** 2026-09-22
+**Contexto:** con el móvil ya conectado (D57), ella lo dijo claro: no necesita ver en Inicio lo que Isabel le dijo, hizo o preguntó. Isabel ya lo sabe y está en Telegram. "Tu foco de hoy" y "Hoy" se repetían, y los dominios al final de Inicio repetían su pestaña. Tiene TDAH: quiere ver lo suyo de un vistazo, en visual.
+**Decisión:** Inicio queda con cuatro cosas, en una sola pantalla:
+- el saludo y la fecha;
+- "Urgente", solo si lo urgente no es una tarea;
+- "Hoy": una tarea grande con ✓ Hecho (y Mañana, Siguiente, Quitar), las dos siguientes en una línea y "Tu día" (agenda + recordatorios de hoy) en orden de hora, con una marca de "ahora";
+- el progreso: "Hoy llevas X de Y" (tareas cerradas hoy en Madrid, en la app o con Isabel) y las rachas, que se marcan tocándolas.
+
+Se quitan de Inicio "Isabel te dijo", "Isabel te preguntó", "Lo que hizo Isabel" y los dominios. El token de app sigue sirviendo para la agenda, las rachas, Instagram y la salud. `/v1/app/today` sigue devolviendo los mensajes de Isabel, pero la app ya no los usa.
+**Estado:** vigente. `life-os-app` `f420055` (53/53). Comprobado con datos inventados en una vista local de móvil: cabe en una pantalla y "Siguiente" rota. Publicado a las 22:30Z.
