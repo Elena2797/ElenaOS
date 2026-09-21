@@ -65,6 +65,9 @@ Encontrado el 2026-09-21, una hora después de conectar Google (D51). Las tools 
 Encontrado en la revisión de la noche del 2026-09-21, después de cerrar el #12. `POST /v1/chat` aceptaba la API key pública del riesgo #2 y le pasaba el mensaje al agente `main` del Gateway. Ese agente llama a las tools con `ISABEL_MCP_KEY`, así que tiene correo, agenda e Instagram. Cualquiera con la llave del bundle podía pedirle "léeme mis correos" y recibir la respuesta. El #12 solo había cerrado la entrada directa a `/mcp`. Visto en el código; no se probó en producción para no tocar su correo. No hay indicios de que nadie lo usara.
 **Arreglo** (D55): se retira la ruta (`isabel-api` `96b0b67`) y el chat de la app (`life-os-app` `2d4e048`). Con Isabel se habla solo por Telegram, que está cerrado a su ID (`dmPolicy: allowlist`). Ninguna ruta de `/v1` llega ya al agente.
 
+### 14. Datos de salud dentro del JS público de la app — RESUELTO 2026-09-22
+La pantalla Salud llevaba escritos en `main.js` su medicación y sus condiciones, y Vida Personal, nombres y la salud de su familia. El bundle se sirve a cualquiera que abra la URL (el PIN solo tapa la pantalla). **Arreglo** (D57): protocolo y condiciones viven en `isabel-api/src/core/healthProfile.js` (repo privado) y la app los pide a `/v1/app/health-profile` con token de app; las listas de relaciones y planes se quitaron. Las versiones antiguas del bundle pueden seguir en la caché de Vercel o de su móvil hasta que se sustituyan.
+
 ## Lo que NO se encontró (positivo)
 - No hay contraseñas ni secretos de terceros hardcodeados más allá de lo anterior.
 - Los documentos `.md` de raíz no contienen valores reales de claves.

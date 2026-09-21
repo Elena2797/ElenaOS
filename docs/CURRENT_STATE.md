@@ -5,6 +5,8 @@ Estado: fotografía operativa vigente
 
 ## Actualización — 2026-09-21, noche (manda sobre la de abajo)
 
+- **Home es "Hoy con Isabel" y la app se conecta con un código de Telegram (D57).** Lo privado (lo que dijo Isabel, agenda, Instagram, salud) solo con token de app. Sin pestaña Avanzar ni voz de Isabel inventada. `isabel-api` `fbec0f8`, `life-os-app` `a8d808f`. Falta que ella conecte el móvil.
+- **JETMI actualizado desde su proyecto de Cowork (D58):** contexto del área, próximos pasos de los 7 proyectos y operadores. `life-os-app` `297a27b`.
 - **La app enseña lo que Isabel hizo, sin el registro de coste, y se actualiza sola al volver (D56).** El registro de coste sigue igual en `eventos`. `life-os-app` `6783ec9`.
 - **La app ya no tiene chat (D55).** Con Isabel se habla solo por Telegram; "Hablar con Isabel" y la pestaña Isabel abren `t.me/Isabellifeosbot`. `POST /v1/chat` retirado: con la API key pública llevaba al correo (SECURITY.md #13). `isabel-api` `96b0b67`, `life-os-app` `2d4e048`.
 - **Isabel ve su Gmail y su Google Calendar** (D51): 34 tools en el Gateway. Las de correo y agenda solo con la llave privada `ISABEL_MCP_KEY` (SECURITY.md #12).
