@@ -7,6 +7,14 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-09-21, última hora de la tarde (Telegram y la app, conectados de verdad — D50)
+
+- **Lo que Isabel apuntaba no se veía en Dominios:** VistaJet solo leía `vj_tasks` y ocultaba `tasks`; el resto de dominios contaba proyectos. Arreglado, y la lista de Tareas vuelve a VistaJet.
+- **Home no cambiaba con lo que ella decía:** el Core solo miraba fechas y no se recalculaba al volver de Telegram. Ahora cuentan urgente, para hoy e importante, y Home se recalcula al volver. `/v1/now` reutiliza su respuesta si nada cambió.
+- **Isabel puede corregir y descartar tareas** (`tasks_update`, `tasks_discard`, estado `discarded`) y entiende "mañana", "el viernes" o "máx mañana" como fecha. Cuatro tareas completadas por error ese día pasaron a descartadas.
+- **Recordatorios en Home**, vía `GET /v1/reminders`, porque `reminders` tiene RLS.
+- `isabel-api` `dcff14e`, `life-os-app` `7f5c410` (publicado desde la rama `fix/tareas-isabel-en-dominios`; el `main` local de `life-os-app` tiene un commit O5 sin publicar, `a1f1bee`, que no se tocó). Gateway reiniciado: 33 tools.
+
 ## 2026-09-21, tarde (Isabel apunta tareas, cierra inventarios y empuja — D48, D49)
 
 - **Tareas desde Telegram:** tools `tasks_list`, `tasks_create` y `tasks_complete` (`isabel-api` `4b3f7d1`). Escriben en `tasks` con los mismos valores que el formulario de la app y `source: 'isabel'`. Hasta hoy Isabel no tenía ninguna tool de tareas: lo que le contaba se quedaba en la memoria de la conversación, que LIFEOS no ve.

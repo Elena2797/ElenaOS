@@ -41,7 +41,7 @@ Migración: `setup.sql` (+ `project_id` en `migration_v1.sql`).
 | Columna | Tipo | Notas |
 |---|---|---|
 | id, title, area_id, project_id | | project_id referencia `projects`, `ON DELETE SET NULL` |
-| status | text | default `pending` |
+| status | text | default `pending`. Valores en uso: `pending`, `avoiding`, `done`, `discarded` (D50: ya no hace falta, sin haberla hecho). "Abiertas" = ni `done` ni `discarded` |
 | priority | text | default `medium` |
 | energy_required | text | default `medium` |
 | suitable_modes | text[] | default `{ON,OFF}` |

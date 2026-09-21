@@ -14,6 +14,7 @@ Estado: fotografía operativa vigente
   - llevar el gasto de OpenRouter a `budget-status`;
   - decidir el nivel de thinking de DeepSeek (hoy `high`).
 - **Desde la tarde del 2026-09-21:** Isabel apunta, lista y completa tareas de LIFEOS por Telegram; cierra inventarios abiertos con confirmación (D48); y escribe por su cuenta a las 08:30, 17:00 y 21:30 (D49). Recordatorios a una hora concreta desde el mismo día (cron `reminders-tick-1m`). Sin calendario todavía.
+- **Desde última hora del 2026-09-21 (D50):** lo que ella le dice a Isabel se ve en Dominios, en VistaJet y en Home. La prioridad cuenta lo urgente, lo de hoy y lo importante, y se recalcula al volver de Telegram. Isabel corrige y descarta tareas, y Home enseña los recordatorios. `isabel-api` `dcff14e`, `life-os-app` `7f5c410`.
 - Detalle operativo y trampas: `operations/INCIDENTE_SALDO_2026-08-11.md` §12.
 
 ## ⚠ Corrección — 2026-09-20
