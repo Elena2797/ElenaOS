@@ -61,6 +61,10 @@ Encontrado el 2026-09-21, una hora después de conectar Google (D51). Las tools 
 **Arreglo** (`isabel-api` `8c38b4a`, `isabel-gateway` `a09f555`): `/mcp` acepta dos llaves. Con `MCP_PRIVATE_KEY` están todas las tools. Esa llave solo vive en Railway: en isabel-api y, en el Gateway, como `ISABEL_MCP_KEY`, referenciada como `${ISABEL_MCP_KEY}` en `openclaw.json`. Con la llave pública están todas menos las de correo y agenda, que se filtran por nombre (`PRIVATE_TOOL`) para que una tool de correo nueva quede protegida sin acordarse. Una sesión privada no acepta llamadas con la llave pública, y sin `MCP_PRIVATE_KEY` configurada no hay acceso privado.
 **Sigue abierto:** el resto de `/v1` y de las tools MCP (tareas, salud, recordatorios, inventario) sigue con la llave pública del riesgo #2.
 
+### 13. El chat de la app llevaba al correo por otro camino — RESUELTO 2026-09-21
+Encontrado en la revisión de la noche del 2026-09-21, después de cerrar el #12. `POST /v1/chat` aceptaba la API key pública del riesgo #2 y le pasaba el mensaje al agente `main` del Gateway. Ese agente llama a las tools con `ISABEL_MCP_KEY`, así que tiene correo, agenda e Instagram. Cualquiera con la llave del bundle podía pedirle "léeme mis correos" y recibir la respuesta. El #12 solo había cerrado la entrada directa a `/mcp`. Visto en el código; no se probó en producción para no tocar su correo. No hay indicios de que nadie lo usara.
+**Arreglo** (D55): se retira la ruta (`isabel-api` `96b0b67`) y el chat de la app (`life-os-app` `2d4e048`). Con Isabel se habla solo por Telegram, que está cerrado a su ID (`dmPolicy: allowlist`). Ninguna ruta de `/v1` llega ya al agente.
+
 ## Lo que NO se encontró (positivo)
 - No hay contraseñas ni secretos de terceros hardcodeados más allá de lo anterior.
 - Los documentos `.md` de raíz no contienen valores reales de claves.
