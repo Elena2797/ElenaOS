@@ -61,18 +61,20 @@ test('una tarea descartada deja de salir en la app', () => {
 });
 
 test('Home enseña los recordatorios pedidos por Telegram', () => {
-  // Desde D57 van en la tarjeta "Hoy", junto a la agenda.
-  assert.match(functionBody('homeView'), /todayCard\(\)/);
-  assert.match(functionBody('todayCard'), /S\.reminders/);
+  // Desde D59 van en la tarjeta "Hoy", en "Tu día", junto a la agenda.
+  assert.match(functionBody('homeView'), /todayBlock\(\)/);
+  assert.match(functionBody('todayBlock'), /S\.reminders/);
   assert.match(functionBody('loadReminders'), /\/v1\/reminders/);
 });
 
-// D57: Home es "Hoy con Isabel": una sola lista de qué hacer (el foco, con las
-// mismas reglas que el Core), y la app no redacta la opinión de Isabel.
-test('Home tiene un solo foco de tareas y no inventa la voz de Isabel', () => {
+// D59: Inicio es solo lo suyo y sin repetir: una tarjeta "Hoy" (ahora, lo
+// siguiente y su día) y el progreso con las rachas. Nada de lo que Isabel
+// dijo, hizo o preguntó (vive en Telegram) ni los dominios (tienen pestaña).
+test('Inicio no repite Telegram ni Dominios, y hay una sola lista de qué hacer', () => {
   const home = functionBody('homeView');
-  assert.match(home, /focusCard\(\)/);
-  assert.doesNotMatch(home, /atItems|isabelHomeCard/);
+  assert.match(home, /todayBlock\(\)/);
+  assert.match(home, /progressCard\(\)/);
+  assert.doesNotMatch(home, /isabelSaidCard|isabelDoneCard|pendingQuestionsCard|visibleDomains|focusCard|atItems|isabelHomeCard/);
   assert.match(functionBody('homeFocusItems'), /workQueue\(\)/);
   assert.doesNotMatch(source, /isabelRolLabel|Criterio de Isabel -->/);
 });

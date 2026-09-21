@@ -67,6 +67,13 @@ export async function completeTask(id) {
   await _db.from('tasks').update({ status: 'done', completed_at: new Date().toISOString() }).eq('id', id);
 }
 
+// Cuántas tareas cerró hoy (en la app o con Isabel), para "Hoy llevas X de Y".
+export async function countDoneSince(sinceIso) {
+  const { count, error } = await _db.from('tasks').select('id', { count: 'exact', head: true })
+    .eq('status', 'done').gte('completed_at', sinceIso);
+  return error ? null : count;
+}
+
 // "Mañana" desde el foco de Home: la tarea sale de hoy y vuelve con fecha.
 export async function postponeTask(id, dueDate) {
   const { error } = await _db.from('tasks').update({ due_date: dueDate, horizon: 'this_week' }).eq('id', id);

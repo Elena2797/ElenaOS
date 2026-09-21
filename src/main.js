@@ -280,14 +280,13 @@ function madridDate(offsetDays = 0) {
   return new Date(Date.now() + offsetDays * 864e5).toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' });
 }
 
-function fmtWhen(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const day = d.toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' });
-  const hm = d.toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' });
-  if (day === madridDate(0)) return 'hoy ' + hm;
-  if (day === madridDate(-1)) return 'ayer ' + hm;
-  return d.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid', day: 'numeric', month: 'short' }) + ' ' + hm;
+// Las 00:00 de hoy en Madrid, en ISO, con el desfase real de ese día (DST).
+function madridMidnightIso() {
+  const day = madridDate(0);
+  const probe = new Date(`${day}T12:00:00Z`);
+  const off = /GMT([+-]\d+)/.exec(probe.toLocaleString('en-US', { timeZone: 'Europe/Madrid', timeZoneName: 'shortOffset' }));
+  const h = off ? Number(off[1]) : 1;
+  return new Date(Date.parse(`${day}T00:00:00Z`) - h * 3600e3).toISOString();
 }
 
 // Isabel escribe con **negritas** de Telegram: se escapa todo y solo se
@@ -327,33 +326,6 @@ async function loadHealthProfile() {
   if (S.view === 'area') render();
 }
 
-function isabelSaidCard() {
-  if (!appClient().isLinked()) {
-    return `<div class="brief-card" style="margin-bottom:10px;border:0.5px solid var(--border)">
-      <div style="${HOME_LABEL}">Isabel</div>
-      <div style="font-size:14px;color:var(--text);line-height:1.55;margin-bottom:12px">Conecta este móvil para ver aquí lo último que te ha dicho Isabel y tu agenda de hoy, y para marcar tus rachas con un toque.</div>
-      <button onclick="openLink()" style="background:var(--text);color:#fff;border:none;border-radius:999px;padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer">Conectar con un código de Telegram</button>
-    </div>`;
-  }
-  const t = S.appToday;
-  const msgs = t && t.isabel && t.isabel.ok ? t.isabel.messages : null;
-  let body;
-  if (!t) body = `<div style="font-size:13px;color:var(--t3)">Cargando lo último de Isabel…</div>`;
-  else if (!msgs) body = `<div style="font-size:13px;color:var(--t3)">No pude leer tu conversación con Isabel ahora mismo.</div>`;
-  else if (!msgs.length) body = `<div style="font-size:13px;color:var(--t3)">Isabel todavía no te ha escrito.</div>`;
-  else {
-    const m = msgs[0];
-    const clamp = S.isabelMsgOpen ? '' : 'display:-webkit-box;-webkit-line-clamp:8;-webkit-box-orient:vertical;overflow:hidden;';
-    body = `<div style="font-size:11px;color:var(--t3);margin-bottom:6px">${fmtWhen(m.at)}</div>
-      <div onclick="toggleIsabelMsg()" style="font-size:14px;color:var(--text);line-height:1.55;white-space:pre-wrap;cursor:pointer;${clamp}">${mdLite(m.text)}</div>`;
-  }
-  return `<div class="brief-card" style="margin-bottom:10px;border:0.5px solid var(--border)">
-    <div style="${HOME_LABEL}">Isabel te dijo</div>
-    ${body}
-    <button onclick="openIsabel()" style="background:none;border:none;padding:10px 0 0;font-size:12px;font-weight:600;color:var(--t2);cursor:pointer">Contestar en Telegram →</button>
-  </div>`;
-}
-
 // Solo lo urgente que NO es una tarea (entrega del avión, esperas, alertas…):
 // las tareas ya salen en "Tu foco de hoy" y no se repiten.
 const TASK_SIGNALS = new Set(['task_overdue', 'due_today', 'due_soon', 'critical_task', 'planned_today', 'important_tasks', 'pending_tasks_without_deadline']);
@@ -383,26 +355,124 @@ function homeFocusItems() {
   });
 }
 
-function focusCard() {
-  const top = homeFocusItems().slice(0, 3);
-  const open = S.tasks.filter(t => t.status === 'pending' || t.status === 'avoiding').length;
-  const rows = top.map((it, i) => `<div style="${i < top.length - 1 ? 'padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border)' : ''}">
-      <div style="font-size:14px;font-weight:500;color:var(--text);line-height:1.4">${escHtml(it.title)}</div>
-      <div style="font-size:11px;color:var(--t3);margin-top:2px">${escHtml(it.reason)}${it.area ? ' · ' + escHtml(it.area) : ''}</div>
-      <div style="display:flex;gap:6px;margin-top:8px">
-        <button onclick="focusDone('${it.ref}')" style="${HOME_BTN};color:#0F6E56">✓ Hecho</button>
-        <button onclick="focusTomorrow('${it.ref}')" style="${HOME_BTN}">Mañana</button>
-        <button onclick="focusDiscard('${it.ref}')" style="${HOME_BTN}">Quitar</button>
+// "Hoy" (D59): UNA tarjeta con lo que toca ahora, lo siguiente y su día en
+// orden de hora. Con TDAH, una sola tarea grande y un botón grande pesan
+// menos que tres tareas con nueve botones. "Siguiente" pasa a la próxima sin
+// tener que decidir (solo en esta pantalla; no cambia nada).
+function todayBlock() {
+  const items = homeFocusItems();
+  const offset = items.length ? (S.focusOffset || 0) % items.length : 0;
+  const ordered = items.slice(offset).concat(items.slice(0, offset));
+  const now = ordered[0];
+  const next = ordered.slice(1, 3);
+
+  let nowHtml;
+  if (!now) {
+    nowHtml = `<div style="font-size:16px;font-weight:600;color:var(--ok);margin-bottom:4px">✓ Nada urgente ni para hoy</div>
+      <div style="font-size:12px;color:var(--t3)">Si quieres adelantar algo, está en tus tareas.</div>`;
+  } else {
+    const urgentReason = /Vencida|Vence hoy|Urgente/.test(now.reason);
+    nowHtml = `<div style="font-size:11px;color:var(--t3);margin-bottom:6px">Ahora</div>
+      <div style="font-size:19px;font-weight:700;color:var(--text);line-height:1.3;margin-bottom:4px">${escHtml(now.title)}</div>
+      <div style="font-size:12px;color:${urgentReason ? '#A32D2D' : 'var(--t3)'};margin-bottom:14px">${escHtml(now.reason)}${now.area ? ' · ' + escHtml(now.area) : ''}</div>
+      <button onclick="focusDone('${now.ref}')" style="width:100%;height:48px;border:none;border-radius:12px;background:#0F6E56;color:#fff;font-size:16px;font-weight:600;cursor:pointer">✓ Hecho</button>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button onclick="focusTomorrow('${now.ref}')" style="${HOME_BTN};flex:1;padding:9px">Mañana</button>
+        ${items.length > 1 ? `<button onclick="focusNext()" style="${HOME_BTN};flex:1;padding:9px">Siguiente</button>` : ''}
+        <button onclick="focusDiscard('${now.ref}')" style="${HOME_BTN};flex:1;padding:9px">Quitar</button>
       </div>
-    </div>`).join('');
+      ${next.length ? `<div style="font-size:12px;color:var(--t2);margin-top:12px;line-height:1.5">Después: ${next.map(n => escHtml(n.title)).join(' · ')}</div>` : ''}`;
+  }
+
+  // Su día en orden de hora: agenda (con la app conectada) y recordatorios,
+  // con una marca de "ahora".
+  const linked = appClient().isLinked();
+  const ag = S.appToday && S.appToday.agenda;
+  const hm = new Date().toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' });
+  const rows = [];
+  if (linked && ag && ag.ok) {
+    (ag.events || []).forEach(e => rows.push({
+      at: e.all_day ? '' : String(e.start || '').slice(11, 16),
+      label: e.all_day ? 'todo el día' : String(e.start || '').slice(11, 16),
+      text: e.title, icon: 'ti-calendar',
+    }));
+  }
+  (S.reminders || []).forEach(r => {
+    const m = /(\d{1,2}:\d{2})/.exec(r.when || '');
+    const today = /^hoy\b/i.test(r.when || '') || !/\d{4}|mañana|lunes|martes|miércoles|jueves|viernes|sábado|domingo/i.test(r.when || '');
+    if (today) rows.push({ at: m ? m[1].padStart(5, '0') : '', label: r.when, text: r.text, icon: 'ti-bell' });
+  });
+  rows.sort((x, y) => x.at.localeCompare(y.at));
+  let dayHtml = '';
+  if (rows.length) {
+    let marked = false;
+    const line = `<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="font-size:11px;font-weight:600;color:#185FA5;width:44px">ahora</span><span style="flex:1;border-top:1.5px solid #185FA5"></span></div>`;
+    dayHtml = rows.map(r => {
+      let pre = '';
+      if (!marked && r.at && r.at > hm) { pre = line; marked = true; }
+      const past = r.at && r.at <= hm;
+      return `${pre}<div style="display:flex;gap:8px;padding:5px 0;font-size:13px;line-height:1.4;${past ? 'opacity:.55' : ''}">
+        <span style="width:44px;flex-shrink:0;color:var(--t3);font-size:12px">${escHtml(r.at || '·')}</span>
+        <i class="ti ${r.icon}" style="font-size:14px;color:var(--t3);margin-top:1px"></i>
+        <span style="flex:1;color:var(--text)">${escHtml(r.text)}</span>
+      </div>`;
+    }).join('') + (marked ? '' : line);
+  } else if (linked && ag && ag.ok) {
+    dayHtml = `<div style="font-size:13px;color:var(--t2)">Agenda libre hoy.</div>`;
+  } else if (linked && ag && !ag.ok) {
+    dayHtml = `<div style="font-size:13px;color:var(--t2)">${ag.error === 'google_reauth_required' ? 'Google está desconectado: no puedo leer tu agenda.' : 'No pude leer tu agenda ahora mismo.'}</div>`;
+  } else if (!linked) {
+    dayHtml = `<button onclick="openLink()" style="border:none;background:none;padding:0;font-size:12px;font-weight:600;color:var(--t2);cursor:pointer">Conecta este móvil para ver tu agenda →</button>`;
+  }
+
+  return `<div style="${HOME_CARD};padding:18px">
+    ${nowHtml}
+    ${dayHtml ? `<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:12px">
+      <div style="${HOME_LABEL};margin-bottom:6px">Tu día</div>${dayHtml}</div>` : ''}
+  </div>`;
+}
+
+function focusNext() { S.focusOffset = (S.focusOffset || 0) + 1; render(); }
+
+// Progreso de hoy y rachas. Ver el avance es la recompensa inmediata que
+// sostiene la motivación con TDAH: cada ✓ mueve la barra.
+function progressCard() {
+  const pending = homeFocusItems().length;
+  const doneToday = S.doneToday || 0;
+  const total = doneToday + pending;
+  const pct = total ? Math.round((doneToday / total) * 100) : 0;
+  const bar = total ? `<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--t2);margin-bottom:6px">
+      <span>Hoy llevas</span><span style="font-weight:600;color:var(--text)">${doneToday} de ${total}</span></div>
+    <div style="height:8px;background:var(--bg);border-radius:99px;overflow:hidden;margin-bottom:${S.habits && S.habits.length ? '12px' : '0'}">
+      <div style="width:${pct}%;height:100%;background:#0F6E56;border-radius:99px"></div></div>` : '';
+  const habits = (S.habits || []).filter(h => h.known !== false);
+  const canTap = appClient().isLinked();
+  const cells = habits.map(h => {
+    const weeks = h.unit === 'semanas';
+    const tone = h.habit === 'gym'
+      ? ((h.this_week && h.target_sessions && h.this_week.strength >= h.target_sessions) ? 'ok' : 'neutral')
+      : h.done_today === true ? 'ok' : h.at_risk ? 'warn' : 'neutral';
+    const bg = { ok: 'var(--ok-bg)', warn: 'var(--warn-bg)', neutral: 'var(--bg)' }[tone];
+    const fg = { ok: 'var(--ok)', warn: 'var(--warn)', neutral: 'var(--text)' }[tone];
+    const big = h.habit === 'gym' && h.target_sessions ? `${(h.this_week && h.this_week.strength) || 0}/${h.target_sessions}` : String(h.streak ?? '—');
+    const small = h.habit === 'gym' ? 'esta semana'
+      : h.done_today === true ? 'hoy ✓' : h.at_risk ? 'se rompe hoy' : (weeks ? 'semanas' : 'días seguidos');
+    const tap = canTap && h.habit !== 'gym' && h.done_today !== true;
+    return `<${tap ? 'button' : 'div'} ${tap ? `onclick="logHabitToday('${h.habit}')"` : ''} style="background:${bg};border:none;border-radius:10px;padding:9px 6px;text-align:center;${tap ? 'cursor:pointer;' : ''}font-family:inherit">
+      <div style="font-size:11px;color:${fg}">${escHtml(h.label)}</div>
+      <div style="font-size:19px;font-weight:700;color:${fg};line-height:1.2">${big}</div>
+      <div style="font-size:10px;color:${fg}">${tap ? 'toca si ya' : small}</div>
+    </${tap ? 'button' : 'div'}>`;
+  }).join('');
+  if (!bar && !cells) return '';
   return `<div style="${HOME_CARD}">
-    <div style="${HOME_LABEL}">Tu foco de hoy</div>
-    ${rows || `<div style="font-size:13px;color:var(--t2)">Nada urgente ni marcado para hoy.</div>`}
-    ${open ? `<button onclick="go('global')" style="background:none;border:none;padding:12px 0 0;font-size:12px;font-weight:500;color:var(--t2);cursor:pointer">Ver todas tus tareas (${open}) →</button>` : ''}
+    ${bar}
+    ${cells ? `<div style="display:grid;grid-template-columns:repeat(${habits.length},minmax(0,1fr));gap:6px">${cells}</div>` : ''}
   </div>`;
 }
 
 async function focusDone(id) {
+  S.doneToday = (S.doneToday || 0) + 1;
   await done(id);
   loadIsabelNow({ silent: true });
 }
@@ -425,68 +495,11 @@ async function focusDiscard(id) {
   loadIsabelNow({ silent: true });
 }
 
-// Su día: la agenda de Google (con la app conectada) y los recordatorios.
-function todayCard() {
-  const linked = appClient().isLinked();
-  const ag = S.appToday && S.appToday.agenda;
-  const rows = [];
-  if (linked && ag && ag.ok) {
-    (ag.events || []).forEach(e => rows.push({
-      icon: '📅', text: e.title,
-      when: e.all_day ? 'todo el día' : `${String(e.start || '').slice(11, 16)}${e.end ? '–' + String(e.end).slice(11, 16) : ''}`,
-    }));
-  }
-  (S.reminders || []).slice(0, 3).forEach(r => rows.push({ icon: '⏰', text: r.text, when: r.when }));
-  let agendaNote = '';
-  if (linked && ag) {
-    if (ag.ok && !(ag.events || []).length) agendaNote = 'Agenda libre hoy.';
-    else if (!ag.ok) agendaNote = ag.error === 'google_reauth_required' ? 'Google está desconectado: no puedo leer tu agenda.' : 'No pude leer tu agenda ahora mismo.';
-  }
-  if (!rows.length && !agendaNote) return '';
-  return `<div style="${HOME_CARD}">
-    <div style="${HOME_LABEL}">Hoy</div>
-    ${agendaNote ? `<div style="font-size:13px;color:var(--t2);margin-bottom:${rows.length ? '10px' : '0'}">${agendaNote}</div>` : ''}
-    ${rows.map((r, i) => `<div style="display:flex;gap:10px;align-items:flex-start;${i < rows.length - 1 ? 'padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid var(--border)' : ''}">
-      <span style="font-size:13px;flex-shrink:0">${r.icon}</span>
-      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500;color:var(--text);line-height:1.4">${escHtml(r.text)}</div>
-      <div style="font-size:11px;color:var(--t3);margin-top:2px">${escHtml(r.when || '')}</div></div>
-    </div>`).join('')}
-  </div>`;
-}
-
-function habitsCard() {
-  const row = habitsStreakRow({ actions: true });
-  if (!row) return '';
-  return `<div class="card" style="margin-bottom:10px">
-    <div class="card-head"><span class="ch-icon">🌱</span><span class="ch-label">Rachas</span></div>
-    ${row}
-  </div>`;
-}
-
 async function logHabitToday(habit) {
   const r = await appClient().post('/v1/app/habits', { habit, done: true });
   if (!r.ok && !r.unlinked) alert('No se pudo apuntar. Inténtalo otra vez.');
   await loadHabits();
   render();
-}
-
-// Lo que Isabel hizo de verdad (sin el registro de coste, D56). El punto verde
-// marca lo que pasó desde la visita anterior.
-function isabelDoneCard() {
-  const evs = S.eventos.filter(e => ['ia', 'isabel'].includes(e.origen)).slice(0, 5);
-  if (!evs.length) return '';
-  const since = S.prevOpenAt || 0;
-  return `<div style="${HOME_CARD}">
-    <div style="${HOME_LABEL}">Lo que hizo Isabel</div>
-    ${evs.map(e => {
-      const isNew = since && new Date(e.created_at).getTime() > since;
-      return `<div style="display:flex;gap:8px;padding:4px 0;line-height:1.45">
-        <span style="font-size:12px;color:${isNew ? '#0F6E56' : 'var(--t3)'};flex-shrink:0">${isNew ? '●' : '·'}</span>
-        <div style="flex:1;min-width:0"><div style="font-size:13px;color:var(--text)">${escHtml(e.resumen || e.texto || '')}</div>
-        <div style="font-size:11px;color:var(--t3)">${fmtWhen(e.created_at)}</div></div>
-      </div>`;
-    }).join('')}
-  </div>`;
 }
 
 // ── Conectar este móvil: código por Telegram ──
@@ -766,6 +779,9 @@ async function reload() {
     });
     S.loadStatus = 'loaded';
     S.loadError = null;
+    // Tareas cerradas hoy (Madrid), en la app o con Isabel: la barra de progreso.
+    const done = await dbSvc.countDoneSince(madridMidnightIso());
+    if (done !== null) S.doneToday = done;
   } catch(e){
     console.error(e);
     S.loadStatus = 'error';
@@ -1134,14 +1150,6 @@ function workQueue() {
   return items.sort((a, b) => b.weight - a.weight);
 }
 
-// Lo que Isabel hizo después de `sinceMs`. `S.eventos` ya viene sin el
-// registro de coste (ver loadAll en services/db.js).
-function isabelActionsSince(sinceMs, areaId=null) {
-  return S.eventos.filter(e => ['ia','isabel'].includes(e.origen)
-    && new Date(e.created_at).getTime() > sinceMs
-    && (!areaId || e.area_id === areaId));
-}
-
 function isabelContributions(areaId=null, limit=4) {
   const areaProjects=areaId?S.projects.filter(p=>p.area_id===areaId).map(p=>p.id):[];
   let evs=S.eventos.filter(e=>['ia','isabel'].includes(e.origen));
@@ -1265,70 +1273,28 @@ function resolveHomePriority() {
 }
 
 function homeView() {
-  const now = Date.now();
   const hour = new Date().getHours();
   const lastOpen = S.prevOpenAt;
-  const daysSinceOpen = lastOpen ? Math.floor((now - lastOpen) / 864e5) : 0;
+  const daysSinceOpen = lastOpen ? Math.floor((Date.now() - lastOpen) / 864e5) : 0;
+  const greeting = daysSinceOpen >= 3 ? 'Bienvenida de vuelta, Estefanía.'
+    : hour < 13 ? 'Buenos días, Estefanía.' : hour < 20 ? 'Buenas tardes, Estefanía.' : 'Buenas noches, Estefanía.';
+  const dateLine = new Date().toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid', weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, c => c.toUpperCase());
 
-  const visdoms = visibleDomains();
-
-  // ── Saludo (presentación pura — nunca decide un dominio prioritario) ──
-  const greetParts = [];
-  if (daysSinceOpen >= 3) greetParts.push('Bienvenida de vuelta, Estefanía.');
-  else if (hour < 13) greetParts.push('Buenos días, Estefanía.');
-  else if (hour < 20) greetParts.push('Buenas tardes, Estefanía.');
-  else greetParts.push('Buenas noches, Estefanía.');
-  // Solo lo que Isabel hizo desde la visita anterior. Antes contaba las 50
-  // últimas filas de `eventos` sin mirar la fecha, y casi todas eran registro
-  // de coste: decía "avancé en 50 puntos" sin que fuera verdad.
-  const sinceLastVisit = lastOpen ? isabelActionsSince(lastOpen) : [];
-  if (sinceLastVisit.length > 0) {
-    greetParts.push(`Desde tu última visita hice ${sinceLastVisit.length} ${sinceLastVisit.length === 1 ? 'cosa' : 'cosas'} por ti.`);
-  }
-  const greeting = greetParts.join(' ');
-
-  // ── Una sola prioridad para toda la vista (tarjeta Isabel + dominio resaltado) ──
+  // Una sola prioridad del Core: solo se usa para el aviso "Urgente" cuando
+  // lo urgente no es una tarea (entrega del avión, esperas…).
   const priority = resolveHomePriority();
 
-  // "Hoy con Isabel" (D57): lo que dijo, lo urgente que no es una tarea, el
-  // foco, su día, sus rachas, lo que le preguntó y lo que hizo. Después, las
-  // puertas a los dominios. Una sola lista de "qué hago" (el foco).
+  // Inicio (D59): solo lo suyo y sin repetir nada. Lo que Isabel dijo, hizo o
+  // preguntó vive en Telegram; los dominios, en su pestaña.
   return `
   <div style="padding:0 0 80px">
-
-    <div style="font-size:15px;color:var(--text);line-height:1.6;margin:2px 2px 12px">${escHtml(greeting)}</div>
-
-    ${isabelSaidCard()}
-
-    ${urgentStrip(priority)}
-
-    ${focusCard()}
-
-    ${todayCard()}
-
-    ${habitsCard()}
-
-    ${pendingQuestionsCard()}
-
-    ${isabelDoneCard()}
-
-    <!-- Dominios — puertas -->
-    <div style="${HOME_LABEL};margin:18px 2px 8px">Tus dominios</div>
-    <div style="display:flex;flex-direction:column;gap:6px">
-      ${visdoms.map(a => {
-        const bp = domainBlueprint(a.name);
-        const signal = domainSignal(a);
-        const isPrimary = priority.area?.id === a.id;
-        return `<button onclick="go('area','${a.id}')" style="width:100%;display:flex;align-items:center;gap:12px;padding:13px 14px;background:${isPrimary ? 'var(--text)' : 'var(--surface)'};border-radius:12px;border:${isPrimary ? 'none' : '0.5px solid var(--border)'};cursor:pointer;text-align:left">
-          <span style="font-size:18px;flex-shrink:0">${bp.icon}</span>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:14px;font-weight:600;color:${isPrimary ? '#fff' : 'var(--text)'}">${a.name}</div>
-            <div style="font-size:11px;color:${isPrimary ? 'rgba(255,255,255,0.55)' : 'var(--t3)'};margin-top:2px">${signal}</div>
-          </div>
-          <i class="ti ti-chevron-right" style="font-size:13px;color:${isPrimary ? 'rgba(255,255,255,0.35)' : 'var(--t3)'};flex-shrink:0"></i>
-        </button>`;
-      }).join('')}
+    <div style="margin:2px 2px 14px">
+      <div style="font-size:20px;font-weight:700;color:var(--text)">${greeting}</div>
+      <div style="font-size:13px;color:var(--t3);margin-top:2px">${dateLine}</div>
     </div>
+    ${urgentStrip(priority)}
+    ${todayBlock()}
+    ${progressCard()}
   </div>`;
 }
 
@@ -4800,7 +4766,7 @@ Object.assign(window, {
   showPin, pinPress,
   go, toggleMode, openAdd, openIsabel,
   openLink, linkStart, linkVerify, toggleIsabelMsg, logHabitToday,
-  focusDone, focusTomorrow, focusDiscard, toggleBrandStrategy, toggleJetmiContext,
+  focusDone, focusTomorrow, focusDiscard, focusNext, toggleBrandStrategy, toggleJetmiContext,
   retryLoad, gymLogSession,
   done, closeModal,
   checkinSueno, checkinDolor, checkinVJ, completeCheckin,
