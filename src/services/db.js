@@ -26,7 +26,14 @@ export async function loadAll() {
     _db.from('vj_state').select('*').order('updated_at', { ascending: false }).limit(1),
     _db.from('vj_tasks').select('*').order('created_at'),
     _db.from('projects').select('*').in('status', ['active', 'paused']).order('last_activity_at', { ascending: false }),
-    _db.from('eventos').select('*').order('created_at', { ascending: false }).limit(50),
+    // Lo que Isabel (o ella) hizo, sin el registro de coste. `eventos` guarda
+    // también una fila por cada llamada a modelo (`ai:*`) y por cada revisión
+    // de 15 minutos (`proactive:*`): el 2026-09-21 eran 414 de 449 en 7 días,
+    // y las 50 últimas cubrían solo 2 horas. Ese registro se queda donde está
+    // (lo leen el control de gasto y el informe de coste); la app no lo enseña.
+    _db.from('eventos').select('*')
+      .or('herramienta.is.null,and(herramienta.not.like.ai:*,herramienta.not.like.proactive:*)')
+      .order('created_at', { ascending: false }).limit(50),
     _db.from('alertas').select('*').eq('status', 'active').order('created_at', { ascending: false }),
   ]);
   const result = {};

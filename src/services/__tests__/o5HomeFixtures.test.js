@@ -13,8 +13,10 @@ const MAIN_URL = new URL('../../main.js', import.meta.url);
 // como parte de la rotación (D53). La tarjeta Hábitos de Vida Personal enseña
 // las rachas de leer, escribir y gym que da GET /v1/habits (D52). Sin O5, sin
 // fixtures. Y otra vez (D55): sin chat propio; "Hablar con Isabel" abre
-// Telegram. Solo se quita código; sin O5.
-const MAIN_CHECKPOINT_SHA256 = '1AFE4F98FBE0DF54DA8CA7FAC94E656E1E5DE1CFF52F79BB822C553756FCBF1D';
+// Telegram. Solo se quita código; sin O5. Y otra (D56): el saludo y JETMI
+// cuentan solo lo que Isabel hizo desde la visita anterior, y la app instalada
+// busca versión nueva al volver (services/appUpdate.js). Sin O5.
+const MAIN_CHECKPOINT_SHA256 = '94D28D0D0039406ADB39A22E44F164D53C6FF0F72CDC684DA46970494B64F5E6';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

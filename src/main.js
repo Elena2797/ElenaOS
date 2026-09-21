@@ -1,6 +1,7 @@
 ﻿import './main.css';
 import { createClient } from '@supabase/supabase-js';
 import * as dbSvc from './services/db.js';
+import { watchAppUpdates } from './services/appUpdate.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import * as invSvc from './services/inventory.js';
 import * as hotoSvc from './services/hoto.js';
@@ -174,6 +175,13 @@ async function initApp() {
   invSvc.setClient(db);
   hotoSvc.setClient(db);
   llcSvc.setClient(db);
+  // "Tu última visita" se fija una vez al arrancar. Antes Home la leía y la
+  // reescribía en cada render, así que el saludo "mientras estuviste fuera"
+  // desaparecía en cuanto la pantalla se repintaba.
+  const LOK = 'lifeos_last_open';
+  const prevOpen = parseInt(localStorage.getItem(LOK) || '0');
+  S.prevOpenAt = prevOpen || null;
+  if (!prevOpen || Date.now() - prevOpen > 3600000) localStorage.setItem(LOK, String(Date.now()));
   const now = new Date();
   document.getElementById('td').textContent = now.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
   await reload();
@@ -691,11 +699,14 @@ function domainSignal(area) {
   }
 
   if (name === 'JETMI') {
-    const recentIA = S.eventos.filter(e =>
+    // Solo desde la visita anterior: sin fecha, cualquier tarea de JETMI
+    // apuntada semanas atrás seguía contando como "avance mientras volabas".
+    const recentIA = S.prevOpenAt ? S.eventos.filter(e =>
       (e.area_id === area.id || projectIds.includes(e.project_id)) &&
-      ['ia', 'isabel'].includes(e.origen)
-    );
-    if (recentIA.length > 0) return `${recentIA.length} avance${recentIA.length !== 1 ? 's' : ''} mientras volabas`;
+      ['ia', 'isabel'].includes(e.origen) &&
+      new Date(e.created_at).getTime() > S.prevOpenAt
+    ) : [];
+    if (recentIA.length > 0) return `${recentIA.length} avance${recentIA.length !== 1 ? 's' : ''} desde tu última visita`;
     const openDec = S.dec.filter(d => d.area_id === area.id);
     if (openDec.length > 0) return `${openDec.length} decisión${openDec.length !== 1 ? 'es' : ''} pendiente${openDec.length !== 1 ? 's' : ''}`;
     if (areaProjects.length > 0) return `${areaProjects.length} proyecto${areaProjects.length !== 1 ? 's' : ''} en curso`;
@@ -821,6 +832,14 @@ function workQueue() {
       time: '~5 min', reason: 'Sin próxima acción definida', area: areaName(p.area_id), areaId: p.area_id, type: 'project_next', ref: p.id }));
 
   return items.sort((a, b) => b.weight - a.weight);
+}
+
+// Lo que Isabel hizo después de `sinceMs`. `S.eventos` ya viene sin el
+// registro de coste (ver loadAll en services/db.js).
+function isabelActionsSince(sinceMs, areaId=null) {
+  return S.eventos.filter(e => ['ia','isabel'].includes(e.origen)
+    && new Date(e.created_at).getTime() > sinceMs
+    && (!areaId || e.area_id === areaId));
 }
 
 function isabelContributions(areaId=null, limit=4) {
@@ -1003,10 +1022,8 @@ function isabelHomeCard(priority, greeting) {
 function homeView() {
   const now = Date.now();
   const hour = new Date().getHours();
-  const LOK = 'lifeos_last_open';
-  const lastOpen = parseInt(localStorage.getItem(LOK) || '0');
+  const lastOpen = S.prevOpenAt;
   const daysSinceOpen = lastOpen ? Math.floor((now - lastOpen) / 864e5) : 0;
-  if (!lastOpen || now - lastOpen > 3600000) localStorage.setItem(LOK, String(now));
 
   const visdoms = visibleDomains();
 
@@ -1016,9 +1033,12 @@ function homeView() {
   else if (hour < 13) greetParts.push('Buenos días, Estefanía.');
   else if (hour < 20) greetParts.push('Buenas tardes, Estefanía.');
   else greetParts.push('Buenas noches, Estefanía.');
-  const recentIA = S.eventos.filter(e => ['ia', 'isabel'].includes(e.origen));
-  if (recentIA.length > 0 && daysSinceOpen >= 1) {
-    greetParts.push(`Mientras estuviste fuera avancé en ${recentIA.length} ${recentIA.length === 1 ? 'punto' : 'puntos'}.`);
+  // Solo lo que Isabel hizo desde la visita anterior. Antes contaba las 50
+  // últimas filas de `eventos` sin mirar la fecha, y casi todas eran registro
+  // de coste: decía "avancé en 50 puntos" sin que fuera verdad.
+  const sinceLastVisit = lastOpen ? isabelActionsSince(lastOpen) : [];
+  if (sinceLastVisit.length > 0) {
+    greetParts.push(`Desde tu última visita hice ${sinceLastVisit.length} ${sinceLastVisit.length === 1 ? 'cosa' : 'cosas'} por ti.`);
   }
   const greeting = greetParts.join(' ');
 
@@ -4593,6 +4613,9 @@ Object.assign(window, {
 });
 
 window.addEventListener('load', showPin);
+
+// Que la app instalada no se quede en una versión vieja (ver services/appUpdate.js).
+watchAppUpdates({ serviceWorker: navigator.serviceWorker, doc: document, reload: () => location.reload() });
 
 // Telegram y LIFEOS son superficies del mismo estado persistente. Volver a la
 // pestaña revalida únicamente datos baratos: Supabase, preguntas pendientes,
