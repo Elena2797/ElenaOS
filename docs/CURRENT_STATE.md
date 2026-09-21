@@ -1,7 +1,19 @@
 Estado: fotografía operativa vigente
-Última verificación: 2026-09-20
+Última verificación: 2026-09-21
 
 # Estado actual de LIFEOS
+
+## Actualización — 2026-09-21
+
+- **Isabel (Telegram) vuelve a funcionar.** Cerebro principal: `openrouter/deepseek/deepseek-v4-flash` (OpenRouter directo, 10 $ de prepago). Repuesto: `anthropic/claude-sonnet-4-6` por el proxy de presupuesto `/ai/v1/messages`. Ver `DECISIONS.md` D46 y D47.
+- **Coste medido:** un mensaje de Telegram cuesta 0,0038 $ con DeepSeek, frente a 0,113 $ con Sonnet.
+- **Backend:** `isabel-api` `92ff51a` en `main` (código del proxy `b360282`), 630/630 tests. GitHub y producción coinciden.
+- **Pendiente:**
+  - revocar la clave antigua de Anthropic `97e63348…` (lo hace la usuaria, en la consola);
+  - verificar el cron de sueño del 2026-09-22 a las 08:00;
+  - llevar el gasto de OpenRouter a `budget-status`;
+  - decidir el nivel de thinking de DeepSeek (hoy `high`).
+- Detalle operativo y trampas: `operations/INCIDENTE_SALDO_2026-08-11.md` §12.
 
 ## ⚠ Corrección — 2026-09-20
 

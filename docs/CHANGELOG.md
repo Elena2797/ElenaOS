@@ -1,11 +1,19 @@
 Estado: conocimiento vigente — se añade cronológicamente, nunca se reescribe
-Última verificación: 2026-08-08
+Última verificación: 2026-09-21
 Verificado en: git log de isabel-api, life-os-app e isabel-gateway
 Fuente de verdad de datos: ninguna
 
 # CHANGELOG.md — Historial relevante
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
+
+## 2026-09-21 (Telegram reparado y primer cerebro fuera de Anthropic — D46, D47)
+
+- **Telegram llevaba roto desde el cambio al proxy**, con "Consumidor no reconocido". Causa demostrada con un diagnóstico de huellas en el 401: OpenClaw presentaba la **clave antigua de Anthropic** (`97e63348…`), guardada en su almacén de perfiles (`agents/main/agent/openclaw-agent.sqlite`, perfil `anthropic:default`), que **manda sobre `openclaw.json` y sobre `ANTHROPIC_API_KEY`**. Arreglado con `openclaw models auth paste-api-key` desde el propio entorno. La afirmación del 2026-09-20 de que "la clave real vive en un solo servicio" era falsa hasta ese momento.
+- Tapados por la autenticación salieron tres fallos más, resueltos en el proxy (D46): streaming, `max_tokens` de 32.000 frente a un techo de 2.048, y turnos de ~88 KB. `isabel-api` `b360282`, 630/630.
+- **Colisión con otra sesión:** el 2026-09-20 se había subido a `main` un soporte SSE propio (`be52e7c`, `408de8b`) que esta sesión no tenía en local, y un `railway up` desde la copia vieja lo pisó en producción. Se unieron las dos versiones: se conserva `parseAnthropicSseUsage` y su test (que no estaba en `npm test`), y el test que exigía rechazar streaming —roto en `origin/main`— se sustituyó. Lección: `git fetch` antes de cualquier `railway up`.
+- **Isabel deja de depender solo de Anthropic (D47):** DeepSeek V4 Flash vía OpenRouter de principal y Claude Sonnet de repuesto. Primer runner real del benchmark (`92ff51a`), smoke de 0,21 $. Mensaje real: 0,0038 $ frente a 0,113 $.
+- Trampas de operación encontradas hoy, todas en `operations/INCIDENTE_SALDO_2026-08-11.md` §12: el almacén de perfiles de OpenClaw; ejecutar `openclaw` como root deja ficheros `600 root` que el proceso `node` no puede leer; y cambiar el modelo por defecto no afecta a la conversación viva hasta reiniciar.
 
 ## 2026-08-08 (segunda tanda — delivery de Interventions, stale context y el porqué del coste — D38…D40)
 

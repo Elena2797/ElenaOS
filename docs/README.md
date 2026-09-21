@@ -28,7 +28,7 @@ Cada dato vive en **un solo documento**. Si ves el mismo dato repetido en dos si
 | Investigar o decidir algo de negocio de un dominio (ej. JETMI) | `research/<DOMINIO>/LOG.md` (mapa de cobertura) → `KNOWLEDGE.md` (lo verificado) → `HYPOTHESES.md` (lo abierto) |
 | Decidir arquitectura de IA, presupuestos o niveles de modelo | `research/AI_RUNTIME/ARQUITECTURA_ECONOMICA_2026-08-09.md` — **empieza por aquí**: qué se verificó, qué se cambió, niveles L0–L4, routing, presupuestos, Agent Budget Contract, sensibilidad, shortlist y simulación €/mes |
 | Saber cuánto cuesta Isabel de verdad y por qué | `research/AI_RUNTIME/MEDICION_CONTEXTO_2026-08-09.md` — la medición: composición del contexto y causa del cache-write. Ojo: su §5 quedó **superada** por el simulador (recortar contexto no basta para Isabel al 150%) |
-| Decidir qué modelos/proveedores de IA usa Isabel | `research/AI_RUNTIME/DECISION_MULTIMODELO_2026-08-09.md` — auditoría del Model Router, precios verificados, niveles de cerebro, benchmark y coste. **Decisión pendiente; ningún proveedor conectado.** Leer *después* del documento de medición |
+| Decidir qué modelos/proveedores de IA usa Isabel | `research/AI_RUNTIME/DECISION_MULTIMODELO_2026-08-09.md` — auditoría del Model Router, precios verificados, niveles de cerebro, benchmark y coste. **Decidido el 2026-09-21 (D47): DeepSeek V4 Flash vía OpenRouter, Claude Sonnet de repuesto** — resultados del smoke en su addendum final. Leer *después* del documento de medición |
 
 ## Estructura
 

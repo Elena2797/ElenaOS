@@ -1,9 +1,13 @@
-Estado: pendiente de la acción manual de la usuaria (crear y revocar claves en el Console de Anthropic)
-Última verificación: 2026-09-20
+Estado: rotación HECHA — clave nueva `d7ff29a1…` solo en isabel-api; falta el paso 5 (revocar `97e63348…`, usuaria)
+Última verificación: 2026-09-21
 Verificado en: escaneo de credenciales por huella SHA-256 sobre disco local, `.codex`, backups y los 4 servicios Railway, sin exponer valores
 Fuente de verdad de datos: ninguna
 
 # operations/ROTAR_ANTHROPIC_KEY.md — Runbook de rotación
+
+> **2026-09-21:** pasos 1–4 cumplidos. El Gateway también guardaba la clave vieja en su almacén de
+> perfiles de OpenClaw, que manda sobre la variable: ya sustituida por el token del proxy (ver
+> `INCIDENTE_SALDO_2026-08-11.md` §12, incluido cómo rotar ese token en el futuro). Solo falta el paso 5.
 
 ## Por qué, actualizado el 2026-09-20
 

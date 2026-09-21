@@ -1,11 +1,14 @@
-Estado: fuga cortada, control desplegado y bloqueado; pendiente migración y rotación
-Última verificación: 2026-09-20
+Estado: resuelto — Telegram operativo desde 2026-09-21; solo falta revocar la clave antigua (usuaria)
+Última verificación: 2026-09-21
 Verificado en: Railway (4 servicios por ID), volúmenes OpenClaw, Vercel, procesos Windows, huellas de credenciales, `npm test` 616/616, PGlite 20/20
 Fuente de verdad de datos: `ai_budget_state` en Supabase (tras aplicar la migración) y la consola de Anthropic para el gasto real
 
 # Incidente de saldo del 2026-08-11 — causa, saneamiento y reactivación
 
-> **Estado a 2026-09-20 21:30: NOT READY TO RECHARGE.**
+> **Actualización 2026-09-21: resuelto.** Telegram funciona por el proxy, la clave está rotada y
+> desde las 12:26 UTC Anthropic es el cerebro de repuesto (D47). Lo que había debajo, en §12.
+>
+> **Estado a 2026-09-20 21:30 (histórico): NOT READY TO RECHARGE.**
 > Todas las rutas de pago conocidas están cortadas o bloqueadas, el libro mayor
 > está aplicado y probado contra Postgres real, y el gasto está impedido por tres
 > comprobaciones independientes. Lo único que falta es **rotar la clave
@@ -242,3 +245,27 @@ tarea, 2.048 tokens de salida, 2 llamadas en vuelo, TTL de 2 min, 2 intentos, al
    que el frontend lee con esa misma clave rompería la app sin políticas previas. **Merece su propia
    sesión**: es un problema de privacidad, no de coste.
 6. El Gateway nuevo no tiene remoto git demostrado: su configuración vive en un volumen.
+
+## 12. 2026-09-21 — Telegram reparado, y lo que había debajo
+
+**Causa del "Consumidor no reconocido".** Se demostró con un diagnóstico en el 401 del proxy (solo huellas y longitudes): el Gateway presentaba una clave de 108 caracteres con huella `97e63348…`, **la antigua expuesta**. OpenClaw la tenía guardada en su almacén de perfiles, `/data/.openclaw/agents/main/agent/openclaw-agent.sqlite`, perfil `anthropic:default`. **Ese almacén manda sobre `openclaw.json` y sobre `ANTHROPIC_API_KEY`**. Cambiar la variable o el fichero no servía de nada. La afirmación de §5 de que la clave real vivía en un solo servicio era falsa hasta este arreglo:
+
+```bash
+echo $ANTHROPIC_API_KEY | runuser -u node -- openclaw models auth paste-api-key --provider anthropic --profile-id anthropic:default
+```
+
+(Ejecutado dentro del contenedor por `railway ssh`. La clave va por tubería y no aparece en ningún terminal.) Después, reiniciar el servicio.
+
+**Trampas que conviene no repetir:**
+
+1. **Nunca ejecutar `openclaw` como root en el contenedor.** Escribe `openclaw.json` con `600 root:root`, el proceso (usuario `node`) deja de poder leerlo y sigue con la copia `last-good`, sin avisar salvo por un `EACCES` en el vigilante de configuración. Usar siempre `runuser -u node --`. El entrypoint repara los permisos con `chown -R` en cada arranque.
+2. **Rotar el token del proxy exige dos pasos:** la variable de Railway **y** el `paste-api-key` de arriba. Con uno solo, el Gateway sigue presentando el token viejo.
+3. **Cambiar el modelo por defecto no cambia la conversación viva.** `openclaw models set` se aplicó en caliente, pero la sesión `agent:main:main` siguió con Sonnet hasta reiniciar el Gateway.
+4. **`git fetch` antes de cualquier `railway up`.** Un `railway up` desde una copia local atrasada pisó en producción el soporte SSE que otra sesión había subido a `main`.
+5. `railway ssh` inyecta en la sesión de diagnóstico un `GH_TOKEN` que **no** está en el proceso del Gateway (comprobado en `/proc/1/environ`). No es una fuga del bot.
+
+**Copias con la clave vieja que siguen en el volumen:** `openclaw-agent.sqlite.pre-token-20260921` y `openclaw-agent.sqlite-wal.pre-token-20260921` (en `agents/main/agent/`), además de los `archived-*` y `*.clobbered.*` de agosto. Son la red de seguridad del arreglo. **En cuanto se revoque `97e63348…` en la consola quedan inertes**, y entonces se pueden borrar.
+
+**Estado de la rotación:** hecha. La clave nueva (`d7ff29a1…`) está **solo** en `isabel-api` y hoy ha servido turnos reales por el proxy. Falta únicamente el paso 5 de `ROTAR_ANTHROPIC_KEY.md`: **revocar `97e63348…`**, que solo puede hacer la usuaria.
+
+**Desde las 12:26 UTC Anthropic es el repuesto, no el principal** (D47): los turnos van a DeepSeek V4 Flash vía OpenRouter, fuera de este presupuesto y con su propio freno (prepago más límite de la clave). El cron de sueño, que el proxy bloqueaba (`kind_not_allowed`), ahora va por OpenRouter. **Queda por verificar la ejecución del 2026-09-22 a las 08:00.**
