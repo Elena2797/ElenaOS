@@ -12,6 +12,7 @@ No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí
 - **Tareas desde Telegram:** tools `tasks_list`, `tasks_create` y `tasks_complete` (`isabel-api` `4b3f7d1`). Escriben en `tasks` con los mismos valores que el formulario de la app y `source: 'isabel'`. Hasta hoy Isabel no tenía ninguna tool de tareas: lo que le contaba se quedaba en la memoria de la conversación, que LIFEOS no ve.
 - **Inventarios abiertos (D48):** Isabel ve y cierra, con propuesta y confirmación, las sesiones de inventario que LIFEOS muestra abiertas. Primer uso: las dos de 9H-VCQ de julio.
 - **Isabel empuja (D49):** tres mensajes diarios en modo sin piedad (08:30, 17:00, 21:30).
+- **Recordatorios a una hora concreta:** tools `reminders_create/_list/_cancel`, tabla nueva `reminders` (`isabel-api/migrations/reminders.sql`, aplicada el 2026-09-21 desde el SQL Editor, con RLS y sin políticas) y cron `reminders-tick-1m` en el Gateway, que llama a `POST /v1/reminders/tick`. La entrega es determinista y cuesta 0 $; es "al menos una vez", con reclamo, reintento y rescate de envíos atascados. `isabel-api` `03abcd4`.
 - Calendario: **no hay ninguno conectado**. Ella usa Google Calendar; queda pendiente, junto con los recordatorios a una hora concreta.
 
 ## 2026-09-21 (Telegram reparado y primer cerebro fuera de Anthropic — D46, D47)
