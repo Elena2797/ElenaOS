@@ -477,3 +477,16 @@ Entregar por `chat.send` habría hecho que **cada notificación costara un turno
 **Alternativa descartada:** reutilizar el OAuth de Vercel y su cliente "Cliente web 1" (junio). Su secreto ya no se puede ver, no pedía Calendar, y Vercel no es donde viven las tools de Isabel.
 **Estado:** vigente desde 2026-09-21. Conectada a las 15:20Z. Verificado en producción: `google_status` con su cuenta y sin permisos que falten; `gmail_unanswered` sin publicidad; `gmail_inbox` con `days: 1`; 23 tools con la llave pública y 34 con la privada. `calendar_list_events`: su calendario principal no tiene nada en los 7 días siguientes.
 **Pendiente:** retirar `api/gmail-auth.js` y `gmail-callback.js` de Vercel y el cliente "Cliente web 1" de junio. Borrar del cliente nuevo el primer secreto (`****xmwJ`), que nadie guardó. Solo se lee el calendario `primary`: si ella usa otro, hace falta `calendarList` y otro permiso. `isAutomatedSender` no reconoce `noreplyapp@` ni `travel@`, e Isabel tiene que descartarlos a mano. Un cliente nuevo que escriba desde un formulario que envíe por SES (con `Feedback-ID`) no sale en el parte de la mañana hasta que ella conteste.
+
+### D52 — Hábitos con racha: leer, escribir y gym
+**Fecha:** 2026-09-21
+**Contexto:** era lo siguiente que ella pidió después de Google. Tiene TDAH y quiere que Isabel la empuje sin piedad; una racha a la vista es lo que hace que no quiera romperla. Hasta hoy el cierre de las 21:30 preguntaba si había leído o escrito, pero no se guardaba nada, salvo el gym.
+**Decisión:**
+- **Leer y escribir:** racha de días seguidos. Si hoy aún no lo ha hecho, la racha de ayer sigue viva, pero con `at_risk`: es lo que Isabel tiene que decirle. "No lo hice" también se apunta (`done:false`), para no volver a preguntarle.
+- **Gym:** semanas seguidas cumpliendo su objetivo de sesiones de fuerza (`metrics.sesiones_semana.target`, hoy 2). Es la misma regla del dominio Gym, leída de las sesiones que ya existen; sin objetivo declarado, vale una semana con al menos un día entrenado.
+- **Sin tabla nueva:** filas de `eventos` con `herramienta='habit_log'`, como las sesiones de gym. Lo último que dijo de un día manda; repetir lo mismo no duplica.
+- Tools `habits_status` y `habits_log` (fechas: hoy, ayer, anteayer o YYYY-MM-DD; nunca futuro ni más de 30 días atrás), y `GET /v1/habits` para la app.
+- **Mensajes de coach:** a las 08:30, una línea con las rachas; a las 17:00, si la racha de leer o escribir se rompe hoy, el paso mínimo (10 minutos, tres líneas); a las 21:30, pregunta solo por lo que hoy no ha dicho y apunta lo que conteste.
+**Alternativa descartada:** una tabla `habits`. Habría hecho falta una migración desde su sesión de Supabase, y `eventos` ya es el registro de las sesiones de gym.
+**Estado:** vigente. `isabel-api` `d0a3240`, `isabel-gateway` `a583c3a`, 36 tools en el Gateway. Con sus datos reales, el 2026-09-21: leer 0, escribir 0, gym 0 semanas (objetivo 2; era lunes).
+**Pendiente:** verlo en la app, en la tarjeta 🌱 Hábitos de Vida Personal, leyendo `/v1/habits`. Coordinado con la sesión de D50, que está tocando `main.js`.

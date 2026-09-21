@@ -7,6 +7,13 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-09-21, última hora (hábitos con racha — D52; OpenRouter en el informe; OAuth viejo retirado)
+
+- **Hábitos con racha (D52):** leer y escribir en días, gym en semanas cumpliendo su objetivo. Tools `habits_status`/`habits_log`, `GET /v1/habits`, y las rachas en los tres mensajes de coach (`isabel-api` `d0a3240`, `isabel-gateway` `a583c3a`).
+- **Cada despliegue de isabel-api dejaba a Isabel sin tools** hasta reiniciar el Gateway: el transporte SSE no reconecta. Lo encontró la sesión de D50, que lo resuelve con `/mcp/http` (Streamable HTTP). Hasta que esté, después de cada despliegue hay que reiniciar el Gateway fuera de la hora de un cron.
+- **Informe de presupuesto con OpenRouter:** `scripts/budget-status.mjs` enseña lo gastado hoy, en la semana y en el mes, y lo que queda del prepago y del límite de la clave. Avisa con menos de 2 $. Está en la rama `feat/openrouter-en-presupuesto` de `isabel-api`, pendiente de unir a `main`. El lector vive en `scripts/lib/`, porque el auditor de rutas de pago no admite en `src/` nada que hable con un proveedor. Primer dato: 0,42 $ gastados de 10 $.
+- **OAuth de Gmail de junio retirado de Vercel** (`life-os-app` `d6470c7`): `/api/gmail-auth` y `/api/gmail-callback` dan 404. Su tabla `gmail_tokens` está vacía; queda borrarla.
+
 ## 2026-09-21, noche (Isabel lee su Gmail y su Google Calendar — D51)
 
 - **Google conectado:** proyecto de Google Cloud `LIFEOS` con Gmail y Calendar activados, 5 permisos, cliente web nuevo "Isabel API (Railway)" y la app **"En producción"** (en "Prueba" el permiso caduca a los 7 días). Para publicarla, Google exige página de inicio y de privacidad: `isabel-api/public/privacidad.html` (`61d2722`). Cuenta conectada: la suya, verificada con `google_status`.
