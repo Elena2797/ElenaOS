@@ -18,8 +18,9 @@ const MAIN_URL = new URL('../../main.js', import.meta.url);
 // busca versión nueva al volver (services/appUpdate.js). Sin O5. Y otra (D57):
 // Home "Hoy con Isabel" (lo que dijo en Telegram, foco con botones, agenda,
 // rachas, lo que hizo), conexión por código de Telegram, Marca con Instagram,
-// Salud sin medicación en el bundle, JETMI sin voz inventada. Sin O5.
-const MAIN_CHECKPOINT_SHA256 = '8CC8B5B31C9377745A29DBBDB7BAA6B48F28E3B9BD3E53CBDFF5AAF39C3CB404';
+// Salud sin medicación en el bundle, JETMI sin voz inventada. Sin O5. Y otra
+// (D58): JETMI enseña "Dónde está JETMI" (areas.ia_context). Sin O5.
+const MAIN_CHECKPOINT_SHA256 = '3FC7262F76CDBDB799FE2220C766DE3367B6B44B78688B5C20EC29C6DC09BC19';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

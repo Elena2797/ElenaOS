@@ -315,6 +315,7 @@ async function loadAppBrand() {
 }
 
 function toggleBrandStrategy() { S.brandStrategyOpen = !S.brandStrategyOpen; render(); }
+function toggleJetmiContext() { S.jetmiContextOpen = !S.jetmiContextOpen; render(); }
 
 // Salud: su protocolo y sus condiciones ya no van dentro del JS público de la
 // app; vienen del servidor con el token de app.
@@ -1912,7 +1913,17 @@ function areaView() {
       jWorkspaces.push({ type: 'projects_all' });
     }
 
+    // Dónde está JETMI: el contexto del área (areas.ia_context), que se
+    // alimenta de su trabajo en Cowork (D58). Como la estrategia de Marca.
+    const jetmiContext=String(a.ia_context||'').trim();
+    const jetmiContextHtml=jetmiContext?`<div class="card" style="margin-bottom:12px">
+      <div class="card-head"><span class="ch-icon">🧭</span><span class="ch-label">Dónde está JETMI</span></div>
+      <div onclick="toggleJetmiContext()" style="padding:12px 14px;font-size:13px;color:var(--text);line-height:1.55;white-space:pre-wrap;cursor:pointer;${S.jetmiContextOpen?'':'display:-webkit-box;-webkit-line-clamp:7;-webkit-box-orient:vertical;overflow:hidden;'}">${mdLite(jetmiContext)}</div>
+      <div style="padding:0 14px 12px;font-size:11px;color:var(--t3)">${S.jetmiContextOpen?'Toca para cerrar':'Toca para leerlo entero'}</div>
+    </div>`:'';
+
     return `
+    ${jetmiContextHtml}
     <!-- ESTADO DE JETMI — calculado de sus datos; no es la opinión de Isabel (D57) -->
     <div style="background:var(--surface);border-radius:12px;padding:16px;margin-bottom:12px;border:0.5px solid var(--border)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -4789,7 +4800,7 @@ Object.assign(window, {
   showPin, pinPress,
   go, toggleMode, openAdd, openIsabel,
   openLink, linkStart, linkVerify, toggleIsabelMsg, logHabitToday,
-  focusDone, focusTomorrow, focusDiscard, toggleBrandStrategy,
+  focusDone, focusTomorrow, focusDiscard, toggleBrandStrategy, toggleJetmiContext,
   retryLoad, gymLogSession,
   done, closeModal,
   checkinSueno, checkinDolor, checkinVJ, completeCheckin,
