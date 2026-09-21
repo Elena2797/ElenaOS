@@ -7,6 +7,11 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-09-21, noche (Marca Personal con Instagram y estrategia propia — D54)
+
+- **Nueva tool `brand_content_context`** (privada). Junta su estrategia de contenido (`areas.ia_context` de Marca Personal), su Instagram de solo lectura (API oficial) y lo que está viviendo, para que Isabel le proponga contenido con datos reales. `isabel-api` `01b40b3`, migración `instagram_credentials.sql` sin aplicar todavía.
+- **Esperando a Estefanía:** el texto de ChatGPT con su idea de contenido, la cuenta de Instagram en profesional, la app de Meta y `INSTAGRAM_ACCESS_TOKEN` en Railway.
+
 ## 2026-09-21, noche (ON/OFF desde el chat, standby como rotación y MCP que sobrevive a los deploys — D53)
 
 - **La app decía OFF y "Fuera de rotación"** en su primer día de rotación (standby, sin avión). Isabel no podía cambiar el ON/OFF, y la app solo reconocía `rotacion` con avión. Nueva tool `lifeos_set_mode`, un aviso en las tools de VistaJet, y standby enseñado como parte de la rotación.
