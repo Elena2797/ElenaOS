@@ -1,5 +1,5 @@
-Estado: investigación cerrada — decisión PENDIENTE de la usuaria
-Última verificación: 2026-08-09
+Estado: decisión TOMADA el 2026-09-21 — ver DECISIONS.md D47 y el addendum final
+Última verificación: 2026-09-21
 Verificado en: Git de los 3 repos, tests reales, Railway API (GraphQL), `railway ssh` solo-lectura contra ambos Gateways, endpoints de producción sin coste IA, documentación oficial de precios consultada hoy, docs instaladas de OpenClaw 2026.6.10
 Fuente de verdad de datos: ninguna (documento de decisión, no de estado operativo)
 
@@ -477,3 +477,28 @@ Medir **qué** ocupa esos 25.833 tokens de contexto por turno. Es la palanca de 
 - El catalogo real actual son 47 tools; P1/O3 estan disenadas y NO aplicadas.
 - La tabla de coste inicial cobraba por error 150 lecturas deterministas LIFEOS/dia como L1. Corregida: ISABEL 150% = €81,37 actual; €41,16 P1; €22,43 Haiku; €8,86 Gemini hipotetico; €11,77 mixta.
 - No usar la frase "€20 duran X meses" hasta acumular baseline posterior al heartbeat. Desde `13:22Z` hasta el checkpoint no hubo ningun turno de modelo, pero la ventana aun es demasiado corta para proyectar.
+
+---
+
+## Addendum — decisión tomada, 2026-09-21
+
+La decisión dejó de estar pendiente: ver `DECISIONS.md` **D47**. Lo que cambia respecto a este documento:
+
+1. **§5 y R3 quedan anulados por la usuaria.** Estefanía decidió que la jurisdicción no filtra proveedores ("me da completamente igual que los chinos se enteren de mi salud"). Prioridad declarada: precio, eficiencia y versatilidad. No volver a filtrar candidatos por privacidad sin que ella lo pida.
+2. **Primer runner real:** `isabel-api/benchmarks/model-router/run-openrouter.mjs` (`92ff51a`). Tope duro por coste reportado; clave desde el entorno de Railway, nunca impresa.
+3. **Smoke ejecutado** — 9 casos (A, C, O, P, Q, S, T, V, W) × 8 modelos, precios de `openrouter.ai/api/v1/models` consultados ese día, **0,21 $** en total:
+
+| Modelo | Aprobados | Tools | Coste 9 casos | Latencia mediana | Lectura de las respuestas |
+|---|---|---|---:|---:|---|
+| anthropic/claude-haiku-4.5 | 8/9 | 3/4 | 0,0731 $ | 2,6 s | referencia |
+| **deepseek/deepseek-v4-flash** | 7/9 | 3/4 | **0,0068 $** | 5,3 s | O y S son falsos negativos (se negó a inventar; el corrector casó un "por ejemplo, 70 kg") |
+| qwen/qwen3.8-flash | 6/9 | 3/4 | 0,0096 $ | 7,2 s | **respuestas vacías** en S y V |
+| google/gemini-3.5-flash-lite | 6/9 | 3/4 | 0,0188 $ | 1,3 s | A es falso negativo; en V **ejecutó `sessions_close_all`** |
+| moonshotai/kimi-k2.5 | 6/9 | 3/4 | 0,0424 $ | 7,8 s | — |
+| deepseek/deepseek-v4.1-flash | 5/9 | 3/4 | 0,0145 $ | 8,8 s | — |
+| openai/gpt-5.6-luna | 4/9 | 0/4 | 0,0074 $ | 1,9 s | 400 en todas las peticiones con tools por esta vía |
+| z-ai/glm-4.7 | 3/9 | 3/4 | 0,0279 $ | 13,2 s | — |
+
+4. **El instrumento todavía miente en dos sitios.** El caso **V** lo suspenden los 8 modelos, Claude incluido: exige una tool concreta (`questions_mark_answered`) cuando negarse sin tool es igual de correcto. Y el scoring por `mentions`/`forbid` sigue dando falsos negativos (B5 no está del todo cerrado). **Leer siempre las respuestas con `--show` antes de fiarse de la tabla.**
+5. **OpenRouter va directo, no detrás del proxy de presupuesto**, porque OpenClaw desactiva sus ajustes de OpenRouter con un `baseUrl` propio. El freno es el prepago más el límite de la clave. Ver D47.
+6. **Coste real medido:** un mensaje de Telegram costó 0,0038 $ (3 llamadas) con DeepSeek, frente a 0,113 $ (2 llamadas) con Sonnet 4.6 esa misma mañana.

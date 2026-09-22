@@ -1,11 +1,54 @@
 Estado: fotografía operativa vigente
-Última verificación: 2026-08-10
+Última verificación: 2026-09-21
 
 # Estado actual de LIFEOS
+
+## Actualización — 2026-09-21, noche (manda sobre la de abajo)
+
+- **Inicio solo con lo suyo (D59):** saludo, "Urgente" (si no es tarea), "Hoy" (ahora + siguiente + su día) y progreso con rachas. Sin lo que Isabel dijo/hizo/preguntó ni dominios. `life-os-app` `f420055`. Ella ya conectó el móvil.
+- **Home es "Hoy con Isabel" y la app se conecta con un código de Telegram (D57).** Lo privado (lo que dijo Isabel, agenda, Instagram, salud) solo con token de app. Sin pestaña Avanzar ni voz de Isabel inventada. `isabel-api` `fbec0f8`, `life-os-app` `a8d808f`. Falta que ella conecte el móvil.
+- **JETMI actualizado desde su proyecto de Cowork (D58):** contexto del área, próximos pasos de los 7 proyectos y operadores. `life-os-app` `297a27b`.
+- **La app enseña lo que Isabel hizo, sin el registro de coste, y se actualiza sola al volver (D56).** El registro de coste sigue igual en `eventos`. `life-os-app` `6783ec9`.
+- **La app ya no tiene chat (D55).** Con Isabel se habla solo por Telegram; "Hablar con Isabel" y la pestaña Isabel abren `t.me/Isabellifeosbot`. `POST /v1/chat` retirado: con la API key pública llevaba al correo (SECURITY.md #13). `isabel-api` `96b0b67`, `life-os-app` `2d4e048`.
+- **Isabel ve su Gmail y su Google Calendar** (D51): 34 tools en el Gateway. Las de correo y agenda solo con la llave privada `ISABEL_MCP_KEY` (SECURITY.md #12).
+- **Isabel empuja** tres veces al día (D49); desde hoy el parte de las 08:30 trae agenda y correos importantes, y el cierre de las 21:30 lo no contestado.
+- **Backend:** `isabel-api` `8c38b4a` en `main`, desplegado desde GitHub. `npm test` 729/731: fallan el guard O5 por `src/index.js` (cambio de Outlook de otra sesión, `1e19184`) y, solo fuera de la carpeta del repo, la prueba que lee `../life-os-app`.
+- **Gateway:** `isabel-gateway` `a09f555` (sin remoto; se despliega con `railway up`). Cerebro DeepSeek V4 Flash (D47).
+
+## Actualización — 2026-09-21
+
+- **Isabel (Telegram) vuelve a funcionar.** Cerebro principal: `openrouter/deepseek/deepseek-v4-flash` (OpenRouter directo, 10 $ de prepago). Repuesto: `anthropic/claude-sonnet-4-6` por el proxy de presupuesto `/ai/v1/messages`. Ver `DECISIONS.md` D46 y D47.
+- **Coste medido:** un mensaje de Telegram cuesta 0,0038 $ con DeepSeek, frente a 0,113 $ con Sonnet.
+- **Backend:** `isabel-api` `92ff51a` en `main` (código del proxy `b360282`), 630/630 tests. GitHub y producción coinciden.
+- **Pendiente:**
+  - la clave nueva de Anthropic **caduca el 2026-10-20**: renovarla antes, o Claude deja de servir de repuesto (la expuesta `97e63348…` ya está revocada, 401 verificado);
+  - verificar el cron de sueño del 2026-09-22 a las 08:00;
+  - llevar el gasto de OpenRouter a `budget-status`;
+  - decidir el nivel de thinking de DeepSeek (hoy `high`).
+- **Desde la tarde del 2026-09-21:** Isabel apunta, lista y completa tareas de LIFEOS por Telegram; cierra inventarios abiertos con confirmación (D48); y escribe por su cuenta a las 08:30, 17:00 y 21:30 (D49). Recordatorios a una hora concreta desde el mismo día (cron `reminders-tick-1m`). Sin calendario todavía.
+- **Desde la noche del 2026-09-21 (D53):** Isabel pone el ON/OFF desde el chat, standby se ve como parte de la rotación, y el Gateway usa MCP sin estado (`/mcp/http`), así que un deploy de `isabel-api` ya no la deja sin tools. `isabel-api` `f3cf0e2`, `life-os-app` `df9c90b`.
+- **Desde última hora del 2026-09-21 (D50):** lo que ella le dice a Isabel se ve en Dominios, en VistaJet y en Home. La prioridad cuenta lo urgente, lo de hoy y lo importante, y se recalcula al volver de Telegram. Isabel corrige y descarta tareas, y Home enseña los recordatorios. `isabel-api` `dcff14e`, `life-os-app` `7f5c410`.
+- Detalle operativo y trampas: `operations/INCIDENTE_SALDO_2026-08-11.md` §12.
+
+## ⚠ Corrección — 2026-09-20
+
+**Todo lo que este documento dice sobre el heartbeat y sobre el coste es incorrecto desde el
+2026-08-09.** El heartbeat se apagó solo en el Gateway nuevo; el Gateway antiguo del proyecto
+Railway `isabel-gateway` siguió despertando al agente 48 veces al día con la misma clave hasta que
+se detuvo el 2026-09-20. Agotó el saldo el 2026-08-11 a las 02:18 UTC.
+
+Las frases "Heartbeat: **PASS** … cero después del reinicio" y "Coste O4 sin contaminación" eran
+ciertas **solo para el Gateway nuevo**, que es lo único que O4 observa. No las uses como evidencia
+de nada.
+
+LIFEOS lleva parado desde entonces. Estado real, causa demostrada, mapa de rutas de pago y
+secuencia de reactivación: [`operations/INCIDENTE_SALDO_2026-08-11.md`](operations/INCIDENTE_SALDO_2026-08-11.md).
+Antes de tocar nada relacionado con gasto, leer ese documento primero.
 
 ## Checkpoint funcional — 2026-08-10 13:18 Europe/Madrid
 
 Este bloque reemplaza como estado vigente las cifras históricas que aparecen más abajo.
+Superado por la corrección de arriba en todo lo relativo a heartbeat y coste.
 
 ### Producción verificada
 

@@ -20,7 +20,7 @@ Las URLs de `isabel-api`, `life-os-app` y `lifeos-agent` ya no contienen credenc
 ### Proyecto Railway `laudable-consideration`
 
 - `isabel-api`: servicio productivo, fuente `Elena2797/isabel-api`, rama `main`.
-- `isabel-gateway`: Gateway productivo nuevo, volumen persistente, sin dominio público. Telegram, MCP, adaptador, cron proactivo y cron de sueño viven aquí.
+- `isabel-gateway`: Gateway productivo nuevo, volumen persistente, sin dominio público. Telegram, MCP, adaptador, cron proactivo y cron de sueño viven aquí. Se conecta a las tools de `isabel-api` por `POST /mcp/http` (MCP Streamable HTTP sin estado, D53), así que los deploys no la cortan. `/mcp` (SSE) sigue para otros clientes.
 - `faithful-light`: confirmado huérfano; sin dominio público, sin deployment activo y con la fuente Git desconectada. El servicio y sus variables se conservan para rollback. Un push futuro a `isabel-api` ya no puede redesplegarlo automáticamente.
 
 ### Proyecto Railway antiguo `isabel-gateway`

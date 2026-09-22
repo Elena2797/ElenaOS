@@ -1,11 +1,62 @@
 Estado: conocimiento vigente — se añade cronológicamente, nunca se reescribe
-Última verificación: 2026-08-08
+Última verificación: 2026-09-21
 Verificado en: git log de isabel-api, life-os-app e isabel-gateway
 Fuente de verdad de datos: ninguna
 
 # CHANGELOG.md — Historial relevante
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
+
+## 2026-09-21, noche (Marca Personal con Instagram y estrategia propia — D54)
+
+- **Nueva tool `brand_content_context`** (privada). Junta su estrategia de contenido (`areas.ia_context` de Marca Personal), su Instagram de solo lectura (API oficial) y lo que está viviendo, para que Isabel le proponga contenido con datos reales. `isabel-api` `01b40b3`, migración `instagram_credentials.sql` sin aplicar todavía.
+- **Conectado el mismo día:** Instagram con un enlace propio (`/oauth/instagram/start`, `isabel-api` `5c3b269`), porque la ventana de tokens de Meta entra en bucle con la verificación en dos pasos. `instagram_credentials` aplicada. Estrategia de ChatGPT cargada, sin datos sensibles. Verificado con sus datos reales, sin errores de métricas.
+
+## 2026-09-21, noche (ON/OFF desde el chat, standby como rotación y MCP que sobrevive a los deploys — D53)
+
+- **La app decía OFF y "Fuera de rotación"** en su primer día de rotación (standby, sin avión). Isabel no podía cambiar el ON/OFF, y la app solo reconocía `rotacion` con avión. Nueva tool `lifeos_set_mode`, un aviso en las tools de VistaJet, y standby enseñado como parte de la rotación.
+- **Cada deploy de `isabel-api` dejaba a Isabel sin tools** (sesión SSE en memoria, 404 "Sesión MCP no encontrada o expirada"). Nuevo `POST /mcp/http` sin estado; el Gateway lo usa con `transport: "streamable-http"`.
+- `isabel-api` `f3cf0e2`, `life-os-app` `df9c90b`. El hash de `index.js` del guard O5, que fallaba desde el webhook de Outlook (`1e19184`), se movió a conciencia.
+
+## 2026-09-21, última hora (hábitos con racha — D52; OpenRouter en el informe; OAuth viejo retirado)
+
+- **Hábitos con racha (D52):** leer y escribir en días, gym en semanas cumpliendo su objetivo. Tools `habits_status`/`habits_log`, `GET /v1/habits`, y las rachas en los tres mensajes de coach (`isabel-api` `d0a3240`, `isabel-gateway` `a583c3a`). En la app, en la tarjeta 🌱 Hábitos de Vida Personal (`life-os-app` `362a711`).
+- **Cada despliegue de isabel-api dejaba a Isabel sin tools** hasta reiniciar el Gateway: el transporte SSE no reconecta. Lo encontró la sesión de D50, que lo resuelve con `/mcp/http` (Streamable HTTP). Hasta que esté, después de cada despliegue hay que reiniciar el Gateway fuera de la hora de un cron.
+- **Informe de presupuesto con OpenRouter:** `scripts/budget-status.mjs` enseña lo gastado hoy, en la semana y en el mes, y lo que queda del prepago y del límite de la clave. Avisa con menos de 2 $. Unido a `main` en `993c98e`: el primer despliegue con el Gateway en `/mcp/http` (D53), y Isabel siguió con sus 38 tools. El lector vive en `scripts/lib/`, porque el auditor de rutas de pago no admite en `src/` nada que hable con un proveedor. Primer dato: 0,42 $ gastados de 10 $.
+- **OAuth de Gmail de junio retirado de Vercel** (`life-os-app` `d6470c7`): `/api/gmail-auth` y `/api/gmail-callback` dan 404. Su tabla `gmail_tokens` está vacía; queda borrarla.
+
+## 2026-09-21, noche (Isabel lee su Gmail y su Google Calendar — D51)
+
+- **Google conectado:** proyecto de Google Cloud `LIFEOS` con Gmail y Calendar activados, 5 permisos, cliente web nuevo "Isabel API (Railway)" y la app **"En producción"** (en "Prueba" el permiso caduca a los 7 días). Para publicarla, Google exige página de inicio y de privacidad: `isabel-api/public/privacidad.html` (`61d2722`). Cuenta conectada: la suya, verificada con `google_status`.
+- **Solo correo de personas** (`df9fabe`, `5ac5bc4`): el primer "sin contestar" eran 7 anuncios de AliExpress de 10. Se descarta lo que trae `Feedback-ID`, `List-Unsubscribe` o `Precedence: bulk`, salvo en hilos donde ella ya escribió.
+- **Seguridad (SECURITY.md #12):** con la API key pública de la app se podía leer su Gmail y enviar correos en su nombre. Desde `8c38b4a`, las tools de correo y agenda solo existen con `MCP_PRIVATE_KEY`, que el Gateway usa como `ISABEL_MCP_KEY`.
+- **Mensajes de coach:** el de las 08:30 trae agenda y correos importantes; el de las 21:30, lo no contestado con la oferta de dejar el borrador hecho (`isabel-gateway` `0d66964`).
+- **El empujón de las 17:00 del primer día no llegó:** empezó a su hora y lo cortó un reinicio del Gateway a las 17:00:14. El sueño de las 08:00 falló por última vez con "Consumidor no reconocido", antes del arreglo de Telegram.
+- Tres sesiones trabajaron a la vez en `isabel-api` (Google, D50 y Outlook). Por eso lo de esta se subió desde una copia limpia de `origin/main` y no con `railway up`: un `railway up` habría publicado trabajo a medias de las otras.
+
+## 2026-09-21, última hora de la tarde (Telegram y la app, conectados de verdad — D50)
+
+- **Lo que Isabel apuntaba no se veía en Dominios:** VistaJet solo leía `vj_tasks` y ocultaba `tasks`; el resto de dominios contaba proyectos. Arreglado, y la lista de Tareas vuelve a VistaJet.
+- **Home no cambiaba con lo que ella decía:** el Core solo miraba fechas y no se recalculaba al volver de Telegram. Ahora cuentan urgente, para hoy e importante, y Home se recalcula al volver. `/v1/now` reutiliza su respuesta si nada cambió.
+- **Isabel puede corregir y descartar tareas** (`tasks_update`, `tasks_discard`, estado `discarded`) y entiende "mañana", "el viernes" o "máx mañana" como fecha. Cuatro tareas completadas por error ese día pasaron a descartadas.
+- **Recordatorios en Home**, vía `GET /v1/reminders`, porque `reminders` tiene RLS.
+- `isabel-api` `dcff14e`, `life-os-app` `7f5c410` (publicado desde la rama `fix/tareas-isabel-en-dominios`; el `main` local de `life-os-app` tiene un commit O5 sin publicar, `a1f1bee`, que no se tocó). Gateway reiniciado: 33 tools.
+
+## 2026-09-21, tarde (Isabel apunta tareas, cierra inventarios y empuja — D48, D49)
+
+- **Tareas desde Telegram:** tools `tasks_list`, `tasks_create` y `tasks_complete` (`isabel-api` `4b3f7d1`). Escriben en `tasks` con los mismos valores que el formulario de la app y `source: 'isabel'`. Hasta hoy Isabel no tenía ninguna tool de tareas: lo que le contaba se quedaba en la memoria de la conversación, que LIFEOS no ve.
+- **Inventarios abiertos (D48):** Isabel ve y cierra, con propuesta y confirmación, las sesiones de inventario que LIFEOS muestra abiertas. Primer uso: las dos de 9H-VCQ de julio.
+- **Isabel empuja (D49):** tres mensajes diarios en modo sin piedad (08:30, 17:00, 21:30).
+- **Recordatorios a una hora concreta:** tools `reminders_create/_list/_cancel`, tabla nueva `reminders` (`isabel-api/migrations/reminders.sql`, aplicada el 2026-09-21 desde el SQL Editor, con RLS y sin políticas) y cron `reminders-tick-1m` en el Gateway, que llama a `POST /v1/reminders/tick`. La entrega es determinista y cuesta 0 $; es "al menos una vez", con reclamo, reintento y rescate de envíos atascados. `isabel-api` `03abcd4`.
+- Calendario: **no hay ninguno conectado**. Ella usa Google Calendar; queda pendiente, junto con los recordatorios a una hora concreta.
+
+## 2026-09-21 (Telegram reparado y primer cerebro fuera de Anthropic — D46, D47)
+
+- **Telegram llevaba roto desde el cambio al proxy**, con "Consumidor no reconocido". Causa demostrada con un diagnóstico de huellas en el 401: OpenClaw presentaba la **clave antigua de Anthropic** (`97e63348…`), guardada en su almacén de perfiles (`agents/main/agent/openclaw-agent.sqlite`, perfil `anthropic:default`), que **manda sobre `openclaw.json` y sobre `ANTHROPIC_API_KEY`**. Arreglado con `openclaw models auth paste-api-key` desde el propio entorno. La afirmación del 2026-09-20 de que "la clave real vive en un solo servicio" era falsa hasta ese momento.
+- Tapados por la autenticación salieron tres fallos más, resueltos en el proxy (D46): streaming, `max_tokens` de 32.000 frente a un techo de 2.048, y turnos de ~88 KB. `isabel-api` `b360282`, 630/630.
+- **Colisión con otra sesión:** el 2026-09-20 se había subido a `main` un soporte SSE propio (`be52e7c`, `408de8b`) que esta sesión no tenía en local, y un `railway up` desde la copia vieja lo pisó en producción. Se unieron las dos versiones: se conserva `parseAnthropicSseUsage` y su test (que no estaba en `npm test`), y el test que exigía rechazar streaming —roto en `origin/main`— se sustituyó. Lección: `git fetch` antes de cualquier `railway up`.
+- **Isabel deja de depender solo de Anthropic (D47):** DeepSeek V4 Flash vía OpenRouter de principal y Claude Sonnet de repuesto. Primer runner real del benchmark (`92ff51a`), smoke de 0,21 $. Mensaje real: 0,0038 $ frente a 0,113 $.
+- Trampas de operación encontradas hoy, todas en `operations/INCIDENTE_SALDO_2026-08-11.md` §12: el almacén de perfiles de OpenClaw; ejecutar `openclaw` como root deja ficheros `600 root` que el proceso `node` no puede leer; y cambiar el modelo por defecto no afecta a la conversación viva hasta reiniciar.
 
 ## 2026-08-08 (segunda tanda — delivery de Interventions, stale context y el porqué del coste — D38…D40)
 

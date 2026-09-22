@@ -179,10 +179,18 @@ No incluye `VITE_ISABEL_API_URL` ni `VITE_ISABEL_KEY`, que sí se usan en produc
 
 ## Integraciones sin conectar
 
-### Gmail OAuth existe como código, sin UI que lo dispare
+### Gmail OAuth existe como código, sin UI que lo dispare — SUSTITUIDO por D51 (2026-09-21), falta retirarlo
+Gmail y Calendar se conectan ahora desde `isabel-api` (D51). Estas dos funciones de Vercel siguen publicadas y hay que retirarlas.
 `life-os-app/api/gmail-auth.js` y `gmail-callback.js` son funciones serverless completas y funcionales en aislamiento, pero 0 referencias desde el frontend. No se sabe si el objetivo original sigue vigente.
 
 ## Infraestructura / deploy
+
+### Reiniciar el Gateway a la hora de un cron corta el mensaje — LECCIÓN 2026-09-21
+El primer empujón de las 17:00 (D49) empezó a su hora y terminó con `cron: job interrupted by gateway restart`: el Gateway se reinició a las 17:00:14 para cargar tools nuevas. No se reintenta: ese día no llegó. Reiniciar lejos de las 08:00, 08:30, 17:00 y 21:30 Madrid.
+
+### El guard O5 falla en `main` desde el cambio de Outlook — ABIERTO 2026-09-21
+`1e19184` (otra sesión) cambió `src/index.js` sin mover su checkpoint en `o5DisconnectedGuard.test.js`. Las pruebas que importan de verdad (que `index.js` no monta rutas de O5 y que el grafo vivo no alcanza O5) pasan. Mover el checkpoint le toca a quien revise ese cambio.
+
 
 ### `faithful-light` huérfano — MITIGADO REVERSIBLEMENTE 2026-08-08
 Confirmado otra vez sin consumidores ni tráfico HTTP en los 7 días previos. Su source GitHub se desconectó y el deployment se detuvo; no tiene dominio público. El servicio, variables y configuración siguen presentes para rollback. Un push a `isabel-api` ya no puede resucitarlo.
