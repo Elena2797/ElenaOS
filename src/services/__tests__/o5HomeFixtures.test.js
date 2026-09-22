@@ -25,7 +25,7 @@ const MAIN_URL = new URL('../../main.js', import.meta.url);
 // (D60): VistaJet cuenta tareas reales y documentos; el día de rotación avanza
 // solo; sin contador de cannabis. Sin O5. Y otra (D61): dominios Libro (índice
 // y progreso con token de app) y Marca Propia. Sin O5.
-const MAIN_CHECKPOINT_SHA256 = '07DEDC7D92D39C157D8C964220748B7AC28A8977258833923BC1E7981CBECE5D';
+const MAIN_CHECKPOINT_SHA256 = 'B92ABB35A08FFB7E1275DAE1944603708552A1897B0C5439355C64F99D83E31A';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

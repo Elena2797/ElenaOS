@@ -176,6 +176,31 @@ async function initApp() {
   invSvc.setClient(db);
   hotoSvc.setClient(db);
   llcSvc.setClient(db);
+  // Login real (D62): la base solo se abre con una sesión de su usuario, y esa
+  // sesión sale del token de app (código de Telegram). Sin ella no se carga nada.
+  if (!(await ensureDbSession())) { showLoginGate(); return; }
+  db.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT') ensureDbSession().then(ok => { if (!ok) showLoginGate(); }); });
+  await startApp();
+}
+
+async function ensureDbSession() {
+  try {
+    const { data } = await db.auth.getSession();
+    if (data?.session) return true;
+    if (!appClient().isLinked()) return false;
+    const r = await appClient().post('/v1/app/session');
+    if (!r?.ok || !r.session) return false;
+    const { error } = await db.auth.setSession({ access_token: r.session.access_token, refresh_token: r.session.refresh_token });
+    return !error;
+  } catch { return false; }
+}
+
+function showLoginGate() {
+  S.loginGate = true;
+  openLink();
+}
+
+async function startApp() {
   // "Tu última visita" se fija una vez al arrancar. Antes Home la leía y la
   // reescribía en cada render, así que el saludo "mientras estuviste fuera"
   // desaparecía en cuanto la pantalla se repintaba.
@@ -532,10 +557,11 @@ function renderLinkModal() {
   if (!m) {
     m = document.createElement('div');
     m.className = 'overlay'; m.id = 'modal';
-    m.onclick = e => { if (e.target === m) closeModal(); };
     document.body.appendChild(m);
   }
+  m.onclick = e => { if (e.target === m && !S.loginGate) closeModal(); };
   const L = S.link || {};
+  const cancel = S.loginGate ? '' : '<button class="btn btn-s" onclick="closeModal()">Cancelar</button>';
   const err = L.error ? `<div style="font-size:12px;color:#A32D2D;margin:4px 0 8px">${L.error}</div>` : '';
   m.innerHTML = L.step === 'code'
     ? `<div class="modal">
@@ -544,17 +570,17 @@ function renderLinkModal() {
         <input class="fi" id="link-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123 456" onkeydown="if(event.key==='Enter')linkVerify()">
         ${err}
         <div class="ma">
-          <button class="btn btn-s" onclick="closeModal()">Cancelar</button>
+          ${cancel}
           <button class="btn btn-p" onclick="linkVerify()" ${L.busy ? 'disabled' : ''}>Conectar</button>
         </div>
         <button onclick="linkStart()" style="background:none;border:none;padding:12px 0 0;font-size:12px;color:var(--t2);cursor:pointer">Mandarme otro código</button>
       </div>`
     : `<div class="modal">
-        <h3>Conectar con Isabel</h3>
+        <h3>${S.loginGate ? 'Entrar en LIFEOS' : 'Conectar con Isabel'}</h3>
         <div style="font-size:13px;color:var(--t2);line-height:1.5;margin-bottom:12px">Te mando un código de 6 cifras a Telegram. Lo escribes aquí una vez y este móvil queda conectado.</div>
         ${err}
         <div class="ma">
-          <button class="btn btn-s" onclick="closeModal()">Cancelar</button>
+          ${cancel}
           <button class="btn btn-p" onclick="linkStart()" ${L.busy ? 'disabled' : ''}>Mandarme el código</button>
         </div>
       </div>`;
@@ -577,8 +603,10 @@ async function linkVerify() {
   S.link.busy = true;
   const r = await appClient().verify(S.link.linkId, code);
   if (r.ok) {
+    if (r.session) await db.auth.setSession({ access_token: r.session.access_token, refresh_token: r.session.refresh_token });
     S.link = null;
     closeModal();
+    if (S.loginGate) { S.loginGate = false; await startApp(); return; }
     render();
     await Promise.all([loadAppToday(), loadHabits()]);
     render();
