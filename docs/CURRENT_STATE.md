@@ -3,7 +3,11 @@ Estado: fotografía operativa vigente
 
 # Estado actual de LIFEOS
 
-## Actualización — 2026-09-22, mediodía (manda sobre las de abajo)
+## Actualización — 2026-09-22, tarde (manda sobre las de abajo)
+
+- **"Ya lo hice" (D64):** cuando ella dice que ya hizo algo, `tasks_complete` cierra la tarea y sus recordatorios, o solo el recordatorio si no había tarea; `tasks_list` incluye los recordatorios pendientes. `isabel-api` `b0983f7`, backend 822/823. Probado en producción.
+
+## Actualización — 2026-09-22, mediodía
 
 - **Login real (D62):** la app entra con el código de Telegram y una sesión real de Supabase; RLS `lifeos_owner_only` en todas las tablas. La clave anónima ve 0 filas. SECURITY #3 y #6 resueltos; sigue abierto #2 (la API key pública de `/v1`).
 - **O5 canary (D63) encendido en `CANARY`:** lo que ella cuenta de sí misma por Telegram (preferencias, objetivos, compromisos con fecha, límites, hechos) se guarda como conocimiento con sus palabras y el día, e Isabel lo usa después: además de `knowledge_recall`, lo vigente viaja dentro de `vistajet_get_status`, `gym_get_status`, `habits_status`, `tasks_list` y `calendar_list_events` (solo con la llave privada), así que también llega a los mensajes de coach. Ella lo ve y lo olvida en Dominios → "Lo que Isabel sabe de ti". `isabel-api` `76f70bd`, `life-os-app` `b6376a2`. Probado en producción con turnos reales en sesiones aisladas; las frases de prueba se olvidaron y el estado quedó vacío. Apagar o pausar: `operations/O5_CANARY.md`.

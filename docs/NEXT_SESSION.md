@@ -1,4 +1,4 @@
-Última actualización: 2026-09-22, mediodía — O5 canary encendido y probado en producción; login real documentado
+Última actualización: 2026-09-22, tarde — O5 canary encendido; "ya lo hice" cierra tarea y recordatorios (D64)
 
 # Próxima sesión
 
@@ -9,6 +9,7 @@
 - El Gateway ve tools nuevas con `openclaw mcp reload`, sin reiniciar.
 - Guard O5 verde; ahora vigila que O5 solo se alcance por `knowledgeCanary.js`.
 - D62 escrita; SECURITY #3 y #6 resueltos.
+- **D64:** "ya lo hice" cierra la tarea y sus recordatorios (o solo el recordatorio); `tasks_list` trae los recordatorios pendientes. Probado con Isabel en producción.
 
 ## 2. Qué quedó pendiente
 
@@ -21,7 +22,8 @@
 
 1. Leer el ledger (`select resumen, created_at from eventos where herramienta = 'lifeos:knowledge' order by created_at desc`) y revisar con ella lo que Isabel haya guardado de verdad. Si guarda cosas que no debe, ajustar la descripción de `knowledge_remember`; si hay que parar, `LIFEOS_KNOWLEDGE_STAGE=READ_ONLY` u `OFF` (`operations/O5_CANARY.md`).
 2. Mirar el `state` del coach 17:00.
-3. Si el canary va bien unos días: decidir el siguiente paso de O5 (`core/KNOWLEDGE_LOOP.md`, pasos 1–4). Nada de eso está activado.
+3. Cuando ella vuelva a decir "ya hice X" por Telegram, comprobar en `tasks`/`reminders` que se cerró en ese turno (D64). Si Isabel sigue sin llamar a `tasks_complete`, el siguiente paso es un aviso en el Gateway, no más texto en las descripciones.
+4. Si el canary va bien unos días: decidir el siguiente paso de O5 (`core/KNOWLEDGE_LOOP.md`, pasos 1–4). Nada de eso está activado.
 
 ## 4. Qué no debe romperse
 
@@ -36,4 +38,4 @@
 
 ## 5. Qué documentos leer
 
-`CURRENT_STATE.md` → `DECISIONS.md` D62–D63 → `operations/O5_CANARY.md` → `core/KNOWLEDGE_LOOP.md` ("Canary vivo") → `SECURITY.md` #2.
+`CURRENT_STATE.md` → `DECISIONS.md` D62–D64 → `operations/O5_CANARY.md` → `core/KNOWLEDGE_LOOP.md` ("Canary vivo") → `SECURITY.md` #2.

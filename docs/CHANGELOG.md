@@ -7,6 +7,10 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-09-22, tarde ("ya lo hice" cierra tarea y recordatorios — D64)
+
+- La visa de Arabia Saudí siguió en LIFEOS después de que ella dijera que ya estaba: era solo un recordatorio y `tasks_complete` solo miraba tareas. Ahora `tasks_complete` cierra la tarea y sus recordatorios (o solo el recordatorio si no había tarea), y `tasks_list` trae los recordatorios pendientes. `isabel-api` `b0983f7`. Probado con Isabel en producción (D64).
+
 ## 2026-09-22, mediodía (Isabel empieza a aprender de lo que ella le cuenta — O5 canary, D63)
 
 - **Encendido:** ella aplicó `knowledge_canary.sql` y puso `LIFEOS_KNOWLEDGE_STAGE=CANARY` (12:57 Madrid). Prueba en producción con turnos reales de Isabel en sesiones aisladas (`openclaw agent --session-key agent:main:o5-proof-*`, sin `--deliver`): las dos frases se guardaron bien, pero en una sesión nueva Isabel **no** consultó lo aprendido y recomendó un vuelo nocturno. Arreglo `isabel-api` `76f70bd`: lo vigente viaja dentro de las tools de estado (solo llave privada). Repetida la prueba: "no lo cojas… sabes que prefieres no volar de noche" y "Gym 1/3 esta semana". Frases de prueba olvidadas después.
