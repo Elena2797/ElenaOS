@@ -33,7 +33,9 @@ const MAIN_URL = new URL('../../main.js', import.meta.url);
 // Y otra (2026-09-22, SECURITY.md #2): la app deja la API key del bundle y
 // llama a isabel-api con su token de app (isabelFetch), y los PDF se abren con
 // un ticket corto. Solo cómo se autentica; Home no cambia. Sin O5.
-const MAIN_CHECKPOINT_SHA256 = 'A783C8D306EF96485472835348FB2BDF0D55AECDD32D30BF07B66059C5C1E904';
+// Y otra el mismo día: botón "Exportar UPLIFT" en VistaJet (antes solo en la
+// página vieja de isabel-api). Home no cambia. Sin O5.
+const MAIN_CHECKPOINT_SHA256 = 'CDC65864118AEF92824E9B16E20B4C5B449C86E63D14874BD7EA8AB655948FAE';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

@@ -3609,20 +3609,25 @@ function vjStatusView(){
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:20px">
     <button onclick="go('vj_inventario')" style="padding:13px;border:0.5px solid var(--border);background:var(--surface);color:var(--text);border-radius:12px;font-size:13px;font-weight:600;cursor:pointer">Ir a Inventario</button>
     <button onclick="invExport()" ${!sess?'disabled':''} style="padding:13px;border:none;background:${sess?'var(--text)':'var(--surface)'};color:${sess?'#fff':'var(--t3)'};border-radius:12px;font-size:13px;font-weight:600;cursor:${sess?'pointer':'not-allowed'};border:0.5px solid var(--border)">Exportar Excel</button>
+    <button onclick="invExport('uplift')" ${!sess?'disabled':''} style="grid-column:1/-1;padding:13px;background:var(--surface);color:${sess?'var(--text)':'var(--t3)'};border-radius:12px;font-size:13px;font-weight:600;cursor:${sess?'pointer':'not-allowed'};border:0.5px solid var(--border)">Exportar UPLIFT</button>
   </div>`;
 }
 
-async function invExport(){
+// `mode`: 'uplift' saca el Excel de lo que hay que reponer (antes solo estaba en
+// la página vieja de isabel-api, que dejó de funcionar con D68). `t` evita que
+// el navegador sirva un Excel viejo de caché.
+async function invExport(mode){
   if(!S.invSession) return;
   try{
-    const res=await isabelFetch(`/v1/session/${S.invSession.id}/export`);
+    const qs=new URLSearchParams({ t:String(Date.now()), ...(mode==='uplift'?{mode:'uplift'}:{}) });
+    const res=await isabelFetch(`/v1/session/${S.invSession.id}/export?${qs}`);
     if(!res.ok) throw new Error(`Export ${res.status}`);
     const blob=await res.blob();
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
     const cd=res.headers.get('Content-Disposition')||'';
     const m=cd.match(/filename="([^"]+)"/);
-    a.download=m?m[1]:'inventory.xlsx';
+    a.download=m?m[1]:(mode==='uplift'?'inventory_UPLIFT.xlsx':'inventory.xlsx');
     a.click();
     URL.revokeObjectURL(a.href);
   }catch(e){ alert('Error exportando: '+e.message); }
