@@ -30,7 +30,10 @@ const MAIN_URL = new URL('../../main.js', import.meta.url);
 // fixture ni read model de O5 preparado (segunda aserción). Y otra (D65, turno
 // de noche): tarjeta "Isabel trabajó por ti" en JETMI, Marca Personal, Marca
 // Propia y Vida Personal, que solo lee GET /v1/app/night. Home no cambia. Sin O5.
-const MAIN_CHECKPOINT_SHA256 = 'AEAB62514F7F2FEBC8DF2D17D679C4EAB50D9C8BBC839766808AD55720AD7CDE';
+// Y otra (2026-09-22, SECURITY.md #2): la app deja la API key del bundle y
+// llama a isabel-api con su token de app (isabelFetch), y los PDF se abren con
+// un ticket corto. Solo cómo se autentica; Home no cambia. Sin O5.
+const MAIN_CHECKPOINT_SHA256 = 'A783C8D306EF96485472835348FB2BDF0D55AECDD32D30BF07B66059C5C1E904';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

@@ -1,21 +1,19 @@
-// Conexión de la app con ella, para lo privado (D57).
-//
-// La API key de la app es pública (va en el bundle), así que lo que le dice
-// Isabel, su agenda o su Instagram solo salen con un token de app. El token se
+// Conexión de la app con ella (D57). El token de app es la única llave de la
+// app ante isabel-api (SECURITY.md #2: el bundle ya no lleva API key). Se
 // consigue una vez con un código que isabel-api manda a su Telegram, y se
 // guarda en este móvil. Si el servidor lo rechaza (caducado o revocado), se
-// olvida y la app vuelve a ofrecer "Conectar".
+// olvida y la app vuelve a pedir entrar.
 
 export const TOKEN_KEY = 'lifeos_app_token';
 
-export function createAppLinkClient({ base, apiKey, storage = globalThis.localStorage, fetchImpl = (...a) => fetch(...a) }) {
+export function createAppLinkClient({ base, storage = globalThis.localStorage, fetchImpl = (...a) => fetch(...a) }) {
   const read = () => { try { return storage?.getItem(TOKEN_KEY) || null; } catch { return null; } };
   const write = (token) => {
     try { if (token) storage.setItem(TOKEN_KEY, token); else storage.removeItem(TOKEN_KEY); } catch { /* sin almacenamiento: no queda conectada */ }
   };
 
   async function call(path, { method = 'GET', body, auth = true } = {}) {
-    const headers = { 'x-api-key': apiKey };
+    const headers = {};
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (auth) {
       const token = read();
@@ -36,6 +34,7 @@ export function createAppLinkClient({ base, apiKey, storage = globalThis.localSt
 
   return {
     isLinked: () => Boolean(read()),
+    token: read,
     start: () => call('/v1/app/link/start', { method: 'POST', auth: false }),
     async verify(linkId, code) {
       const r = await call('/v1/app/link/verify', { method: 'POST', body: { link_id: linkId, code }, auth: false });

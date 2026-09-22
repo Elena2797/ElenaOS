@@ -229,7 +229,7 @@ async function startApp() {
 // null = no se pudo leer (no es "no hay ninguno"): la tarjeta no se pinta.
 async function loadReminders() {
   try {
-    const res = await fetch(`${ISABEL_API}/v1/reminders`, { headers: { 'x-api-key': ISABEL_KEY } });
+    const res = await isabelFetch(`/v1/reminders`);
     if (!res.ok) throw new Error('reminders ' + res.status);
     const data = await res.json();
     S.reminders = data.ok ? data.reminders : null;
@@ -245,7 +245,7 @@ async function loadReminders() {
 // la vista no cuenta días. null = no se pudo leer: la fila no se pinta.
 async function loadHabits() {
   try {
-    const res = await fetch(`${ISABEL_API}/v1/habits`, { headers: { 'x-api-key': ISABEL_KEY } });
+    const res = await isabelFetch(`/v1/habits`);
     if (!res.ok) throw new Error('habits ' + res.status);
     const data = await res.json();
     S.habits = data.ok ? data.habits : null;
@@ -295,7 +295,7 @@ function habitsStreakRow({ actions = false } = {}) {
 
 let appLinkClient = null;
 function appClient() {
-  return appLinkClient || (appLinkClient = createAppLinkClient({ base: ISABEL_API, apiKey: ISABEL_KEY }));
+  return appLinkClient || (appLinkClient = createAppLinkClient({ base: ISABEL_API }));
 }
 
 const HOME_CARD = 'background:var(--surface);border-radius:14px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)';
@@ -701,7 +701,7 @@ async function loadGymState() {
   if (S._gymLoading) return;
   S._gymLoading = true;
   try {
-    const res = await fetch(`${ISABEL_API}/v1/gym/state`, { headers: { 'x-api-key': ISABEL_KEY } });
+    const res = await isabelFetch(`/v1/gym/state`);
     if (!res.ok) throw new Error('gym ' + res.status);
     S.gym = await res.json();
   } catch (e) {
@@ -715,7 +715,7 @@ async function loadSleepState() {
   if (S._sleepLoading) return;
   S._sleepLoading = true;
   try {
-    const res = await fetch(`${ISABEL_API}/v1/health/sleep/recent?days=7`, { headers: { 'x-api-key': ISABEL_KEY } });
+    const res = await isabelFetch(`/v1/health/sleep/recent?days=7`);
     if (!res.ok) throw new Error('sleep ' + res.status);
     S.sleep = await res.json();
   } catch (e) {
@@ -728,7 +728,7 @@ async function loadSleepState() {
 async function loadFinanceState(month = S.finMonth) {
   const token = ++S._financeRequestToken;
   try {
-    const res = await fetch(`${ISABEL_API}/v1/finance/summary?month=${encodeURIComponent(month)}`, { headers: { 'x-api-key': ISABEL_KEY } });
+    const res = await isabelFetch(`/v1/finance/summary?month=${encodeURIComponent(month)}`);
     if (!res.ok) throw new Error('finance ' + res.status);
     const model = await res.json();
     if (token !== S._financeRequestToken) return;
@@ -747,9 +747,9 @@ async function gymLogSession() {
   el.value = '';
   S._gymSaving = true; render();
   try {
-    const res = await fetch(`${ISABEL_API}/v1/gym/session`, {
+    const res = await isabelFetch(`/v1/gym/session`, {
       method: 'POST',
-      headers: { 'x-api-key': ISABEL_KEY, 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ text }),
     });
     const data = await res.json();
@@ -773,7 +773,7 @@ async function gymLogSession() {
 // es peor que no haberla hecho.
 async function loadPendingQuestions() {
   try {
-    const res = await fetch(`${ISABEL_API}/v1/interventions/pending`, { headers: { 'x-api-key': ISABEL_KEY } });
+    const res = await isabelFetch(`/v1/interventions/pending`);
     if (!res.ok) throw new Error('pending ' + res.status);
     const data = await res.json();
     S.pendingQuestions = (data.interventions || []).filter(i => i.text);
@@ -845,7 +845,7 @@ function pendingQuestionsCard() {
 async function loadIsabelNow({ silent = false } = {}) {
   if (!silent) S.isabelNow = { status: 'loading' };
   try {
-    const res = await fetch(`${ISABEL_API}/v1/now`, { headers: { 'x-api-key': ISABEL_KEY } });
+    const res = await isabelFetch(`/v1/now`);
     if (!res.ok) throw new Error(`Isabel Core ${res.status}`);
     const data = await res.json();
     S.isabelNow = data;
@@ -2982,8 +2982,7 @@ function llcExport(){
   if(!S.llcRec) return;
   // Navegación directa (no fetch+blob): en iOS/PWA los blobs de descarga fallan,
   // pero abrir la URL muestra el PDF en el visor nativo con compartir/guardar.
-  const url=`${ISABEL_API}/v1/laundry-cleaning/${S.llcRec.id}/export?inline=1&api_key=${encodeURIComponent(ISABEL_KEY)}`;
-  window.open(url,'_blank');
+  openPdf(`/v1/laundry-cleaning/${S.llcRec.id}/export`,{inline:'1'});
 }
 
 function vjHotoView(){
@@ -3448,6 +3447,9 @@ function vjLandingCleaningView(){
     return `${head}<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--t3);font-size:13px">Cargando…</div>`;
   }
 
+  // El ticket del PDF se pide ya, para que "Exportar" lo abra dentro del toque.
+  if(S.llcRec&&S.llcRec.id) preparePdfTicket(`/v1/laundry-cleaning/${S.llcRec.id}/export`);
+
   if(S.llcErr){
     return `${head}<div style="background:var(--surface);border-radius:12px;padding:20px;border:0.5px solid var(--border);font-size:13px;color:var(--t2);line-height:1.6">No se pudo cargar el formulario.<br><span style="color:var(--t3);font-size:12px">${S.llcErr}</span><br><br>Si la tabla aún no existe, ejecuta la migración <code>laundry_cleaning_migration_v1.sql</code> en Supabase.</div>`;
   }
@@ -3613,7 +3615,7 @@ function vjStatusView(){
 async function invExport(){
   if(!S.invSession) return;
   try{
-    const res=await fetch(`${ISABEL_API}/v1/session/${S.invSession.id}/export`,{headers:{'x-api-key':ISABEL_KEY}});
+    const res=await isabelFetch(`/v1/session/${S.invSession.id}/export`);
     if(!res.ok) throw new Error(`Export ${res.status}`);
     const blob=await res.blob();
     const a=document.createElement('a');
@@ -3676,9 +3678,9 @@ async function hotoImportFileSelected(input){
   S.hotoImportBusy=true; S.hotoImportErr=null; S.hotoImportAnalysis=null;
   render();
   try{
-    const res=await fetch(`${ISABEL_API}/v1/hoto/import/analyze`,{
+    const res=await isabelFetch(`/v1/hoto/import/analyze`,{
       method:'POST',
-      headers:{'x-api-key':ISABEL_KEY,'Content-Type':'application/pdf'},
+      headers:{'Content-Type':'application/pdf'},
       body:_hotoImportBytes,
     });
     const body=await res.json();
@@ -3699,9 +3701,9 @@ async function hotoImportChoose(mode){
   render();
   try{
     const qs=new URLSearchParams({ tail_number:S.vjState.aircraft||'', mode, source_filename:_hotoImportFilename });
-    const res=await fetch(`${ISABEL_API}/v1/hoto/import/apply?${qs}`,{
+    const res=await isabelFetch(`/v1/hoto/import/apply?${qs}`,{
       method:'POST',
-      headers:{'x-api-key':ISABEL_KEY,'Content-Type':'application/pdf'},
+      headers:{'Content-Type':'application/pdf'},
       body:_hotoImportBytes,
     });
     const body=await res.json();
@@ -3785,6 +3787,7 @@ function openHotoSaveModal(){
   const tail=(S.hotoRec.tail_number||'AIRCRAFT').replace(/[^A-Za-z0-9-]/g,'')||'AIRCRAFT';
   const dateStr=new Date().toISOString().slice(0,10);
   const defaultName=`HOTO_${tail}_${dateStr}`;
+  preparePdfTicket(`/v1/hoto/${S.hotoRec.id}/export`); // por si hay que abrir el visor
   const m=document.createElement('div');
   m.className='overlay'; m.id='modal';
   m.innerHTML=`<div class="modal">
@@ -3809,14 +3812,12 @@ async function hotoSaveConfirm(){
   if(btn){ btn.disabled=true; btn.textContent='Generando…'; }
 
   const fallbackToViewer=()=>{
-    const url=`${ISABEL_API}/v1/hoto/${S.hotoRec.id}/export?inline=1&filename=${encodeURIComponent(rawName)}&api_key=${encodeURIComponent(ISABEL_KEY)}`;
-    window.open(url,'_blank');
+    openPdf(`/v1/hoto/${S.hotoRec.id}/export`,{inline:'1',filename:rawName});
     closeModal();
   };
 
   try{
-    const url=`${ISABEL_API}/v1/hoto/${S.hotoRec.id}/export?filename=${encodeURIComponent(rawName)}`;
-    const res=await fetch(url,{headers:{'x-api-key':ISABEL_KEY}});
+    const res=await isabelFetch(`/v1/hoto/${S.hotoRec.id}/export?filename=${encodeURIComponent(rawName)}`);
     if(!res.ok) throw new Error('No se pudo generar el PDF ('+res.status+')');
     const blob=await res.blob();
     const file=new File([blob],filename,{type:'application/pdf'});
@@ -4968,12 +4969,55 @@ async function invCreateSession() {
 // a localhost rompe la app en móvil ("Load failed"). Para dev local, define
 // VITE_ISABEL_API_URL=http://localhost:3002 en .env.local.
 const ISABEL_API = import.meta.env.VITE_ISABEL_API_URL || 'https://isabel-api-production.up.railway.app';
-const ISABEL_KEY = import.meta.env.VITE_ISABEL_KEY || 'isabel-api-2026';
+
+// isabel-api sin llave en el bundle (SECURITY.md #2): la app entra con el
+// token de este móvil, el que dio el código de Telegram (D57). Si el servidor
+// lo rechaza (caducado o revocado), se olvida y vuelve la pantalla de entrar.
+async function isabelFetch(path, { headers = {}, ...opts } = {}) {
+  const token = appClient().token();
+  const res = await fetch(ISABEL_API + path, { ...opts, headers: token ? { ...headers, 'x-app-token': token } : headers });
+  if (res.status === 401) lostAppLink();
+  return res;
+}
+
+function lostAppLink() {
+  appClient().unlink();
+  if (!S.loginGate) showLoginGate();
+}
+
+// El visor de PDF del móvil abre la URL y no manda cabeceras: la app pide un
+// ticket de 30 minutos que solo vale para ese PDF. Se pide al entrar en la
+// pantalla, porque Safari bloquea la ventana si no sale directamente del toque.
+const pdfTickets = new Map();
+function preparePdfTicket(path) {
+  const c = pdfTickets.get(path);
+  if (c?.pending) return c.pending;
+  if (c && c.exp - Date.now() > 5 * 60 * 1000) return Promise.resolve(c.ticket);
+  const pending = appClient().post('/v1/app/ticket', { path }).then((r) => {
+    if (!r?.ok || !r.ticket) { pdfTickets.delete(path); return null; }
+    pdfTickets.set(path, { ticket: r.ticket, exp: Date.parse(r.expires_at) });
+    return r.ticket;
+  });
+  pdfTickets.set(path, { pending });
+  return pending;
+}
+
+function openPdf(path, query = {}) {
+  const url = (ticket) => `${ISABEL_API}${path}?${new URLSearchParams({ ...query, ticket })}`;
+  const c = pdfTickets.get(path);
+  if (c?.ticket && c.exp - Date.now() > 60 * 1000) { window.open(url(c.ticket), '_blank'); return; }
+  // Sin ticket a mano: la ventana se abre ya, dentro del toque, y recibe la URL al llegar.
+  const w = window.open('', '_blank');
+  preparePdfTicket(path).then((ticket) => {
+    if (!ticket) { w?.close(); alert('No se pudo abrir el PDF. Inténtalo otra vez.'); return; }
+    if (w) w.location.href = url(ticket); else window.open(url(ticket), '_blank');
+  });
+}
 
 async function isabelPost(path, body) {
-  const res = await fetch(ISABEL_API + path, {
+  const res = await isabelFetch(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': ISABEL_KEY },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`Isabel API ${res.status}`);
