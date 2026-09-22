@@ -5,12 +5,13 @@
 ## 1. Qué se terminó en esta sesión
 
 - La rama `docs/incidente-saldo` (D46–D61, incidente de saldo, multi-modelo, Gmail/Calendar, hábitos, Inicio, JETMI, Libro) se unió a `main`. La documentación vigente vive otra vez solo en `main`.
+- `/v1/now`, Inventario y Gym pasados a DeepSeek vía OpenRouter con Haiku de repuesto (`isabel-api` `3412e63`), verificado en producción.
 - Crons verificados el 2026-09-22: sueño 08:00, coach 08:30 y cierre 21:30 entregados; ticks de recordatorios y proactivo en `ok`.
 
 ## 2. Qué quedó pendiente
 
 - **Coach 17:00:** nunca ha tenido un disparo bueno (el del 21 lo cortó un reinicio). Verificar el `state` después de las 15:00Z del 22.
-- **Clave de Anthropic caduca el 2026-10-20.** `/v1/now` e Inventario (`structured_generation`/`structured_extraction` en el Model Router de `isabel-api`) solo tienen Anthropic. Añadir OpenRouter/DeepSeek al Model Router (el adapter contractual existe en `benchmarks/`), con Haiku de repuesto mientras la clave viva.
+- Clave de Anthropic caduca el 2026-10-20: renovarla o aceptar que Haiku deja de ser repuesto (DeepSeek ya es el principal).
 - Gasto de OpenRouter fuera del control de presupuesto (hoy el freno es el prepago de 10 $).
 - memory-core de OpenClaw pide clave de OpenAI (`[memory] sync failed`), sin investigar.
 - Guard O5 en rojo en `isabel-api` desde `1e19184` (Outlook, otra sesión).
@@ -21,8 +22,8 @@
 
 ## 3. Qué hacer inmediatamente después
 
-1. Pasar `/v1/now` e Inventario a DeepSeek vía OpenRouter en el Model Router, con pruebas, y desplegar por push a `main` (nunca `railway up` desde `isabel-api`).
-2. Mirar el `state` del coach 17:00.
+1. Mirar el `state` del coach 17:00.
+2. Siguiente mejora: login real en la app (desbloquea agenda, correo e Instagram en LIFEOS).
 
 ## 4. Qué no debe romperse
 

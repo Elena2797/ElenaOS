@@ -8,7 +8,7 @@ Estado: fotografía operativa vigente
 - **Documentación unida a `main`:** la rama `docs/incidente-saldo` (D46–D61) se fusionó en `main`. Ya no hay que buscar el estado en otra rama.
 - **Crons verificados hoy** (`openclaw cron list --json`, 09:18Z): sueño 08:00 `ok/delivered` (el primero con DeepSeek), coach 08:30 `ok/delivered` (el primero con agenda y correo), cierre 21:30 del 21 `ok/delivered`, `reminders-tick-1m` y `proactive-tick-15m` `ok`. El coach de las 17:00 aún no tiene ningún disparo bueno (el del 21 lo cortó un reinicio): verificar hoy después de las 15:00Z.
 - **Código de app en `main`:** D57–D61 (`life-os-app` hasta `7fdb959`): Inicio solo con lo suyo, VistaJet con tareas reales y rotación que avanza, JETMI desde Cowork, dominios Libro y Marca Propia.
-- **Riesgo con fecha:** `/v1/now` (tarjeta de Inicio) e Inventario dependen solo de Claude Haiku; la clave de Anthropic caduca el **2026-10-20**. Siguiente trabajo decidido: pasarlos a DeepSeek vía OpenRouter antes de esa fecha.
+- **`/v1/now`, Inventario y Gym usan DeepSeek V4 Flash vía OpenRouter, con Haiku de repuesto** (`isabel-api` `3412e63`, `OPENROUTER_API_KEY` en el servicio isabel-api, misma clave que el Gateway). Tras el mismo control de gasto; verificado en producción 09:40Z (~0,0003 $ por tarjeta frente a ~0,005 $ con Haiku). Si falta la clave, la cadena vuelve a solo Haiku. La clave de Anthropic caduca el 2026-10-20: desde entonces el repuesto deja de existir, no la función.
 
 ## Actualización — 2026-09-21, noche
 
