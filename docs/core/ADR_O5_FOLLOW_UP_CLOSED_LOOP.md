@@ -1,6 +1,6 @@
 # ADR O5 — Closed Loop con una única entidad FollowUp
 
-Estado: **aprobado e implementado en copia desconectada; no activado**  
+Estado: **aprobado e implementado en copia desconectada; no activado** — salvo la entrada conversacional de `KnowledgeCandidate:v1`, viva como canary desde el 2026-09-22 (D63, `operations/O5_CANARY.md`). FollowUp, Home adaptativo y todo lo de este ADR siguen desconectados.  
 Fecha: 2026-08-09  
 Backend: `94c660bbdccb3b97efbb62046dff29f5d86dcb43`  
 Frontend: `db23828a4b390b2ff01ebb3732b110b98c47685a`  

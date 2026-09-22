@@ -39,7 +39,11 @@ El Gateway rollback conserva una copia deshabilitada del cron de sueño. En toda
 - `life-os-app`: Vercel, `vite build`, salida `dist`.
 - `isabel-api`: Railway, dominio público autenticado `https://isabel-api-production.up.railway.app`.
 - `isabel-gateway`: Railway private networking IPv6; OpenClaw permanece en loopback y `gateway-adapter.mjs` expone solo chat/history/message/health con token separado.
-- Supabase: base de datos y Storage compartidos; RLS desactivado por la arquitectura personal actual.
+- Supabase: base de datos y Storage compartidos. Desde el 2026-09-22 (D62) RLS `lifeos_owner_only` en todas las tablas: la app entra con la sesión de su usuario; el servidor, con la service key.
+
+## Interruptores (sin secreto)
+
+- `LIFEOS_KNOWLEDGE_STAGE` (isabel-api): `OFF` | `READ_ONLY` | `CANARY` | `LIVE`, y `LIFEOS_KNOWLEDGE_DAILY_CAP` (por defecto 25). Qué hace cada valor y cómo volver atrás: `operations/O5_CANARY.md`.
 
 ## Secretos
 

@@ -60,9 +60,10 @@ Decisiones abiertas. Migración: `setup.sql`. Columnas: id, title, area_id, stak
 Migración: `migration_v1.sql`. Columnas: id, title, area_id, objetivo, status (`active`\|`paused`\|…), next_action, ia_context, ia_last_session, created_at, completed_at, last_activity_at.
 
 ### `eventos`
-Audit trail / contribuciones IA. Migración: `migration_v1.sql`. Columnas: id, project_id, area_id, origen (default `manual`), texto, herramienta, resumen, resultado_ubicacion, created_at.
+Audit trail / contribuciones IA. Migración: `migration_v1.sql`. Columnas: id, project_id, area_id, origen (default `manual`), texto, herramienta, resumen, resultado_ubicacion, created_at, ledger_event_id (UUID, `isabel-api/migrations/knowledge_canary.sql`).
 
-Convención universal preparada (aún no activada durante O4): las filas con `herramienta='lifeos:knowledge'` forman un ledger inmutable independiente de los eventos legacy. `texto` contiene un envelope JSON `schema_version:1`; `resultado_ubicacion` usa `knowledge://<entity-or-event-id>`. No se reinterpretan como conocimiento filas de Gym, Salud, VistaJet, Inventario o consumo de IA. El snapshot de estado, objetivos, señales, acciones y feedback se reconstruye plegando esas filas en orden de append. Ver `core/KNOWLEDGE_LOOP.md`.
+**Ledger de conocimiento (vivo desde el 2026-09-22 por el canary O5, `operations/O5_CANARY.md`):** las filas con `herramienta='lifeos:knowledge'` forman un ledger inmutable independiente de los eventos legacy. `texto` contiene un envelope JSON `schema_version:1`; `resultado_ubicacion` usa `knowledge://<entity-or-event-id>`. No se reinterpretan como conocimiento filas de Gym, Salud, VistaJet, Inventario o consumo de IA. El snapshot de estado, objetivos, señales, acciones y feedback se reconstruye plegando esas filas en orden de append. Ver `core/KNOWLEDGE_LOOP.md`.
+Índices únicos parciales (solo filas `lifeos:knowledge`): `idx_eventos_knowledge_ledger_event_id` y `idx_eventos_knowledge_idempotency` sobre `(texto::jsonb ->> 'idempotency_key')`. Tipos de evento que escribe el canary: `KNOWLEDGE_WRITTEN` (con `record.metadata.her_words`, `learned_on`, `evidence`) y `KNOWLEDGE_RETRACTED` (olvidar). La app no enseña estas filas en su feed.
 
 ### `alertas`
 Migración: `migration_v1.sql`. Columnas: id, texto, tipo (default `manual`), urgencia (default `media`), area_id, project_id, status (default `active`), created_at.

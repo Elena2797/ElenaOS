@@ -1,11 +1,24 @@
 Estado: conocimiento vigente — se añade cronológicamente, nunca se reescribe
-Última verificación: 2026-09-21
+Última verificación: 2026-09-22
 Verificado en: git log de isabel-api, life-os-app e isabel-gateway
 Fuente de verdad de datos: ninguna
 
 # CHANGELOG.md — Historial relevante
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
+
+## 2026-09-22, mediodía (Isabel empieza a aprender de lo que ella le cuenta — O5 canary, D63)
+
+- **Primera entrada viva de O5.** Tools privadas `knowledge_remember`, `knowledge_recall` y `knowledge_forget`: lo que ella afirma de sí misma por Telegram (preferencia, objetivo, compromiso con fecha, límite, hecho, estado) se guarda en el ledger `lifeos:knowledge` de `eventos` con sus palabras, el día y el canal, y Isabel lo consulta después. Deduplicado (identidad semántica + clave idempotente + índice único), con tope diario y sin specialists, FollowUps ni entrega. `isabel-api` `789df11` + `47c35a2` (812/813; el que falla es el conocido de `../life-os-app` fuera del repo).
+- **Interruptor `LIFEOS_KNOWLEDGE_STAGE`** (OFF/READ_ONLY/CANARY) y rollback: `operations/O5_CANARY.md`. Desplegado en `OFF`; verificado en producción que las tools existen solo con la llave privada (45 frente a 26) y que en `OFF` no leen ni escriben.
+- **La app enseña lo aprendido** en Dominios → "Lo que Isabel sabe de ti", con "Olvidar" (`life-os-app` `b6376a2`, 59/59). El feed de eventos de la app deja fuera las filas del ledger.
+- **El Gateway ve tools nuevas sin reiniciarse:** `openclaw mcp reload` (como `node`) hace que el siguiente turno pida otra vez el catálogo al MCP. Comprobado con un turno aislado: Isabel listó las tres `knowledge_*`. Sustituye al reinicio que se hacía para cargar tools (KNOWN_PROBLEMS, coach de las 17:00 del 21).
+- **Guard O5:** ya estaba verde en `origin/main` desde que se movió el hash de `index.js` (D55/D57); el rojo de `1e19184` solo seguía en el checkout local atrasado. Ahora comprueba que O5 solo se alcanza por `knowledgeCanary.js`.
+- **Docs pendientes de la sesión anterior:** D62 escrita en `DECISIONS.md`; SECURITY #3 y #6 resueltos.
+
+## 2026-09-22, mañana (login real — D62)
+
+- La app entra con el código de Telegram y recibe una sesión real de Supabase; RLS `lifeos_owner_only` en todas las tablas (la aplicó ella). La clave anónima ve 0 filas. `isabel-api` `4197883` + `b74aa53`, `life-os-app` `24f1576`. Detalle en D62.
 
 ## 2026-09-21, noche (Marca Personal con Instagram y estrategia propia — D54)
 

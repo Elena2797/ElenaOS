@@ -1,5 +1,5 @@
 Estado: implementado (documenta riesgos reales, no un plan de mitigación)
-Última verificación: 2026-09-21
+Última verificación: 2026-09-22
 Verificado en: grep directo sobre isabel-api/src y life-os-app/src, lectura de .git/config; riesgo #5 confirmado en la práctica el 2026-08-02; riesgos #7 y #8 confirmados el 2026-08-05 durante la auditoría de OpenClaw; riesgo #7 resuelto y verificado en producción el 2026-08-06; riesgo #9 encontrado el 2026-08-06 durante el despliegue de isabel-gateway
 Fuente de verdad de datos: ninguna
 
@@ -15,11 +15,12 @@ Este documento no es un plan de seguridad aspiracional. Es lo que **hoy** es ver
 ### 2. API key de isabel-api con fallback hardcodeado, y expuesta en el bundle del cliente
 `isabel-api/src/config.js`: `apiKey: process.env.API_KEY || 'isabel-api-2026'`. El mismo valor de fallback está hardcodeado en `life-os-app/src/main.js` (`const ISABEL_KEY = ... || 'isabel-api-2026'`) porque el cliente necesita enviarla en cada petición. Al ser un fallback usado en producción, la clave real que protege isabel-api es literalmente ese string, visible en el JS del navegador. Cualquiera que la lea puede llamar a la API (leer/escribir sesiones de inventario y HOTO).
 
-### 3. RLS desactivado en las 18 tablas de Supabase
-Confirmado explícitamente en las migraciones (`ALTER TABLE ... DISABLE ROW LEVEL SECURITY`). Decisión consciente documentada en los propios archivos SQL ("app personal, una sola usuaria"), no un descuido. Implica: quien tenga la `anon key` del frontend puede leer y escribir cualquier fila de cualquier tabla directamente contra la API REST de Supabase, sin pasar por ninguna lógica de negocio.
+### 3. RLS desactivado en las 18 tablas de Supabase — RESUELTO 2026-09-22
+**Arreglo** (D62): RLS `lifeos_owner_only` en todas las tablas de `public` (`isabel-api/migrations/rls_owner_only.sql`, aplicada por ella en el SQL Editor). Solo su sesión (`owner@lifeos.internal`) lee y escribe; verificado que la clave anónima ve 0 filas. La service key del servidor se salta RLS a propósito. Al crear una tabla nueva hay que volver a ejecutar la migración.
+**Lo que había:** confirmado explícitamente en las migraciones (`ALTER TABLE ... DISABLE ROW LEVEL SECURITY`). Decisión consciente documentada en los propios archivos SQL ("app personal, una sola usuaria"), no un descuido. Implica: quien tenga la `anon key` del frontend puede leer y escribir cualquier fila de cualquier tabla directamente contra la API REST de Supabase, sin pasar por ninguna lógica de negocio.
 
 ### 4. Service role key en el backend
-`isabel-api/.env` → `SUPABASE_SERVICE_KEY`. Correcto en cuanto a que vive solo en el servidor (Railway), no en el cliente. Pero dado que RLS está desactivado, la distinción entre anon key y service key deja de aportar aislamiento real — ambas llegan a los mismos datos.
+`isabel-api/.env` → `SUPABASE_SERVICE_KEY`. Correcto en cuanto a que vive solo en el servidor (Railway), no en el cliente. Hasta D62, con RLS desactivado, la distinción entre anon key y service key no aportaba aislamiento; desde el 2026-09-22 sí: la anónima no ve nada y la service key es la única que se salta RLS.
 
 ### 5. Token de GitHub en URLs locales de remotos — MITIGADO 2026-08-08
 `.git/config` de `life-os-app` tiene el remoto configurado como `https://ghp_...@github.com/Elena2797/ElenaOS.git` — el token de acceso personal está en la URL, en texto plano, en un archivo que puede copiarse o compartirse sin darse cuenta (por ejemplo, al hacer backup de la carpeta `.git`).
@@ -28,8 +29,9 @@ Confirmado explícitamente en las migraciones (`ALTER TABLE ... DISABLE ROW LEVE
 
 **Mitigación aplicada el 2026-08-08:** `isabel-api`, `life-os-app` y `lifeos-agent` usan ahora URLs HTTPS limpias, sin credenciales. Se guardó una copia local `.git/config.pre-clean-20260808` antes del cambio; Git Credential Manager autentica correctamente y se verificó acceso remoto. La exposición histórica del token no desaparece y su revocación/rotación sigue siendo decisión de la usuaria, pero ya no se propaga en cada lectura o copia de `.git/config`.
 
-### 6. Sin autenticación de usuario
-No hay login, no hay sesiones de usuario, no hay JWT propio del sistema. Todo el acceso se basa en "quien tiene la URL y las claves". Es coherente con ser una app estrictamente personal de un solo usuario — pero significa que no hay ninguna capa que impida acceso si las claves se filtran.
+### 6. Sin autenticación de usuario — RESUELTO 2026-09-22
+**Arreglo** (D62): login real. El código que llega a su Telegram (D57) abre una sesión de Supabase de su usuario; sin ella la app no carga datos. Sigue abierto lo de #2: `/v1` de `isabel-api` todavía acepta la API key pública.
+**Lo que había:** no hay login, no hay sesiones de usuario, no hay JWT propio del sistema. Todo el acceso se basa en "quien tiene la URL y las claves". Es coherente con ser una app estrictamente personal de un solo usuario — pero significa que no hay ninguna capa que impida acceso si las claves se filtran.
 
 ### 7. `isabel-api/src/mcp.js` no tenía ninguna autenticación — RESUELTO
 `GET/POST /mcp` era la única ruta del servidor sin `requireApiKey`. Corregido el 2026-08-06, commit `c02d4cd`: `requireApiKey` aplicado a `/mcp` igual que al resto de rutas. Verificado en producción: `GET /mcp` sin token → 401. Necesario porque `isabel-gateway` (Railway) ya se conecta a este endpoint — ver `core/AUTOMATIONS.md`.

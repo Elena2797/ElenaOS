@@ -23,6 +23,7 @@ Cada dato vive en **un solo documento**. Si ves el mismo dato repetido en dos si
 | Desplegar o verificar un servicio | `operations/` |
 | Entender por qué algo se hizo así | `DECISIONS.md` |
 | Saber si un problema ya es conocido | `KNOWN_PROBLEMS.md` |
+| Encender, apagar o revisar lo que Isabel aprende de ella (O5) | `operations/O5_CANARY.md` → `core/KNOWLEDGE_LOOP.md` ("Canary vivo") → `DECISIONS.md` D63 |
 | Trabajar con "el chat de Isabel" | `core/ISABEL_CHANNELS.md` **primero** — hay 4 sistemas distintos, solo uno activo |
 | Entender qué principios no se deben romper | `PRINCIPLES.md` |
 | Investigar o decidir algo de negocio de un dominio (ej. JETMI) | `research/<DOMINIO>/LOG.md` (mapa de cobertura) → `KNOWLEDGE.md` (lo verificado) → `HYPOTHESES.md` (lo abierto) |

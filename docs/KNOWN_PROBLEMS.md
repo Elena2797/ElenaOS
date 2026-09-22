@@ -1,5 +1,5 @@
 Estado: conocimiento vigente — lista viva, se actualiza con "Actualiza la documentación"
-Última verificación: 2026-08-08
+Última verificación: 2026-09-22
 Verificado en: auditorías de sesiones anteriores (HOTO, Inventario, arquitectura de Isabel, incidente de Supabase pausado) + incidentes de infraestructura reales del 2026-08-03 (Isabel Core Fase 1/2, Railway, Vercel) + spike de OpenClaw del 2026-08-05 + repro Windows-vs-Linux y despliegue real de `isabel-gateway` en Railway del 2026-08-06
 
 # KNOWN_PROBLEMS.md — Deuda técnica y grietas conocidas
@@ -187,9 +187,10 @@ Gmail y Calendar se conectan ahora desde `isabel-api` (D51). Estas dos funciones
 
 ### Reiniciar el Gateway a la hora de un cron corta el mensaje — LECCIÓN 2026-09-21
 El primer empujón de las 17:00 (D49) empezó a su hora y terminó con `cron: job interrupted by gateway restart`: el Gateway se reinició a las 17:00:14 para cargar tools nuevas. No se reintenta: ese día no llegó. Reiniciar lejos de las 08:00, 08:30, 17:00 y 21:30 Madrid.
+**Desde el 2026-09-22 no hace falta reiniciar para cargar tools:** `railway ssh -- runuser -u node -- openclaw mcp reload` descarta el catálogo en caché y el siguiente turno pide las tools otra vez (D63). Solo lectura del catálogo: no corta Telegram ni los crons.
 
-### El guard O5 falla en `main` desde el cambio de Outlook — ABIERTO 2026-09-21
-`1e19184` (otra sesión) cambió `src/index.js` sin mover su checkpoint en `o5DisconnectedGuard.test.js`. Las pruebas que importan de verdad (que `index.js` no monta rutas de O5 y que el grafo vivo no alcanza O5) pasan. Mover el checkpoint le toca a quien revise ese cambio.
+### El guard O5 falla en `main` desde el cambio de Outlook — RESUELTO (comprobado 2026-09-22)
+`1e19184` (otra sesión) cambió `src/index.js` sin mover su checkpoint en `o5DisconnectedGuard.test.js`. El checkpoint se movió a conciencia con D55/D57 (`96b0b67`, `fbec0f8`) y en `origin/main` el guard pasa 6/6; el rojo solo seguía en el checkout local `isabel-api`, 23 commits atrasado. Desde D63 el guard comprueba que O5 solo se alcanza por `src/core/knowledgeCanary.js`.
 
 
 ### `faithful-light` huérfano — MITIGADO REVERSIBLEMENTE 2026-08-08

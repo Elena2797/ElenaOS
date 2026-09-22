@@ -1,39 +1,37 @@
-Última actualización: 2026-09-22, mañana — docs unidas a main y crons verificados
+Última actualización: 2026-09-22, mediodía — O5 canary desplegado en OFF; login real documentado
 
 # Próxima sesión
 
 ## 1. Qué se terminó en esta sesión
 
-- La rama `docs/incidente-saldo` (D46–D61, incidente de saldo, multi-modelo, Gmail/Calendar, hábitos, Inicio, JETMI, Libro) se unió a `main`. La documentación vigente vive otra vez solo en `main`.
-- `/v1/now`, Inventario y Gym pasados a DeepSeek vía OpenRouter con Haiku de repuesto (`isabel-api` `3412e63`), verificado en producción.
-- Crons verificados el 2026-09-22: sueño 08:00, coach 08:30 y cierre 21:30 entregados; ticks de recordatorios y proactivo en `ok`.
+- **O5 canary (D63):** Isabel puede guardar lo que ella cuenta de sí misma por Telegram (`knowledge_remember`), usarlo (`knowledge_recall`) y olvidarlo (`knowledge_forget`); la app lo enseña en Dominios → "Lo que Isabel sabe de ti". Deduplicación, procedencia, interruptor `LIFEOS_KNOWLEDGE_STAGE` y rollback. `isabel-api` `47c35a2`, `life-os-app` `b6376a2`. Desplegado en `OFF`.
+- El Gateway ve las tools nuevas sin reiniciarse (`openclaw mcp reload`).
+- Guard O5: verde en `origin/main`; ahora vigila que O5 solo se alcance por `knowledgeCanary.js`.
+- D62 escrita; SECURITY #3 y #6 resueltos.
 
 ## 2. Qué quedó pendiente
 
-- **Coach 17:00:** nunca ha tenido un disparo bueno (el del 21 lo cortó un reinicio). Verificar el `state` después de las 15:00Z del 22.
-- Clave de Anthropic caduca el 2026-10-20: renovarla o aceptar que Haiku deja de ser repuesto (DeepSeek ya es el principal).
-- Gasto de OpenRouter fuera del control de presupuesto (hoy el freno es el prepago de 10 $).
-- memory-core de OpenClaw pide clave de OpenAI (`[memory] sync failed`), sin investigar.
-- Guard O5 en rojo en `isabel-api` desde `1e19184` (Outlook, otra sesión).
-- Login real en la app: requisito para enseñar agenda, correo e Instagram sin reabrir SECURITY #13.
-- Datos parados desde junio/agosto (Finanzas, métricas manuales, parte de JETMI): conectarlos a Isabel u ocultarlos.
-- O5 por su canary (`LIFEOS_KNOWLEDGE_STAGE`) cuando ella lo pida.
-- Limpieza Google/Supabase ("Cliente web 1", secreto `****xmwJ`, tabla `gmail_tokens`): preguntarle antes.
+- **Encender el canary (lo hace ella):** (1) `isabel-api/migrations/knowledge_canary.sql` en el SQL Editor; (2) `LIFEOS_KNOWLEDGE_STAGE=CANARY` en el servicio isabel-api. Después, la prueba de extremo a extremo.
+- Mensajes de coach con `knowledge_recall` (`isabel-gateway` `ffacbcf`, sin aplicar): `ensure-coach-crons.mjs` no va en la imagen; hay que ejecutarlo en el contenedor con `--apply --replace`.
+- Coach 17:00: comprobar su primer disparo bueno.
+- `/v1` sigue aceptando la API key pública (SECURITY #2): que acepte la sesión de D62 y rotar la llave.
+- Clave de Anthropic caduca el 2026-10-20. Gasto de OpenRouter fuera del control de presupuesto. memory-core de OpenClaw pide clave de OpenAI.
 
 ## 3. Qué hacer inmediatamente después
 
-1. Mirar el `state` del coach 17:00.
-2. Siguiente mejora: login real en la app (desbloquea agenda, correo e Instagram en LIFEOS).
+1. Si ella ya aplicó el SQL y puso `CANARY`: prueba con dos turnos aislados (`openclaw agent --agent main --session-key agent:main:<clave>` sin `--deliver`): una frase suya → `knowledge_remember`; en una sesión nueva, una pregunta que lo necesite → `knowledge_recall`. Comprobar la fila en `eventos` y la pantalla de la app. Olvidar lo que fuera solo de prueba.
+2. Mirar el `state` del coach 17:00.
 
 ## 4. Qué no debe romperse
 
-- Nunca `railway up` desde `isabel-api` con varias sesiones: se despliega por push a `main`; trabajar desde un worktree limpio de `origin/main`.
-- No reiniciar el Gateway a la hora de un cron (08:00, 08:30, 17:00, 21:30 Madrid, ni en :00/:15/:30/:45).
-- `MCP_PRIVATE_KEY` (isabel-api) = `ISABEL_MCP_KEY` (Gateway).
-- La app de Google sigue "En producción".
-- `openclaw` en el contenedor siempre como `runuser -u node --`; desde Git Bash, `MSYS_NO_PATHCONV=1`.
+- O5 solo por `src/core/knowledgeCanary.js` (guard). `LIVE` no se usa: abre rutas universales que no están montadas.
+- Quien lea `eventos` debe excluir `herramienta = 'lifeos:knowledge'` (su `texto` es JSON interno).
+- Tabla nueva en `public` → volver a ejecutar `rls_owner_only.sql` o la app no la ve (D62).
+- Nunca `railway up` en `isabel-api`: push a `main` desde un worktree limpio de `origin/main`.
+- No reiniciar el Gateway en :00/:15/:30/:45 ni a la hora de un cron (08:00, 08:30, 17:00, 21:30 Madrid). Para tools nuevas basta `openclaw mcp reload`.
+- `openclaw` en el contenedor como `runuser -u node --`; desde Git Bash, `MSYS_NO_PATHCONV=1`.
 - Sin chat dentro de LIFEOS (D55). Inicio solo con lo suyo (D59).
 
 ## 5. Qué documentos leer
 
-`CURRENT_STATE.md` → `DECISIONS.md` D46–D61 → `SECURITY.md` #12–#14 → `research/AI_RUNTIME/DECISION_MULTIMODELO_2026-08-09.md` → `isabel-gateway/README.md`.
+`CURRENT_STATE.md` → `DECISIONS.md` D62–D63 → `operations/O5_CANARY.md` → `core/KNOWLEDGE_LOOP.md` ("Canary vivo") → `SECURITY.md` #2.

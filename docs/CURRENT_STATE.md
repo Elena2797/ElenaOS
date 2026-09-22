@@ -3,7 +3,14 @@ Estado: fotografía operativa vigente
 
 # Estado actual de LIFEOS
 
-## Actualización — 2026-09-22 (manda sobre las de abajo)
+## Actualización — 2026-09-22, mediodía (manda sobre las de abajo)
+
+- **Login real (D62):** la app entra con el código de Telegram y una sesión real de Supabase; RLS `lifeos_owner_only` en todas las tablas. La clave anónima ve 0 filas. SECURITY #3 y #6 resueltos; sigue abierto #2 (la API key pública de `/v1`).
+- **O5 canary (D63) desplegado en `OFF`:** Isabel tiene `knowledge_remember`/`knowledge_recall`/`knowledge_forget` (privadas) y la app, Dominios → "Lo que Isabel sabe de ti". `isabel-api` `47c35a2`, `life-os-app` `b6376a2`. El Gateway ya las ve (`openclaw mcp reload`, sin reiniciar). **Para que aprenda faltan dos pasos de ella:** aplicar `isabel-api/migrations/knowledge_canary.sql` en el SQL Editor y poner `LIFEOS_KNOWLEDGE_STAGE=CANARY` en isabel-api. Runbook: `operations/O5_CANARY.md`. La prueba de extremo a extremo con una frase suya queda para después de esos dos pasos.
+- **Guard O5 verde** en `origin/main` (el rojo era del checkout local atrasado). Backend 812/813 (falla solo la prueba que lee `../life-os-app` fuera de la carpeta), frontend 59/59.
+- **Mensajes de coach con `knowledge_recall`:** cambiado en `isabel-gateway` `ffacbcf` (local, sin remoto) pero **no aplicado**: `ensure-coach-crons.mjs` no está en la imagen y el despliegue del Gateway no se hizo. La descripción de la tool ya le pide a Isabel usarlo en el coach.
+
+## Actualización — 2026-09-22, mañana
 
 - **Documentación unida a `main`:** la rama `docs/incidente-saldo` (D46–D61) se fusionó en `main`. Ya no hay que buscar el estado en otra rama.
 - **Crons verificados hoy** (`openclaw cron list --json`, 09:18Z): sueño 08:00 `ok/delivered` (el primero con DeepSeek), coach 08:30 `ok/delivered` (el primero con agenda y correo), cierre 21:30 del 21 `ok/delivered`, `reminders-tick-1m` y `proactive-tick-15m` `ok`. El coach de las 17:00 aún no tiene ningún disparo bueno (el del 21 lo cortó un reinicio): verificar hoy después de las 15:00Z.

@@ -1,6 +1,7 @@
-Estado: arquitectura implementada y probada en desconectado; activación bloqueada durante baseline O4
-Última verificación: 2026-08-09
-Fuente de verdad futura: filas `eventos.herramienta = 'lifeos:knowledge'`
+Estado: parcial — una entrada viva (canary conversacional, 2026-09-22); el resto de O5 sigue implementado y desconectado
+Última verificación: 2026-09-22
+Verificado en: isabel-api `789df11` (`src/core/knowledgeCanary.js`, `src/__tests__/knowledgeCanary.test.js`, guard O5), life-os-app `b6376a2`
+Fuente de verdad de datos: filas `eventos.herramienta = 'lifeos:knowledge'` (DATA_MODEL.md)
 
 # Bucle universal de conocimiento de LIFEOS
 
@@ -99,6 +100,20 @@ Después de cerrar O4, la secuencia segura es:
 5. solo después, añadir una única entrada conversacional genérica al catálogo MCP, con medición separada del coste de interpretación.
 
 Hasta el paso 5, un hecho general dicho por Telegram seguirá sin cruzar automáticamente a estado estructurado. Esta limitación es deliberada y visible, no una promesa implícita. La copia desconectada ya contiene y prueba `KnowledgeCandidate:v1`; aún no existe una tool viva que lo entregue.
+
+## Canary vivo (2026-09-22)
+
+Se activó **una sola entrada**, la conversacional, antes que los pasos 1–4 de arriba: era el hueco que más se notaba ("Isabel lo oyó" ≠ "LIFEOS lo sabe") y es la que menos toca del runtime. Qué entra y qué no:
+
+- **Entrada:** tool MCP privada `knowledge_remember`. Isabel ya entiende la frase en Telegram y la pasa estructurada (tipo, dominio, título en tercera persona y sus palabras). La interpretación es el turno de conversación que ya existía: no hay llamada de IA añadida. `src/core/knowledgeCanary.js` la convierte en `KnowledgeCandidate:v1` (`USER_REPORTED`, `KNOWN`, explícita, reversible, superficie `telegram`) y la pasa por la misma Write Policy y el mismo ledger. Es el único módulo vivo que importa O5; el guard lo comprueba.
+- **Límites del canary:** 6 tipos (`PREFERENCE`, `GOAL`, `COMMITMENT`, `CONSTRAINT`, `FACT`, `STATE`), dominios conocidos, sin sensibilidad alta, tope diario; si la política no da `AUTO_WRITE` (ambigüedad) no se escribe y no se abre Intervention: Isabel pregunta. Sin specialists, FollowUps ni entrega.
+- **Identidad y deduplicación:** `entity_id` = tipo + dominio + título normalizado (sin tildes, mayúsculas ni signos); clave idempotente = entidad + sus palabras + día de Madrid; índice único en la base.
+- **Uso:** `knowledge_recall` (lo vigente; lo caducado por `valid_until` deja de contar) y los tres mensajes de coach lo llaman.
+- **Olvidar:** `knowledge_forget` y "Olvidar" en la app escriben `KNOWLEDGE_RETRACTED`; el fold lo quita del estado y lo guarda en `retracted`.
+- **Superficie:** `GET /v1/app/knowledge` (token de app) → Dominios, "Lo que Isabel sabe de ti". Ni chat (D55) ni Inicio (D59).
+- **Operación:** `LIFEOS_KNOWLEDGE_STAGE` y rollback en `operations/O5_CANARY.md`. Decisión: `DECISIONS.md` D63.
+
+Sigue desconectado: rutas `routes/knowledge.js`, `/v1/now`, Home adaptativo, FollowUps, specialists con `evaluateKnowledge`, entrega.
 
 ## O5 Closed Loop preparado
 
