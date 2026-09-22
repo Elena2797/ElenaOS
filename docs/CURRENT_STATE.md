@@ -3,7 +3,11 @@ Estado: fotografía operativa vigente
 
 # Estado actual de LIFEOS
 
-## Actualización — 2026-09-22, tarde (manda sobre las de abajo)
+## Actualización — 2026-09-22, noche (manda sobre las de abajo)
+
+- **Turno de noche (D65):** a las 04:00 Isabel trabaja sola en JETMI, Marca Personal, Marca Propia y Vida Personal (nunca VistaJet): ordena, deja borradores/planes/checklists y como mucho una pregunta por dominio; lo cuenta el parte de las 08:30 y se ve en cada dominio de la app. Servidor (`isabel-api` `3ea4b44`, 841/842) y app (`life-os-app` `7ba1c76`, 63/63) desplegados y verificados. **Falta aplicar el cron `turno-noche-0400` y el parte nuevo en el Gateway** (`operations/TURNO_NOCHE.md` §2): hasta entonces no corre.
+
+## Actualización — 2026-09-22, tarde
 
 - **"Ya lo hice" (D64):** cuando ella dice que ya hizo algo, `tasks_complete` cierra la tarea y sus recordatorios, o solo el recordatorio si no había tarea; `tasks_list` incluye los recordatorios pendientes. `isabel-api` `b0983f7`, backend 822/823. Probado en producción.
 

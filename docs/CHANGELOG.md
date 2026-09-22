@@ -7,6 +7,11 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-09-22, noche (turno de noche: Isabel trabaja sola — D65)
+
+- Revisión: Isabel no trabajaba sin que ella le escribiera y no podía leer JETMI ni Marca Propia. Nuevo turno de las 04:00 (`isabel-api` `3ea4b44`, `src/core/night/`): en JETMI, Marca Personal, Marca Propia y Vida Personal ordena tareas y próximos pasos y deja 1-2 cosas listas para usar y una pregunta; VistaJet fuera, en código. Nunca envía, borra, completa ni descarta.
+- `POST /v1/night/run` (solo llave privada), tool `night_shift_report`, `GET /v1/app/night`; en la app, "🌙 Isabel trabajó por ti" en esos dominios (`life-os-app` `7ba1c76`). Cron `turno-noche-0400` y parte de las 08:30 en `isabel-gateway` `aa17ecf`, **sin aplicar aún en el contenedor**. Runbook: `operations/TURNO_NOCHE.md`.
+
 ## 2026-09-22, tarde ("ya lo hice" cierra tarea y recordatorios — D64)
 
 - La visa de Arabia Saudí siguió en LIFEOS después de que ella dijera que ya estaba: era solo un recordatorio y `tasks_complete` solo miraba tareas. Ahora `tasks_complete` cierra la tarea y sus recordatorios (o solo el recordatorio si no había tarea), y `tasks_list` trae los recordatorios pendientes. `isabel-api` `b0983f7`. Probado con Isabel en producción (D64).

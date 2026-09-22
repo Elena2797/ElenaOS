@@ -1,4 +1,4 @@
-Última actualización: 2026-09-22, tarde — O5 canary encendido; "ya lo hice" cierra tarea y recordatorios (D64)
+Última actualización: 2026-09-22, noche — O5 canary encendido; "ya lo hice" (D64); turno de noche (D65)
 
 # Próxima sesión
 
@@ -10,8 +10,12 @@
 - Guard O5 verde; ahora vigila que O5 solo se alcance por `knowledgeCanary.js`.
 - D62 escrita; SECURITY #3 y #6 resueltos.
 - **D64:** "ya lo hice" cierra la tarea y sus recordatorios (o solo el recordatorio); `tasks_list` trae los recordatorios pendientes. Probado con Isabel en producción.
+- **D65, turno de noche** (otra sesión, en paralelo): a las 04:00 Isabel trabaja sola en JETMI, Marca Personal, Marca Propia y Vida Personal (VistaJet fuera, en código). Servidor y app desplegados y verificados; el cron del Gateway, sin aplicar.
 
 ## 2. Qué quedó pendiente
+
+- **Aplicar el turno de noche en el Gateway** (`operations/TURNO_NOCHE.md` §2): `ensure-coach-crons.mjs --apply --only=turno-noche-0400`, `--apply --replace --only=coach-manana-0830` y `openclaw mcp reload`. Hasta entonces no corre. A la sesión que lo construyó el clasificador le bloqueó `railway ssh` (incluso leer): hace falta que ella lo autorice o lo haga.
+- **Ver el primer turno real con ella:** si lo que deja es útil o relleno, si reescribe de más, y si quiere también un turno de día.
 
 - **Ver el canary con uso real suyo:** que Isabel guarde lo que ella diga de verdad por Telegram (qué tipos y áreas elige, si guarda de más o de menos) y que ella lo vea en la app con su móvil. Nadie ha visto aún la pantalla con su token en producción (se probó en local con datos de ejemplo).
 - Coach 17:00: comprobar su primer disparo bueno (ahora `tasks_list` le lleva lo aprendido).
@@ -19,6 +23,8 @@
 - Clave de Anthropic caduca el 2026-10-20. Gasto de OpenRouter fuera del control de presupuesto. memory-core de OpenClaw pide clave de OpenAI.
 
 ## 3. Qué hacer inmediatamente después
+
+0. Turno de noche: con el cron aplicado, un `dry_run` (`operations/TURNO_NOCHE.md` §3) y revisar `would_save`/`would_change`/`rejected` antes de la primera noche. Tras la primera noche: la fila `isabel:turno_noche` de hoy y las `isabel:taller`, y el parte de las 08:30.
 
 1. Leer el ledger (`select resumen, created_at from eventos where herramienta = 'lifeos:knowledge' order by created_at desc`) y revisar con ella lo que Isabel haya guardado de verdad. Si guarda cosas que no debe, ajustar la descripción de `knowledge_remember`; si hay que parar, `LIFEOS_KNOWLEDGE_STAGE=READ_ONLY` u `OFF` (`operations/O5_CANARY.md`).
 2. Mirar el `state` del coach 17:00.
@@ -35,7 +41,8 @@
 - No reiniciar el Gateway en :00/:15/:30/:45 ni a la hora de un cron (08:00, 08:30, 17:00, 21:30 Madrid). Para tools nuevas basta `openclaw mcp reload`.
 - `openclaw` en el contenedor como `runuser -u node --`; desde Git Bash, `MSYS_NO_PATHCONV=1`.
 - Sin chat dentro de LIFEOS (D55). Inicio solo con lo suyo (D59).
+- El turno de noche nunca trabaja en VistaJet: `NIGHT_AREAS` en `isabel-api/src/core/night/plan.js` y en `life-os-app/src/services/nightWork.js`. `POST /v1/night/run` solo con la llave privada.
 
 ## 5. Qué documentos leer
 
-`CURRENT_STATE.md` → `DECISIONS.md` D62–D64 → `operations/O5_CANARY.md` → `core/KNOWLEDGE_LOOP.md` ("Canary vivo") → `SECURITY.md` #2.
+`CURRENT_STATE.md` → `DECISIONS.md` D62–D65 → `operations/TURNO_NOCHE.md` → `operations/O5_CANARY.md` → `core/KNOWLEDGE_LOOP.md` ("Canary vivo") → `SECURITY.md` #2.
