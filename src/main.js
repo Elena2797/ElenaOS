@@ -12,6 +12,7 @@ import { createSurfaceRevalidator, shouldRevalidateVisibility } from './services
 import { currentSleepEntry, formatSleepMinutes } from './services/sleepReadModel.js';
 import { financeStateSummary } from './services/financeReadModel.js';
 import { buildLearnedModel, kindLabel, learnedMeta } from './services/knowledgeLearned.js';
+import { buildNightWorkModel } from './services/nightWork.js';
 // Definiciones del dominio HOTO: fuente única en src/hoto/model.js.
 // Se importan con los nombres VJ_* históricos para no tocar sus usos.
 import {
@@ -342,6 +343,75 @@ async function loadAppBrand() {
 function toggleBrandStrategy() { S.brandStrategyOpen = !S.brandStrategyOpen; render(); }
 function toggleJetmiContext() { S.jetmiContextOpen = !S.jetmiContextOpen; render(); }
 function toggleMarcaPropia() { S.marcaPropiaOpen = !S.marcaPropiaOpen; render(); }
+
+// ── Turno de noche (D65) ─────────────────────────────────────────────────────
+// Lo que Isabel dejó hecho sola mientras ella dormía, en su dominio: listo para
+// copiar y usar. Privado (borradores de sus negocios): solo con la app
+// conectada. Se pide una vez por sesión; el turno corre una vez por noche.
+async function loadNightWork() {
+  if (!appClient().isLinked() || S._nightLoading) return;
+  S._nightLoading = true;
+  const r = await appClient().get('/v1/app/night');
+  S._nightLoading = false;
+  S.nightWork = r.unlinked ? null : r;
+  if (S.view === 'area') render();
+}
+
+function toggleNightItem(id) {
+  S.nightOpen = { ...(S.nightOpen || {}), [id]: !(S.nightOpen || {})[id] };
+  render();
+}
+
+async function copyNightItem(id) {
+  const item = (S.nightWork?.work || []).find(w => w.id === id);
+  if (!item) return;
+  try {
+    await navigator.clipboard.writeText(item.body);
+    S.nightCopied = id;
+    render();
+    setTimeout(() => { if (S.nightCopied === id) { S.nightCopied = null; render(); } }, 1800);
+  } catch {
+    alert('No se pudo copiar. Mantén pulsado el texto para copiarlo.');
+  }
+}
+
+function nightWorkCard(area) {
+  const linked = appClient().isLinked();
+  const m = buildNightWorkModel(S.nightWork, area.name, { linked, today: madridDate(0) });
+  if (m.state === 'hidden') return '';
+  if (m.state === 'loading' && linked && !S._nightLoading) loadNightWork();
+  const head = `<div class="card-head"><span class="ch-icon">🌙</span><span class="ch-label">Isabel trabajó por ti</span>${m.dayLabel ? `<span class="ch-count" style="background:none;color:var(--t3);font-weight:500">${escHtml(m.dayLabel)}</span>` : ''}</div>`;
+  if (m.state !== 'ok') {
+    const text = m.state === 'unlinked' ? 'Conecta este móvil para ver lo que Isabel deja hecho de noche.'
+      : m.state === 'loading' ? 'Cargando…'
+      : m.state === 'error' ? 'No se pudo cargar ahora mismo.'
+      : 'Cada noche Isabel revisa este dominio y te deja aquí lo que haya preparado.';
+    return `<div class="card" style="margin-bottom:10px">${head}<div style="padding:10px 14px 12px;font-size:12px;color:var(--t3);line-height:1.45">${text}</div></div>`;
+  }
+  const open = S.nightOpen || {};
+  const rows = m.items.map(it => `<div style="border-top:1px solid var(--border)">
+      <div onclick="toggleNightItem('${escHtml(it.id)}')" style="padding:12px 14px;cursor:pointer;display:flex;gap:10px;align-items:flex-start">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:3px">${escHtml(it.label)}</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);line-height:1.35">${escHtml(it.title)}</div>
+        </div>
+        <i class="ti ti-chevron-${open[it.id] ? 'up' : 'down'}" style="color:var(--t3);margin-top:14px"></i>
+      </div>
+      ${open[it.id] ? `<div style="padding:0 14px 12px">
+        <div style="font-size:13px;color:var(--text);line-height:1.55;white-space:pre-wrap;background:var(--bg);border-radius:10px;padding:10px 12px">${mdLite(it.body)}</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button onclick="copyNightItem('${escHtml(it.id)}')" style="${HOME_BTN}">${S.nightCopied === it.id ? 'Copiado ✓' : 'Copiar'}</button>
+          <button onclick="openIsabel()" style="${HOME_BTN}">Seguir con Isabel</button>
+        </div>
+      </div>` : ''}
+    </div>`).join('');
+  const q = m.question ? `<div style="border-top:1px solid var(--border);padding:12px 14px">
+      <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#534AB7;margin-bottom:3px">Isabel te pregunta</div>
+      <div style="font-size:13px;color:var(--text);line-height:1.5;white-space:pre-wrap">${escHtml(m.question.body)}</div>
+      <button onclick="openIsabel()" style="${HOME_BTN};margin-top:8px">Contestar en Telegram</button>
+    </div>` : '';
+  return `<div class="card" style="margin-bottom:10px">${head}${rows}${q}</div>`;
+}
 
 // Su libro (D61): índice y progreso, con el token de app.
 async function loadAppBook() {
@@ -2728,6 +2798,7 @@ function areaView() {
     <h2>${a.name}</h2>
   </div>
   ${domainIntroHtml}
+  ${nightWorkCard(a)}
   ${isVJ?vjView():''}
   ${isJETMI?jetmiView():''}
   ${isFin?finView():''}
@@ -4977,7 +5048,7 @@ async function invCloseSession() {
 // Expose functions to global scope for inline onclick handlers (required in ES module context)
 Object.assign(window, {
   showPin, pinPress,
-  go, toggleMode, openAdd, openIsabel, forgetLearned,
+  go, toggleMode, openAdd, openIsabel, forgetLearned, toggleNightItem, copyNightItem,
   openLink, linkStart, linkVerify, toggleIsabelMsg, logHabitToday,
   focusDone, focusTomorrow, focusDiscard, focusNext, toggleBrandStrategy, toggleJetmiContext, toggleMarcaPropia,
   retryLoad, gymLogSession,

@@ -27,8 +27,10 @@ const MAIN_URL = new URL('../../main.js', import.meta.url);
 // y progreso con token de app) y Marca Propia. Sin O5. Y otra (2026-09-22, O5
 // canary): "Lo que Isabel sabe de ti" en Dominios, que solo lee
 // GET /v1/app/knowledge y deja olvidar; Home no cambia y no importa ningún
-// fixture ni read model de O5 preparado (segunda aserción).
-const MAIN_CHECKPOINT_SHA256 = '10CF64B1904D2716C70F8215870EE3717A1C9510ED251A5F851B51274056AE0D';
+// fixture ni read model de O5 preparado (segunda aserción). Y otra (D65, turno
+// de noche): tarjeta "Isabel trabajó por ti" en JETMI, Marca Personal, Marca
+// Propia y Vida Personal, que solo lee GET /v1/app/night. Home no cambia. Sin O5.
+const MAIN_CHECKPOINT_SHA256 = 'AEAB62514F7F2FEBC8DF2D17D679C4EAB50D9C8BBC839766808AD55720AD7CDE';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {
