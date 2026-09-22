@@ -7,6 +7,12 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-09-22, tarde-noche (la app sin API key: SECURITY #2 — D68; turno de noche activo)
+
+- `/v1` deja de depender de `isabel-api-2026`, que iba en el JS público de la app: entra la app con su token de app, los servidores con la llave privada o `API_KEY` (sin valor por defecto), y los PDF con un ticket de 30 minutos (`isabel-api` `2fcdb0b`, `src/core/access.js`; `life-os-app` `6c726b3`, `isabelFetch`). Pedir un código de conexión ya no pide llave: 10 al día como mucho. Los ticks del Gateway pasan a la llave privada en `isabel-gateway` `1c38740`. **Falta que ella rote `API_KEY`** (`cerrar-clave-publica.ps1`): a Claude el clasificador no le deja escribir en el Gateway ni en secretos de Railway.
+- Turno de noche y buscador activados en el Gateway (ella, 14:48Z): cron `turno-noche-0400`, parte de las 08:30 con `night_shift_report`, 48 tools. El `dry_run` del script falló por comillas de PowerShell; el hecho desde Git Bash salió bien (8 trabajos, 7 tareas, 3 búsquedas, 92 s).
+- Primer disparo bueno del coach de las 17:00 (15:00:04Z, `delivered`). `npm run fallos`: ninguno abierto.
+
 ## 2026-09-22, noche (Isabel busca en internet — D67)
 
 - Tool privada `web_research` (Perplexity Sonar por OpenRouter, ~0,007 $ por búsqueda, con fuentes, sin datos suyos en la consulta) y una búsqueda por dominio en el turno de noche, guardada como "Investigación". Capacidad `web_search` en el router; el control de gasto cuenta la tarifa por búsqueda. `isabel-api` `a1ad7bc`.

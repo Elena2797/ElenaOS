@@ -175,7 +175,7 @@ Hoy `vj_state` de D-AFBS está en `rotacion` **sin `rotation_day`/`rotation_tota
 Ver [DATA_MODEL.md](DATA_MODEL.md). Si Supabase se perdiera, estas tres tablas no podrían recrearse solo con el código versionado — habría que reconstruir el esquema a mano a partir de las columnas observadas.
 
 ### `.env.example` de `life-os-app` está incompleto
-No incluye `VITE_ISABEL_API_URL` ni `VITE_ISABEL_KEY`, que sí se usan en producción. Alguien que siga el `.env.example` al pie de la letra tendrá el chat/HOTO/Inventario roto sin saber por qué.
+No incluye `VITE_ISABEL_API_URL`, que sí se usa en producción (`VITE_ISABEL_KEY` ya no se usa desde D68: la app entra con su token de app). Alguien que siga el `.env.example` al pie de la letra tendrá el chat/HOTO/Inventario roto sin saber por qué.
 
 ## Integraciones sin conectar
 
@@ -218,4 +218,4 @@ Encontrado el 2026-08-07: el commit `37b0bb1` (señales de VistaJet) quedó `FAI
 Encontrado el 2026-08-03: con la región ya corregida, Railway seguía sin recoger el commit más nuevo de `isabel-api` — ni "Redeploy" ni "Latest deploy" ni re-seleccionar la rama en el dropdown lo resolvían (todos reconstruían el mismo commit viejo). Solo un `Disconnect` + `Connect Repo` completo del Source forzó una resincronización real. Ver `operations/RAILWAY.md`.
 
 ## Seguridad
-Ver [SECURITY.md](SECURITY.md). Las URLs Git locales ya están limpias y `faithful-light` está detenido sin autodespliegue. Siguen abiertos el PIN/API key visible en el bundle, RLS desactivado, la exposición histórica de tokens y la rotación pendiente de `ANTHROPIC_API_KEY`. MCP sin autenticación ya se resolvió.
+Ver [SECURITY.md](SECURITY.md). Las URLs Git locales ya están limpias y `faithful-light` está detenido sin autodespliegue. Siguen abiertos el PIN visible en el bundle, la rotación de `API_KEY` (D68; RLS ya está cerrado, D62), la exposición histórica de tokens y la rotación pendiente de `ANTHROPIC_API_KEY`. MCP sin autenticación ya se resolvió.

@@ -1,4 +1,4 @@
-Estado: implementado (servidor y app desplegados; el cron del Gateway se aplica a mano, ver §2)
+Estado: implementado y activo (cron `turno-noche-0400` creado el 2026-09-22 14:48Z)
 Última verificación: 2026-09-22
 Verificado en: isabel-api `3ea4b44` (841/842), life-os-app `7ba1c76` (63/63), isabel-gateway `aa17ecf`
 Fuente de verdad de datos: `eventos` (herramienta `isabel:taller` e `isabel:turno_noche`), `tasks`, `projects.next_action`
@@ -31,7 +31,19 @@ runuser -u node -- openclaw cron list --json
 
 `--only` evita reescribir los demás mensajes de coach de paso. No reiniciar el Gateway a :00/:15/:30/:45.
 
+**Aplicado el 2026-09-22 (14:48Z)** con `activar-turno-noche.ps1`: cron creado, parte de las 08:30 actualizado y `mcp reload` (48 tools, con `night_shift_report` y `web_research`). Su paso 4 (el `dry_run`) falló sin avisar: PowerShell rompe las comillas del `curl` al pasarlo por `railway ssh` ("URL using bad/illegal format") y el fichero quedó vacío. Desde Git Bash sí funciona (§3).
+
 ## 3. Probarlo sin escribir nada
+
+Desde Git Bash, en `isabel-gateway` (la llave no sale del contenedor):
+
+```bash
+printf '%s\n' 'curl -sS -m 280 -X POST -H "authorization: Bearer $ISABEL_MCP_KEY" -H "content-type: application/json" -d "{\"dry_run\":true,\"wait\":true}" https://isabel-api-production.up.railway.app/v1/night/run' | MSYS_NO_PATHCONV=1 railway ssh -- sh -s
+```
+
+Primer `dry_run` real (2026-09-22, 92 s): 8 trabajos listos, 7 tareas nuevas o reescritas, 1 próximo paso, 3 búsquedas en internet y 2 descartes `unknown_project` (proyectos fuera de `active`/`paused` o sin id: la validación hizo su trabajo). Nada de VistaJet.
+
+O directamente:
 
 ```bash
 curl -sS -X POST -H "authorization: Bearer $ISABEL_MCP_KEY" -H "content-type: application/json" \

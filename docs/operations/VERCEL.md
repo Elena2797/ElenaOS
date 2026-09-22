@@ -24,7 +24,7 @@ Fuente de verdad de datos: ninguna
 Estas funciones se despliegan igualmente porque Vercel las detecta por convención de carpeta — están vivas como endpoints (`/api/chat`, `/api/gmail-auth`, `/api/gmail-callback`), solo que nada las invoca desde la app.
 
 ## Variables de entorno necesarias
-`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_ISABEL_API_URL`, `VITE_ISABEL_KEY` (las dos últimas ausentes del `.env.example`, ver KNOWN_PROBLEMS.md). Si `api/chat.js` se activara: `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY` (nombres distintos a los de `isabel-api`, cuidado al configurar).
+`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_ISABEL_API_URL` (ausente del `.env.example`, ver KNOWN_PROBLEMS.md). `VITE_ISABEL_KEY` ya no se lee desde D68 (la app entra en isabel-api con su token de app); si sigue en el panel de Vercel se puede borrar. Si `api/chat.js` se activara: `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY` (nombres distintos a los de `isabel-api`, cuidado al configurar).
 
 **`VITE_ISABEL_API_URL` debe ser `https://isabel-api-production.up.railway.app` — con la `s`.** El 2026-08-03 se encontró horneada en producción como `http://` (sin la `s`), causando que Railway rechazara la conexión con 503 y que `GET /v1/now` (ver `core/ISABEL_NOW.md`) pareciera roto en el navegador aunque el backend funcionaba perfectamente por `curl`. La variable es "Sensitive" en el dashboard de Vercel — no se puede leer su valor actual desde la UI, solo sobrescribir; para confirmar el valor real desplegado, inspeccionar el string horneado en el bundle de producción (`grep` sobre el `.js` servido), no confiar solo en lo que diga el dashboard.
 
