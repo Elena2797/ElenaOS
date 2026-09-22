@@ -5,7 +5,7 @@ Estado: fotografía operativa vigente
 
 ## Actualización — 2026-09-22, 17:30 Madrid (manda sobre las de abajo)
 
-- **La app ya no lleva llave (D68, SECURITY #2):** `/v1` acepta el token de app, la llave privada del Gateway, `API_KEY` (solo Railway, sin valor por defecto) o un ticket de PDF de 30 minutos. `isabel-api` `2fcdb0b` (866/867) y `life-os-app` `6c726b3` (63/63) desplegados y verificados en producción. **Pendiente de ella:** `cerrar-clave-publica.ps1` (ticks del Gateway a la llave privada + `API_KEY` nueva). Hasta entonces `isabel-api-2026` sigue abriendo `/v1` y el MCP público.
+- **La app ya no lleva llave (D68, SECURITY #2):** `/v1` acepta el token de app, la llave privada del Gateway, `API_KEY` (solo Railway, sin valor por defecto) o un ticket de PDF de 30 minutos. `isabel-api` `2fcdb0b` (866/867) y `life-os-app` `6c726b3` (63/63) desplegados y verificados en producción. `API_KEY` rotada por ella a las ~15:35Z: `isabel-api-2026` da 401 en `/v1`, MCP y OAuth; los ticks usan la llave privada. SECURITY #2 resuelto. La app carga en su móvil con el token.
 - **Turno de noche activo:** el cron `turno-noche-0400` existe desde las 14:48Z; Isabel ve `night_shift_report` y `web_research` (48 tools). Primer `dry_run` bueno (sin escribir). La primera noche real es la del 23.
 - **Coach 17:00:** primer disparo bueno hoy (`ok/delivered`).
 

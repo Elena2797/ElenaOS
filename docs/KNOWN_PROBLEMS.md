@@ -218,4 +218,4 @@ Encontrado el 2026-08-07: el commit `37b0bb1` (señales de VistaJet) quedó `FAI
 Encontrado el 2026-08-03: con la región ya corregida, Railway seguía sin recoger el commit más nuevo de `isabel-api` — ni "Redeploy" ni "Latest deploy" ni re-seleccionar la rama en el dropdown lo resolvían (todos reconstruían el mismo commit viejo). Solo un `Disconnect` + `Connect Repo` completo del Source forzó una resincronización real. Ver `operations/RAILWAY.md`.
 
 ## Seguridad
-Ver [SECURITY.md](SECURITY.md). Las URLs Git locales ya están limpias y `faithful-light` está detenido sin autodespliegue. Siguen abiertos el PIN visible en el bundle, la rotación de `API_KEY` (D68; RLS ya está cerrado, D62), la exposición histórica de tokens y la rotación pendiente de `ANTHROPIC_API_KEY`. MCP sin autenticación ya se resolvió.
+Ver [SECURITY.md](SECURITY.md). Las URLs Git locales ya están limpias y `faithful-light` está detenido sin autodespliegue. Siguen abiertos el PIN visible en el bundle, (la API key del bundle se retiró y rotó en D68; RLS está cerrado, D62) la exposición histórica de tokens y la rotación pendiente de `ANTHROPIC_API_KEY`. MCP sin autenticación ya se resolvió.
