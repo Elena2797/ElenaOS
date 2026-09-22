@@ -6,9 +6,9 @@ Estado: fotografía operativa vigente
 ## Actualización — 2026-09-22, mediodía (manda sobre las de abajo)
 
 - **Login real (D62):** la app entra con el código de Telegram y una sesión real de Supabase; RLS `lifeos_owner_only` en todas las tablas. La clave anónima ve 0 filas. SECURITY #3 y #6 resueltos; sigue abierto #2 (la API key pública de `/v1`).
-- **O5 canary (D63) desplegado en `OFF`:** Isabel tiene `knowledge_remember`/`knowledge_recall`/`knowledge_forget` (privadas) y la app, Dominios → "Lo que Isabel sabe de ti". `isabel-api` `47c35a2`, `life-os-app` `b6376a2`. El Gateway ya las ve (`openclaw mcp reload`, sin reiniciar). **Para que aprenda faltan dos pasos de ella:** aplicar `isabel-api/migrations/knowledge_canary.sql` en el SQL Editor y poner `LIFEOS_KNOWLEDGE_STAGE=CANARY` en isabel-api. Runbook: `operations/O5_CANARY.md`. La prueba de extremo a extremo con una frase suya queda para después de esos dos pasos.
-- **Guard O5 verde** en `origin/main` (el rojo era del checkout local atrasado). Backend 812/813 (falla solo la prueba que lee `../life-os-app` fuera de la carpeta), frontend 59/59.
-- **Mensajes de coach con `knowledge_recall`:** cambiado en `isabel-gateway` `ffacbcf` (local, sin remoto) pero **no aplicado**: `ensure-coach-crons.mjs` no está en la imagen y el despliegue del Gateway no se hizo. La descripción de la tool ya le pide a Isabel usarlo en el coach.
+- **O5 canary (D63) encendido en `CANARY`:** lo que ella cuenta de sí misma por Telegram (preferencias, objetivos, compromisos con fecha, límites, hechos) se guarda como conocimiento con sus palabras y el día, e Isabel lo usa después: además de `knowledge_recall`, lo vigente viaja dentro de `vistajet_get_status`, `gym_get_status`, `habits_status`, `tasks_list` y `calendar_list_events` (solo con la llave privada), así que también llega a los mensajes de coach. Ella lo ve y lo olvida en Dominios → "Lo que Isabel sabe de ti". `isabel-api` `76f70bd`, `life-os-app` `b6376a2`. Probado en producción con turnos reales en sesiones aisladas; las frases de prueba se olvidaron y el estado quedó vacío. Apagar o pausar: `operations/O5_CANARY.md`.
+- **El Gateway ve tools nuevas sin reiniciar:** `openclaw mcp reload`.
+- **Guard O5 verde** en `origin/main` (el rojo era del checkout local atrasado). Backend 814/815 (falla solo la prueba que lee `../life-os-app` fuera de la carpeta), frontend 59/59.
 
 ## Actualización — 2026-09-22, mañana
 

@@ -9,6 +9,9 @@ No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí
 
 ## 2026-09-22, mediodía (Isabel empieza a aprender de lo que ella le cuenta — O5 canary, D63)
 
+- **Encendido:** ella aplicó `knowledge_canary.sql` y puso `LIFEOS_KNOWLEDGE_STAGE=CANARY` (12:57 Madrid). Prueba en producción con turnos reales de Isabel en sesiones aisladas (`openclaw agent --session-key agent:main:o5-proof-*`, sin `--deliver`): las dos frases se guardaron bien, pero en una sesión nueva Isabel **no** consultó lo aprendido y recomendó un vuelo nocturno. Arreglo `isabel-api` `76f70bd`: lo vigente viaja dentro de las tools de estado (solo llave privada). Repetida la prueba: "no lo cojas… sabes que prefieres no volar de noche" y "Gym 1/3 esta semana". Frases de prueba olvidadas después.
+- El cambio de los mensajes de coach en `isabel-gateway` (`ffacbcf`) se revirtió (`b9d1a8c`): no hace falta y nunca llegó a producción.
+
 - **Primera entrada viva de O5.** Tools privadas `knowledge_remember`, `knowledge_recall` y `knowledge_forget`: lo que ella afirma de sí misma por Telegram (preferencia, objetivo, compromiso con fecha, límite, hecho, estado) se guarda en el ledger `lifeos:knowledge` de `eventos` con sus palabras, el día y el canal, y Isabel lo consulta después. Deduplicado (identidad semántica + clave idempotente + índice único), con tope diario y sin specialists, FollowUps ni entrega. `isabel-api` `789df11` + `47c35a2` (812/813; el que falla es el conocido de `../life-os-app` fuera del repo).
 - **Interruptor `LIFEOS_KNOWLEDGE_STAGE`** (OFF/READ_ONLY/CANARY) y rollback: `operations/O5_CANARY.md`. Desplegado en `OFF`; verificado en producción que las tools existen solo con la llave privada (45 frente a 26) y que en `OFF` no leen ni escriben.
 - **La app enseña lo aprendido** en Dominios → "Lo que Isabel sabe de ti", con "Olvidar" (`life-os-app` `b6376a2`, 59/59). El feed de eventos de la app deja fuera las filas del ledger.

@@ -1,30 +1,32 @@
-Última actualización: 2026-09-22, mediodía — O5 canary desplegado en OFF; login real documentado
+Última actualización: 2026-09-22, mediodía — O5 canary encendido y probado en producción; login real documentado
 
 # Próxima sesión
 
 ## 1. Qué se terminó en esta sesión
 
-- **O5 canary (D63):** Isabel puede guardar lo que ella cuenta de sí misma por Telegram (`knowledge_remember`), usarlo (`knowledge_recall`) y olvidarlo (`knowledge_forget`); la app lo enseña en Dominios → "Lo que Isabel sabe de ti". Deduplicación, procedencia, interruptor `LIFEOS_KNOWLEDGE_STAGE` y rollback. `isabel-api` `47c35a2`, `life-os-app` `b6376a2`. Desplegado en `OFF`.
-- El Gateway ve las tools nuevas sin reiniciarse (`openclaw mcp reload`).
-- Guard O5: verde en `origin/main`; ahora vigila que O5 solo se alcance por `knowledgeCanary.js`.
+- **O5 canary (D63) encendido en `CANARY`:** lo que ella cuenta de sí misma por Telegram se guarda como conocimiento (con sus palabras, día y canal), Isabel lo usa después y ella lo ve y lo olvida en Dominios → "Lo que Isabel sabe de ti". Deduplicación en tres capas, interruptor `LIFEOS_KNOWLEDGE_STAGE`, rollback. `isabel-api` `76f70bd`, `life-os-app` `b6376a2`.
+- Probado en producción con turnos reales de Isabel en sesiones aisladas. La primera prueba falló (no consultaba lo aprendido); arreglado haciendo que lo vigente viaje dentro de las tools de estado (solo llave privada). Frases de prueba olvidadas: el estado quedó vacío.
+- El Gateway ve tools nuevas con `openclaw mcp reload`, sin reiniciar.
+- Guard O5 verde; ahora vigila que O5 solo se alcance por `knowledgeCanary.js`.
 - D62 escrita; SECURITY #3 y #6 resueltos.
 
 ## 2. Qué quedó pendiente
 
-- **Encender el canary (lo hace ella):** (1) `isabel-api/migrations/knowledge_canary.sql` en el SQL Editor; (2) `LIFEOS_KNOWLEDGE_STAGE=CANARY` en el servicio isabel-api. Después, la prueba de extremo a extremo.
-- Mensajes de coach con `knowledge_recall` (`isabel-gateway` `ffacbcf`, sin aplicar): `ensure-coach-crons.mjs` no va en la imagen; hay que ejecutarlo en el contenedor con `--apply --replace`.
-- Coach 17:00: comprobar su primer disparo bueno.
+- **Ver el canary con uso real suyo:** que Isabel guarde lo que ella diga de verdad por Telegram (qué tipos y áreas elige, si guarda de más o de menos) y que ella lo vea en la app con su móvil. Nadie ha visto aún la pantalla con su token en producción (se probó en local con datos de ejemplo).
+- Coach 17:00: comprobar su primer disparo bueno (ahora `tasks_list` le lleva lo aprendido).
 - `/v1` sigue aceptando la API key pública (SECURITY #2): que acepte la sesión de D62 y rotar la llave.
 - Clave de Anthropic caduca el 2026-10-20. Gasto de OpenRouter fuera del control de presupuesto. memory-core de OpenClaw pide clave de OpenAI.
 
 ## 3. Qué hacer inmediatamente después
 
-1. Si ella ya aplicó el SQL y puso `CANARY`: prueba con dos turnos aislados (`openclaw agent --agent main --session-key agent:main:<clave>` sin `--deliver`): una frase suya → `knowledge_remember`; en una sesión nueva, una pregunta que lo necesite → `knowledge_recall`. Comprobar la fila en `eventos` y la pantalla de la app. Olvidar lo que fuera solo de prueba.
+1. Leer el ledger (`select resumen, created_at from eventos where herramienta = 'lifeos:knowledge' order by created_at desc`) y revisar con ella lo que Isabel haya guardado de verdad. Si guarda cosas que no debe, ajustar la descripción de `knowledge_remember`; si hay que parar, `LIFEOS_KNOWLEDGE_STAGE=READ_ONLY` u `OFF` (`operations/O5_CANARY.md`).
 2. Mirar el `state` del coach 17:00.
+3. Si el canary va bien unos días: decidir el siguiente paso de O5 (`core/KNOWLEDGE_LOOP.md`, pasos 1–4). Nada de eso está activado.
 
 ## 4. Qué no debe romperse
 
 - O5 solo por `src/core/knowledgeCanary.js` (guard). `LIVE` no se usa: abre rutas universales que no están montadas.
+- Lo aprendido solo sale con la llave privada del MCP o el token de app; nunca con la API key pública.
 - Quien lea `eventos` debe excluir `herramienta = 'lifeos:knowledge'` (su `texto` es JSON interno).
 - Tabla nueva en `public` → volver a ejecutar `rls_owner_only.sql` o la app no la ve (D62).
 - Nunca `railway up` en `isabel-api`: push a `main` desde un worktree limpio de `origin/main`.

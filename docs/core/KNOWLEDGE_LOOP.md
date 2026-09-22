@@ -1,6 +1,6 @@
 Estado: parcial — una entrada viva (canary conversacional, 2026-09-22); el resto de O5 sigue implementado y desconectado
 Última verificación: 2026-09-22
-Verificado en: isabel-api `789df11` (`src/core/knowledgeCanary.js`, `src/__tests__/knowledgeCanary.test.js`, guard O5), life-os-app `b6376a2`
+Verificado en: isabel-api `789df11` + `76f70bd` (`src/core/knowledgeCanary.js`, `src/__tests__/knowledgeCanary.test.js`, guard O5), life-os-app `b6376a2`, prueba en producción 2026-09-22 (D63)
 Fuente de verdad de datos: filas `eventos.herramienta = 'lifeos:knowledge'` (DATA_MODEL.md)
 
 # Bucle universal de conocimiento de LIFEOS
@@ -108,7 +108,7 @@ Se activó **una sola entrada**, la conversacional, antes que los pasos 1–4 de
 - **Entrada:** tool MCP privada `knowledge_remember`. Isabel ya entiende la frase en Telegram y la pasa estructurada (tipo, dominio, título en tercera persona y sus palabras). La interpretación es el turno de conversación que ya existía: no hay llamada de IA añadida. `src/core/knowledgeCanary.js` la convierte en `KnowledgeCandidate:v1` (`USER_REPORTED`, `KNOWN`, explícita, reversible, superficie `telegram`) y la pasa por la misma Write Policy y el mismo ledger. Es el único módulo vivo que importa O5; el guard lo comprueba.
 - **Límites del canary:** 6 tipos (`PREFERENCE`, `GOAL`, `COMMITMENT`, `CONSTRAINT`, `FACT`, `STATE`), dominios conocidos, sin sensibilidad alta, tope diario; si la política no da `AUTO_WRITE` (ambigüedad) no se escribe y no se abre Intervention: Isabel pregunta. Sin specialists, FollowUps ni entrega.
 - **Identidad y deduplicación:** `entity_id` = tipo + dominio + título normalizado (sin tildes, mayúsculas ni signos); clave idempotente = entidad + sus palabras + día de Madrid; índice único en la base.
-- **Uso:** `knowledge_recall` (lo vigente; lo caducado por `valid_until` deja de contar) y los tres mensajes de coach lo llaman.
+- **Uso:** `knowledge_recall` (lo vigente; lo caducado por `valid_until` deja de contar) y, sin depender de que Isabel se acuerde, `attachLearned` añade lo vigente a `vistajet_get_status`, `gym_get_status`, `habits_status`, `tasks_list` y `calendar_list_events` (solo con la llave privada). La prueba en producción demostró que sin esto no lo consultaba.
 - **Olvidar:** `knowledge_forget` y "Olvidar" en la app escriben `KNOWLEDGE_RETRACTED`; el fold lo quita del estado y lo guarda en `retracted`.
 - **Superficie:** `GET /v1/app/knowledge` (token de app) → Dominios, "Lo que Isabel sabe de ti". Ni chat (D55) ni Inicio (D59).
 - **Operación:** `LIFEOS_KNOWLEDGE_STAGE` y rollback en `operations/O5_CANARY.md`. Decisión: `DECISIONS.md` D63.
