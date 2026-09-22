@@ -11,8 +11,8 @@
 
 ## 2. Qué quedó pendiente
 
-- **Probar un PDF en el móvil** (HOTO o Laundry → visor): usa el ticket nuevo y nadie lo ha abierto aún en producción.
-- Limpieza sin prisa: borrar `ISABEL_API_KEY` del Gateway y `VITE_ISABEL_KEY` de Vercel (ya no se usan); preguntarle si retira la página vieja de inventario `isabel-api/public/` (ya no funciona).
+- **Esta noche empieza avión nuevo** (HOTO, inventario y Laundry Form nuevos). El ticket de PDF se probó en el servidor (HOTO de D-AFBS: 200); falta verlo en el visor de su móvil, y Laundry no tiene ningún registro aún (el de hoy será el primero). "Exportar UPLIFT" ya está en VistaJet (`e40f0b1`).
+- Limpieza sin prisa: borrar `ISABEL_API_KEY` del Gateway y `VITE_ISABEL_KEY` de Vercel (ya no se usan); retirar la página vieja de inventario `isabel-api/public/` (ya no funciona; su UPLIFT pasó a la app) si ella no la echa de menos.
 - **Primera noche real** (23 de septiembre, 04:00): la fila `isabel:turno_noche` de hoy, las `isabel:taller` y el parte de las 08:30.
 - **O5 canary sin uso real:** el ledger (`lifeos:knowledge`) solo tiene las frases de prueba olvidadas.
 - Clave de Anthropic caduca el 2026-10-20. Gasto de OpenRouter fuera del control de presupuesto. memory-core de OpenClaw pide clave de OpenAI.

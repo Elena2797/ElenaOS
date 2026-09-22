@@ -12,6 +12,7 @@ No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí
 - `/v1` deja de depender de `isabel-api-2026`, que iba en el JS público de la app: entra la app con su token de app, los servidores con la llave privada o `API_KEY` (sin valor por defecto), y los PDF con un ticket de 30 minutos (`isabel-api` `2fcdb0b`, `src/core/access.js`; `life-os-app` `6c726b3`, `isabelFetch`). Pedir un código de conexión ya no pide llave: 10 al día como mucho. Los ticks del Gateway pasan a la llave privada en `isabel-gateway` `1c38740`. Ella rotó `API_KEY` con `cerrar-clave-publica.ps1` (a Claude el clasificador no le deja escribir en el Gateway ni en secretos de Railway): la llave vieja da 401 en todo desde las 15:37Z.
 - Turno de noche y buscador activados en el Gateway (ella, 14:48Z): cron `turno-noche-0400`, parte de las 08:30 con `night_shift_report`, 48 tools. El `dry_run` del script falló por comillas de PowerShell; el hecho desde Git Bash salió bien (8 trabajos, 7 tareas, 3 búsquedas, 92 s).
 - Primer disparo bueno del coach de las 17:00 (15:00:04Z, `delivered`). `npm run fallos`: ninguno abierto.
+- La página vieja de inventario de `isabel-api/public/` (chat de inventario con dictado y "Exportar UPLIFT") dejó de funcionar al rotar la clave. Su única función que la app no tenía, **Exportar UPLIFT**, pasa a VistaJet (`life-os-app` `e40f0b1`; `mode=uplift` probado en producción). Ticket de PDF probado en producción con el HOTO de D-AFBS: 200 PDF, y 401 en otro PDF.
 
 ## 2026-09-22, noche (Isabel busca en internet — D67)
 
