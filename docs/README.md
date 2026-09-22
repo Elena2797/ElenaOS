@@ -14,7 +14,7 @@ Cada dato vive en **un solo documento**. Si ves el mismo dato repetido en dos si
 
 | Tu tarea es... | Lee esto primero |
 |---|---|
-| Empezar una sesión nueva, sin más contexto | `CURRENT_STATE.md` (fotografía del proyecto) → `NEXT_SESSION.md` (handoff exacto) |
+| Empezar una sesión nueva, sin más contexto | `CURRENT_STATE.md` (fotografía del proyecto) → `NEXT_SESSION.md` (handoff exacto) → `npm run fallos` en `isabel-api`: los fallos que Isabel apuntó para arreglar con Claude (D66) |
 | Continuar donde se quedó la última sesión | `NEXT_SESSION.md` |
 | Entender qué funciona y qué no, ahora mismo | `CURRENT_STATE.md` |
 | Tocar código de un módulo concreto (HOTO, Inventario, etc.) | `modules/<MÓDULO>.md` correspondiente |

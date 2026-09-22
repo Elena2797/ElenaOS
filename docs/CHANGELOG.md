@@ -7,6 +7,10 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-09-22, noche (Isabel sincera con sus fallos — D66)
+
+- Nueva tool privada `system_report_failure`: Isabel ya no promete "no volverá a pasar"; dice si falló ella o el sistema y lo apunta en `eventos` (`lifeos:fallo`) para que Claude lo arregle. `npm run fallos` lo lista al empezar cada sesión. `isabel-api` `f1db257`. Probado en producción; el fallo de prueba (la visa, real) se cerró con D64.
+
 ## 2026-09-22, noche (turno de noche: Isabel trabaja sola — D65)
 
 - Revisión: Isabel no trabajaba sin que ella le escribiera y no podía leer JETMI ni Marca Propia. Nuevo turno de las 04:00 (`isabel-api` `3ea4b44`, `src/core/night/`): en JETMI, Marca Personal, Marca Propia y Vida Personal ordena tareas y próximos pasos y deja 1-2 cosas listas para usar y una pregunta; VistaJet fuera, en código. Nunca envía, borra, completa ni descarta.

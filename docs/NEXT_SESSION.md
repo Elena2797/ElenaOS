@@ -10,6 +10,7 @@
 - Guard O5 verde; ahora vigila que O5 solo se alcance por `knowledgeCanary.js`.
 - D62 escrita; SECURITY #3 y #6 resueltos.
 - **D64:** "ya lo hice" cierra la tarea y sus recordatorios (o solo el recordatorio); `tasks_list` trae los recordatorios pendientes. Probado con Isabel en producción.
+- **D66:** Isabel no promete "no volverá a pasar": dice si falló ella o el sistema y lo apunta para Claude (`npm run fallos`). Probado en producción.
 - **D65, turno de noche** (otra sesión, en paralelo): a las 04:00 Isabel trabaja sola en JETMI, Marca Personal, Marca Propia y Vida Personal (VistaJet fuera, en código). Servidor y app desplegados y verificados; el cron del Gateway, sin aplicar.
 
 ## 2. Qué quedó pendiente
@@ -23,6 +24,8 @@
 - Clave de Anthropic caduca el 2026-10-20. Gasto de OpenRouter fuera del control de presupuesto. memory-core de OpenClaw pide clave de OpenAI.
 
 ## 3. Qué hacer inmediatamente después
+
+0. **Antes que nada:** `npm run fallos` en `isabel-api` (con su `.env`): lo que Isabel apuntó como fallo para arreglar con Claude (D66). Arreglar, cerrar con `--resolver` y decírselo a ella.
 
 0. Turno de noche: con el cron aplicado, un `dry_run` (`operations/TURNO_NOCHE.md` §3) y revisar `would_save`/`would_change`/`rejected` antes de la primera noche. Tras la primera noche: la fila `isabel:turno_noche` de hoy y las `isabel:taller`, y el parte de las 08:30.
 
