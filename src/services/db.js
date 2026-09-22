@@ -31,8 +31,10 @@ export async function loadAll() {
     // de 15 minutos (`proactive:*`): el 2026-09-21 eran 414 de 449 en 7 días,
     // y las 50 últimas cubrían solo 2 horas. Ese registro se queda donde está
     // (lo leen el control de gasto y el informe de coste); la app no lo enseña.
+    // Tampoco el ledger de conocimiento (`lifeos:knowledge`, O5): su `texto`
+    // es un JSON interno; lo aprendido se ve en "Lo que Isabel sabe de ti".
     _db.from('eventos').select('*')
-      .or('herramienta.is.null,and(herramienta.not.like.ai:*,herramienta.not.like.proactive:*)')
+      .or('herramienta.is.null,and(herramienta.not.like.ai:*,herramienta.not.like.proactive:*,herramienta.neq.lifeos:knowledge)')
       .order('created_at', { ascending: false }).limit(50),
     _db.from('alertas').select('*').eq('status', 'active').order('created_at', { ascending: false }),
   ]);

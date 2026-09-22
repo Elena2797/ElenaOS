@@ -11,6 +11,7 @@ import * as readiSvc from './services/readiness.js';
 import { createSurfaceRevalidator, shouldRevalidateVisibility } from './services/surfaceSync.js';
 import { currentSleepEntry, formatSleepMinutes } from './services/sleepReadModel.js';
 import { financeStateSummary } from './services/financeReadModel.js';
+import { buildLearnedModel, kindLabel, learnedMeta } from './services/knowledgeLearned.js';
 // Definiciones del dominio HOTO: fuente única en src/hoto/model.js.
 // Se importan con los nombres VJ_* históricos para no tocar sus usos.
 import {
@@ -851,12 +852,12 @@ function render() {
   ['home','areas','avanzar'].forEach(v=>{
     const el=document.getElementById('nb-'+v);
     if(!el) return;
-    const on=S.view===v||(v==='areas'&&(S.view==='area'||S.view==='project'))||(v==='avanzar'&&S.view==='resultado_ia');
+    const on=S.view===v||(v==='areas'&&(S.view==='area'||S.view==='project'||S.view==='aprendido'))||(v==='avanzar'&&S.view==='resultado_ia');
     el.className='nb'+(on?' on':'');
   });
   const mp=document.getElementById('mp');
   mp.textContent=S.mode; mp.className='mode-pill '+(S.mode==='ON'?'m-on':'m-off');
-  const views={home:homeView,areas:areasView,area:areaView,global:globalView,project:projectView,avanzar:avanzarView,resultado_ia:resultadoIAView,vj_hoto:vjHotoView,vj_inventario:vjInventarioView,vj_laundry_cleaning:vjLandingCleaningView,vj_fresh:vjFreshView,vj_status:vjStatusView};
+  const views={home:homeView,areas:areasView,aprendido:learnedView,area:areaView,global:globalView,project:projectView,avanzar:avanzarView,resultado_ia:resultadoIAView,vj_hoto:vjHotoView,vj_inventario:vjInventarioView,vj_laundry_cleaning:vjLandingCleaningView,vj_fresh:vjFreshView,vj_status:vjStatusView};
   document.getElementById('main').innerHTML=connectionBanner()+(views[S.view]||homeView)();
   renderFab();
 }
@@ -1533,7 +1534,90 @@ function areasView() {
       <div class="brief-kicker">Dominios</div>
       <h2>Cómo está cada área</h2>
     </div>
-    <div class="domains-list">${domains.map(domainCard).join('')}</div>
+    <div class="domains-list">${domains.map(domainCard).join('')}${learnedEntryCard()}</div>
+  </div>`;
+}
+
+// ── Lo que Isabel sabe de ti (O5 canary, 2026-09-22) ─────────────────────────
+// Lo que ella cuenta de sí misma por Telegram y Isabel guarda como
+// conocimiento (preferencias, objetivos, compromisos con fecha, límites). Vive
+// aquí, en Dominios, y no en Inicio (D59); solo se lee y se olvida, sin chat
+// (D55). La lista la decide el servidor (GET /v1/app/knowledge).
+function learnedEntryCard() {
+  const linked = appClient().isLinked();
+  if (linked && !S.learned && !S._learnedLoading) loadLearned();
+  const m = buildLearnedModel(S.learned, { linked });
+  const sub = m.state === 'ok' ? `${m.count} cosa${m.count === 1 ? '' : 's'} que le has contado`
+    : m.state === 'empty' ? 'Aún nada: cuéntaselo por Telegram'
+    : m.state === 'unlinked' ? 'Conecta este móvil para verlo'
+    : m.state === 'off' ? 'Aprendizaje apagado'
+    : 'Lo que le cuentas por Telegram';
+  return `<button class="domain-card" onclick="go('aprendido')" style="--domain:#6366F1">
+    <div class="domain-top"><span class="domain-icon">🧠</span>${m.paused ? '<span class="domain-state">En pausa</span>' : ''}</div>
+    <div class="domain-name">Lo que Isabel sabe de ti</div>
+    <div class="domain-purpose">${escHtml(sub)}</div>
+  </button>`;
+}
+
+async function loadLearned() {
+  if (!appClient().isLinked() || S._learnedLoading) return;
+  S._learnedLoading = true;
+  const r = await appClient().get('/v1/app/knowledge');
+  S._learnedLoading = false;
+  S.learned = r.unlinked ? null : r;
+  if (S.view === 'aprendido' || S.view === 'areas') render();
+}
+
+async function forgetLearned(id) {
+  const item = (S.learned?.items || []).find(i => i.id === id);
+  if (!item || !confirm(`¿Olvidar "${item.title}"? Isabel dejará de tenerlo en cuenta.`)) return;
+  const r = await appClient().post(`/v1/app/knowledge/${encodeURIComponent(id)}/forget`);
+  if (!r.ok) { alert('No se pudo olvidar ahora mismo. Prueba otra vez o díselo a Isabel por Telegram.'); return; }
+  S.learned = { ...S.learned, items: S.learned.items.filter(i => i.id !== id) };
+  render();
+}
+
+function learnedItemRow(item) {
+  return `<div style="padding:12px 14px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:flex-start">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:3px">${kindLabel(item.kind)}</div>
+      <div style="font-size:14px;font-weight:600;color:var(--text);line-height:1.35">${escHtml(item.title)}</div>
+      ${item.her_words ? `<div style="font-size:12px;color:var(--t2);margin-top:4px;font-style:italic;line-height:1.4">"${escHtml(item.her_words)}"</div>` : ''}
+      <div style="font-size:11px;color:var(--t3);margin-top:4px">${escHtml(learnedMeta(item))}</div>
+    </div>
+    ${item.expired ? '' : `<button onclick="forgetLearned('${escHtml(item.id)}')" style="${HOME_BTN};flex-shrink:0">Olvidar</button>`}
+  </div>`;
+}
+
+function learnedView() {
+  const linked = appClient().isLinked();
+  if (linked && !S.learned && !S._learnedLoading) loadLearned();
+  const m = buildLearnedModel(S.learned, { linked });
+  const intro = `<div class="page-intro">
+      <div class="brief-kicker">Isabel</div>
+      <h2>Lo que Isabel sabe de ti</h2>
+      <p>Lo que le cuentas de ti por Telegram y ella usa después para ayudarte: gustos, objetivos, compromisos y límites. Si algo ya no es así, olvídalo aquí o díselo a ella.</p>
+    </div>`;
+  const note = (text, cta = '') => `<div class="card" style="padding:16px;font-size:13px;color:var(--t2);line-height:1.5">${text}${cta}</div>`;
+  const tgBtn = `<div><button onclick="openIsabel()" style="margin-top:10px;background:var(--text);color:#fff;border:none;border-radius:999px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer">Abrir Telegram</button></div>`;
+  let body;
+  if (m.state === 'unlinked') body = note('Conecta este móvil para ver lo que Isabel sabe de ti. Es privado: solo sale con la app conectada.',
+    `<div><button onclick="openLink()" style="margin-top:10px;background:var(--text);color:#fff;border:none;border-radius:999px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer">Conectar con un código de Telegram</button></div>`);
+  else if (m.state === 'loading') body = note('Leyendo lo que Isabel sabe de ti…');
+  else if (m.state === 'off') body = note('El aprendizaje de Isabel está apagado ahora mismo: no guarda ni usa nada de lo que le cuentas.');
+  else if (m.state === 'error') body = note(`No pude leerlo ahora mismo (${escHtml(m.error)}).`);
+  else if (m.state === 'empty') body = note('Todavía no le has contado nada que guardar. Dile por Telegram cosas como "esta semana quiero ir al gym 3 veces" o "no me gusta volar de noche" y aparecerán aquí.', tgBtn);
+  else {
+    body = (m.paused ? note('En pausa: Isabel usa lo que ya sabe, pero ahora no aprende nada nuevo.') : '')
+      + m.groups.map(g => `<div class="card" style="margin-bottom:10px;overflow:hidden">
+        <div class="card-head"><span class="ch-label">${escHtml(g.domain)}</span></div>
+        ${g.items.map(learnedItemRow).join('')}
+      </div>`).join('')
+      + (m.past.length ? `<details class="card" style="margin-bottom:10px;overflow:hidden"><summary style="padding:12px 14px;font-size:13px;color:var(--t2);cursor:pointer">Ya pasado (${m.past.length})</summary>${m.past.map(learnedItemRow).join('')}</details>` : '');
+  }
+  return `<div class="domains-page">
+    <button onclick="go('areas')" style="border:none;background:none;color:var(--t2);font-size:13px;cursor:pointer;padding:0 0 10px"><i class="ti ti-chevron-left"></i> Dominios</button>
+    ${intro}${body}
   </div>`;
 }
 
@@ -4893,7 +4977,7 @@ async function invCloseSession() {
 // Expose functions to global scope for inline onclick handlers (required in ES module context)
 Object.assign(window, {
   showPin, pinPress,
-  go, toggleMode, openAdd, openIsabel,
+  go, toggleMode, openAdd, openIsabel, forgetLearned,
   openLink, linkStart, linkVerify, toggleIsabelMsg, logHabitToday,
   focusDone, focusTomorrow, focusDiscard, focusNext, toggleBrandStrategy, toggleJetmiContext, toggleMarcaPropia,
   retryLoad, gymLogSession,
@@ -4944,6 +5028,7 @@ const surfaceRevalidator = createSurfaceRevalidator({
     const inVJ = (S.view === 'area' && S.areas.find(a => a.id === S.areaId)?.name === 'VistaJet')
       || VJ_SUBVIEWS.includes(S.view);
     if (inVJ) await refreshVjContext();
+    if (S.view === 'aprendido') await loadLearned();
   },
   reloadPrimaryState: reload,
   refreshPendingQuestions: loadPendingQuestions,
