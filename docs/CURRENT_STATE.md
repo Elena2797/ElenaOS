@@ -1,9 +1,16 @@
 Estado: fotografía operativa vigente
-Última verificación: 2026-09-21
+Última verificación: 2026-09-22
 
 # Estado actual de LIFEOS
 
-## Actualización — 2026-09-21, noche (manda sobre la de abajo)
+## Actualización — 2026-09-22 (manda sobre las de abajo)
+
+- **Documentación unida a `main`:** la rama `docs/incidente-saldo` (D46–D61) se fusionó en `main`. Ya no hay que buscar el estado en otra rama.
+- **Crons verificados hoy** (`openclaw cron list --json`, 09:18Z): sueño 08:00 `ok/delivered` (el primero con DeepSeek), coach 08:30 `ok/delivered` (el primero con agenda y correo), cierre 21:30 del 21 `ok/delivered`, `reminders-tick-1m` y `proactive-tick-15m` `ok`. El coach de las 17:00 aún no tiene ningún disparo bueno (el del 21 lo cortó un reinicio): verificar hoy después de las 15:00Z.
+- **Código de app en `main`:** D57–D61 (`life-os-app` hasta `7fdb959`): Inicio solo con lo suyo, VistaJet con tareas reales y rotación que avanza, JETMI desde Cowork, dominios Libro y Marca Propia.
+- **Riesgo con fecha:** `/v1/now` (tarjeta de Inicio) e Inventario dependen solo de Claude Haiku; la clave de Anthropic caduca el **2026-10-20**. Siguiente trabajo decidido: pasarlos a DeepSeek vía OpenRouter antes de esa fecha.
+
+## Actualización — 2026-09-21, noche
 
 - **Inicio solo con lo suyo (D59):** saludo, "Urgente" (si no es tarea), "Hoy" (ahora + siguiente + su día) y progreso con rachas. Sin lo que Isabel dijo/hizo/preguntó ni dominios. `life-os-app` `f420055`. Ella ya conectó el móvil.
 - **Home es "Hoy con Isabel" y la app se conecta con un código de Telegram (D57).** Lo privado (lo que dijo Isabel, agenda, Instagram, salud) solo con token de app. Sin pestaña Avanzar ni voz de Isabel inventada. `isabel-api` `fbec0f8`, `life-os-app` `a8d808f`. Falta que ella conecte el móvil.

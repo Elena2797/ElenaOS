@@ -1,42 +1,38 @@
-Última actualización: 2026-09-21, última hora — hábitos con racha (D52)
+Última actualización: 2026-09-22, mañana — docs unidas a main y crons verificados
 
 # Próxima sesión
 
-El relevo anterior (2026-08-10, ventana O4) está en `archive/NEXT_SESSION_2026-08-10.md`: ya no aplica.
-
 ## 1. Qué se terminó en esta sesión
 
-- **Isabel lee su Gmail y su Google Calendar** (D51). App de Google "En producción", cuenta conectada y verificada, 34 tools en el Gateway.
-- **Solo correo de personas:** fuera la publicidad, aunque Gmail la tenga en Principal (`Feedback-ID`, `List-Unsubscribe`).
-- **Hueco de seguridad cerrado** (SECURITY.md #12): con la API key pública de la app se podía leer su Gmail y enviar correos en su nombre. Ahora el correo y la agenda solo existen con la llave privada del Gateway.
-- **Mensajes de coach ampliados:** 08:30 con agenda, correos importantes y rachas; 17:00 con la racha en juego; 21:30 con lo no contestado y los hábitos.
-- **Hábitos con racha** (D52): leer, escribir y gym, también en la tarjeta 🌱 Hábitos de la app. 36 tools.
-- **Informe de presupuesto con el gasto real de OpenRouter** (`isabel-api` `993c98e`; cómo ejecutarlo, en la cabecera de `scripts/budget-status.mjs`).
-- **OAuth viejo de Gmail retirado de Vercel.**
+- La rama `docs/incidente-saldo` (D46–D61, incidente de saldo, multi-modelo, Gmail/Calendar, hábitos, Inicio, JETMI, Libro) se unió a `main`. La documentación vigente vive otra vez solo en `main`.
+- Crons verificados el 2026-09-22: sueño 08:00, coach 08:30 y cierre 21:30 entregados; ticks de recordatorios y proactivo en `ok`.
 
 ## 2. Qué quedó pendiente
 
-- **Verificar los disparos:** 21:30 del 2026-09-21 (primer cierre con correo), y el 2026-09-22 el sueño de las 08:00 (primero con DeepSeek, antes fallaba por el proxy), el parte de las 08:30 (primero con agenda y correo) y el empujón de las 17:00 (el del día 21 lo cortó un reinicio del Gateway y no llegó). Cómo: `openclaw cron list --json` como `node` en el Gateway, campo `state`.
-- **Prueba con ella por Telegram** (correos importantes, sin contestar, un borrador, un evento): lanzada el día 21, sin confirmar el resultado aquí.
-- ¿Usa otro calendario además del principal? Hoy solo se lee `primary`, y no tiene nada en los próximos 7 días.
-- Borrar el cliente de Google "Cliente web 1" (junio), el primer secreto del cliente nuevo (`****xmwJ`, que nadie guardó) y la tabla vacía `gmail_tokens`. Preguntarle antes: son cambios en su Google Cloud y en su Supabase.
-- En los logs del Gateway sale `[memory] sync failed … No API key found for provider openai` (memory-core): la búsqueda de memoria de OpenClaw pide embeddings de OpenAI y no hay clave. Nadie lo ha investigado aún.
-- El guard O5 (`o5DisconnectedGuard.test.js`) falla en `main` desde `1e19184` (Outlook, de otra sesión): cambió `src/index.js` sin mover su checkpoint. Lo tiene que revisar quien hizo ese cambio.
-- Lo que ella dejó en cola: activar el aprendizaje y seguimiento (O5) y unir `docs/incidente-saldo` a `main` (preguntarle antes). O5 está construido y desconectado a propósito; su plan escrito es un canary reversible (`LIFEOS_KNOWLEDGE_STAGE`), no activarlo entero. Ver `core/KNOWLEDGE_LOOP.md` y `core/ADR_O5_FOLLOW_UP_CLOSED_LOOP.md`.
+- **Coach 17:00:** nunca ha tenido un disparo bueno (el del 21 lo cortó un reinicio). Verificar el `state` después de las 15:00Z del 22.
+- **Clave de Anthropic caduca el 2026-10-20.** `/v1/now` e Inventario (`structured_generation`/`structured_extraction` en el Model Router de `isabel-api`) solo tienen Anthropic. Añadir OpenRouter/DeepSeek al Model Router (el adapter contractual existe en `benchmarks/`), con Haiku de repuesto mientras la clave viva.
+- Gasto de OpenRouter fuera del control de presupuesto (hoy el freno es el prepago de 10 $).
+- memory-core de OpenClaw pide clave de OpenAI (`[memory] sync failed`), sin investigar.
+- Guard O5 en rojo en `isabel-api` desde `1e19184` (Outlook, otra sesión).
+- Login real en la app: requisito para enseñar agenda, correo e Instagram sin reabrir SECURITY #13.
+- Datos parados desde junio/agosto (Finanzas, métricas manuales, parte de JETMI): conectarlos a Isabel u ocultarlos.
+- O5 por su canary (`LIFEOS_KNOWLEDGE_STAGE`) cuando ella lo pida.
+- Limpieza Google/Supabase ("Cliente web 1", secreto `****xmwJ`, tabla `gmail_tokens`): preguntarle antes.
 
 ## 3. Qué hacer inmediatamente después
 
-1. Mirar el `state` de los cron de coach y de sueño (ver arriba) y decírselo a ella en corto.
-2. Si ella lo pide, O5 por su canary.
+1. Pasar `/v1/now` e Inventario a DeepSeek vía OpenRouter en el Model Router, con pruebas, y desplegar por push a `main` (nunca `railway up` desde `isabel-api`).
+2. Mirar el `state` del coach 17:00.
 
 ## 4. Qué no debe romperse
 
-- **Nunca `railway up` desde `isabel-api`** si hay más de una sesión: publica también el trabajo a medias de las otras. El despliegue sale de los push a `main` en GitHub. Para subir solo lo tuyo, usa un worktree limpio de `origin/main`.
-- **No reiniciar el Gateway a la hora de un cron** (08:00, 08:30, 17:00, 21:30 Madrid): el mensaje en curso se corta y no se reintenta.
-- `MCP_PRIVATE_KEY` (isabel-api) e `ISABEL_MCP_KEY` (Gateway) son la misma llave. Si no coinciden, Isabel pierde el correo y la agenda. `openclaw.json` la referencia como `${ISABEL_MCP_KEY}`, no como valor.
-- La app de Google tiene que seguir "En producción": en "Prueba" el permiso caduca a los 7 días (error `google_reauth_required`).
-- Ejecutar `openclaw` en el contenedor siempre como `runuser -u node --`. Desde Git Bash, `MSYS_NO_PATHCONV=1`, o las rutas `/tmp/...` llegan cambiadas.
+- Nunca `railway up` desde `isabel-api` con varias sesiones: se despliega por push a `main`; trabajar desde un worktree limpio de `origin/main`.
+- No reiniciar el Gateway a la hora de un cron (08:00, 08:30, 17:00, 21:30 Madrid, ni en :00/:15/:30/:45).
+- `MCP_PRIVATE_KEY` (isabel-api) = `ISABEL_MCP_KEY` (Gateway).
+- La app de Google sigue "En producción".
+- `openclaw` en el contenedor siempre como `runuser -u node --`; desde Git Bash, `MSYS_NO_PATHCONV=1`.
+- Sin chat dentro de LIFEOS (D55). Inicio solo con lo suyo (D59).
 
 ## 5. Qué documentos leer
 
-`CURRENT_STATE.md` → `DECISIONS.md` D49 a D52 → `SECURITY.md` #2 y #12 → `isabel-gateway/README.md` (variables y SSH).
+`CURRENT_STATE.md` → `DECISIONS.md` D46–D61 → `SECURITY.md` #12–#14 → `research/AI_RUNTIME/DECISION_MULTIMODELO_2026-08-09.md` → `isabel-gateway/README.md`.
