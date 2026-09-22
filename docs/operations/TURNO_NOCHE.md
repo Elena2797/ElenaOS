@@ -19,7 +19,7 @@ Una vez por noche: si ya hay fila `turno://<hoy>`, no se repite salvo `force`.
 
 ## 2. Activarlo (una vez)
 
-El servidor y la app ya están desplegados. Falta el Gateway, desde el contenedor (`isabel-gateway`, como en D49):
+El servidor y la app ya están desplegados. Falta el Gateway. A Claude el clasificador le deja leer el contenedor pero no escribir en él, así que lo lanza ella: el 2026-09-22 se le dejó `activar-turno-noche.ps1` (pasa `ensure-coach-crons.mjs` por la entrada estándar, sin copiar ficheros al contenedor, recarga las tools y hace un `dry_run`). A mano, desde el contenedor (`isabel-gateway`, como en D49):
 
 ```bash
 # copiar ensure-coach-crons.mjs al contenedor (ver D49 para las trampas de UTF-8) y:
@@ -38,7 +38,7 @@ curl -sS -X POST -H "authorization: Bearer $ISABEL_MCP_KEY" -H "content-type: ap
   -d '{"dry_run":true,"wait":true}' https://isabel-api-production.up.railway.app/v1/night/run
 ```
 
-Devuelve por dominio `would_save`, `would_change`, `question` y `rejected` (lo que se descartó y por qué). Cuesta las mismas llamadas al modelo que un turno real (céntimos). `"areas":["JETMI"]` limita a un dominio; VistaJet se ignora siempre.
+Devuelve por dominio `would_save`, `would_change`, `would_research` (la búsqueda en internet, que sí se hace: D67), `question` y `rejected` (lo que se descartó y por qué). Cuesta las mismas llamadas al modelo que un turno real (céntimos). `"areas":["JETMI"]` limita a un dominio; VistaJet se ignora siempre.
 
 Para lanzar uno real a mano: `{"wait":true}` (y `"force":true` si ya corrió hoy).
 

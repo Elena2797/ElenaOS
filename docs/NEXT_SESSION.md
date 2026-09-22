@@ -1,4 +1,4 @@
-Última actualización: 2026-09-22, noche — O5 canary encendido; "ya lo hice" (D64); turno de noche (D65)
+Última actualización: 2026-09-22, noche — O5 canary encendido; "ya lo hice" (D64); turno de noche (D65); fallos sinceros (D66); buscador (D67)
 
 # Próxima sesión
 
@@ -15,7 +15,8 @@
 
 ## 2. Qué quedó pendiente
 
-- **Aplicar el turno de noche en el Gateway** (`operations/TURNO_NOCHE.md` §2): `ensure-coach-crons.mjs --apply --only=turno-noche-0400`, `--apply --replace --only=coach-manana-0830` y `openclaw mcp reload`. Hasta entonces no corre. A la sesión que lo construyó el clasificador le bloqueó `railway ssh` (incluso leer): hace falta que ella lo autorice o lo haga.
+- **Aplicar el turno de noche y el buscador en el Gateway** (`operations/TURNO_NOCHE.md` §2): se le dejó a ella `activar-turno-noche.ps1` (cron `turno-noche-0400`, parte de las 08:30, `openclaw mcp reload` y un `dry_run`). El clasificador deja a Claude leer el contenedor (`railway ssh … openclaw cron list --json`) pero no escribir. Comprobar si ya lo lanzó: `turno-noche-0400` en la lista de crons.
+- **Primera búsqueda real del buscador (D67):** que ella le pida algo a Isabel por Telegram, o el `dry_run`; mirar fuentes y coste (`eventos` `ai:*` con `web_research`).
 - **Ver el primer turno real con ella:** si lo que deja es útil o relleno, si reescribe de más, y si quiere también un turno de día.
 
 - **Ver el canary con uso real suyo:** que Isabel guarde lo que ella diga de verdad por Telegram (qué tipos y áreas elige, si guarda de más o de menos) y que ella lo vea en la app con su móvil. Nadie ha visto aún la pantalla con su token en producción (se probó en local con datos de ejemplo).
@@ -48,4 +49,4 @@
 
 ## 5. Qué documentos leer
 
-`CURRENT_STATE.md` → `DECISIONS.md` D62–D66 → `operations/TURNO_NOCHE.md` → `operations/O5_CANARY.md` → `core/KNOWLEDGE_LOOP.md` ("Canary vivo") → `SECURITY.md` #2.
+`CURRENT_STATE.md` → `DECISIONS.md` D62–D67 → `operations/TURNO_NOCHE.md` → `operations/O5_CANARY.md` → `core/KNOWLEDGE_LOOP.md` ("Canary vivo") → `SECURITY.md` #2.

@@ -7,6 +7,10 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-09-22, noche (Isabel busca en internet — D67)
+
+- Tool privada `web_research` (Perplexity Sonar por OpenRouter, ~0,007 $ por búsqueda, con fuentes, sin datos suyos en la consulta) y una búsqueda por dominio en el turno de noche, guardada como "Investigación". Capacidad `web_search` en el router; el control de gasto cuenta la tarifa por búsqueda. `isabel-api` `a1ad7bc`.
+
 ## 2026-09-22, noche (Isabel sincera con sus fallos — D66)
 
 - Nueva tool privada `system_report_failure`: Isabel ya no promete "no volverá a pasar"; dice si falló ella o el sistema y lo apunta en `eventos` (`lifeos:fallo`) para que Claude lo arregle. `npm run fallos` lo lista al empezar cada sesión. `isabel-api` `f1db257`. Probado en producción; el fallo de prueba (la visa, real) se cerró con D64.
