@@ -13,9 +13,21 @@ VistaJet es, con diferencia, el dominio más maduro de LIFEOS: es el único con 
 |---|---|---|
 | [VISTAJET_INVENTORY.md](VISTAJET_INVENTORY.md) | Sesiones de inventario del avión, parser de chat, export Excel/UPLIFT | implementado |
 | [VISTAJET_HOTO.md](VISTAJET_HOTO.md) | Handover/Takeover vivo, export PDF oficial | implementado, con gaps documentados |
-| [VISTAJET_LAUNDRY_CLEANING.md](VISTAJET_LAUNDRY_CLEANING.md) | Laundry & Cleaning Form (lavandería, dishwashing, bed linen, dry cleaning, cristalería), export PDF oficial | implementado y verificado en worktrees aislados — sin merge a main, no desplegado |
+| [VISTAJET_LAUNDRY_CLEANING.md](VISTAJET_LAUNDRY_CLEANING.md) | Laundry & Cleaning Form (lavandería, dishwashing, bed linen, dry cleaning, cristalería), export PDF oficial | implementado, en `main`, desplegado — con tools de chat (`laundry_*`) desde 2026-09-22 |
 | [VISTAJET_FRESH.md](VISTAJET_FRESH.md) | Plan de provisiones frescas | implementado mínimo |
 | [AIRCRAFT_READINESS.md](AIRCRAFT_READINESS.md) | Evaluación de "¿puedo entregar el avión ya?" | implementado |
+
+## Los 3 documentos del avión — no confundirlos (2026-09-22)
+
+Se confirmó en producción que estos tres se confunden fácilmente porque llegan juntos (handover de la compañera saliente) y algunos ítems se solapan (ej. cristalería aparece en más de uno) sin estar sincronizados entre sí. Son independientes: mismo dato, tres sitios distintos, cada uno con su propia tool.
+
+| Documento | Qué es | Quién lo manda / cuándo | Tool de Isabel | Módulo |
+|---|---|---|---|---|
+| **HOTO Checklist** | Handover/takeover de la tripulante saliente: tareas diarias de galley, cabin, lavabo, stock management | La compañera anterior, al entregar el avión | `vistajet_get_status` (campo `hoto`) | [VISTAJET_HOTO.md](VISTAJET_HOTO.md) |
+| **Inventory Checklist** | Excel de la flota completa (código, descripción, StdQty, ActQty, ReqQty) — abre y sostiene la sesión de inventario del avión | Se sube el Excel del avión en la app al empezar rotación; sin subirlo no hay sesión abierta | `isabel_message`/`isabel_confirm` (consumos), `vistajet_open_inventory_sessions` (qué hay abierto) | [VISTAJET_INVENTORY.md](VISTAJET_INVENTORY.md) |
+| **Laundry & Cleaning Form** | Formulario Given/Received con el proveedor de lavandería: vajilla, mantelería, ropa de cama, lencería, cristalería, dry cleaning | Se rellena durante la rotación, plantilla acumulativa multi-avión en el PDF oficial | `laundry_get_status`, `laundry_start`, `laundry_update_header`, `laundry_update_items` | [VISTAJET_LAUNDRY_CLEANING.md](VISTAJET_LAUNDRY_CLEANING.md) |
+
+**Por qué el Inventory Checklist no abre solo una sesión al recibir el avión**: a propósito (D34, ver `DECISIONS.md`). `getActiveSession` exige matrícula explícita y nunca inventa una sesión — abrir una requiere el Excel real del avión (con sus `StdQty` reales), que solo Estefanía tiene y sube desde la app. Si Isabel dice "no hay sesión de inventario abierta para este avión", la acción es subir ese Excel en LIFEOS, no un bug de Isabel.
 
 ## Estado general y tareas (fuera de los sub-módulos)
 `vj_state` (status libre/rotación/standby, horas, pasaporte, maleta) y `vj_tasks` (tareas simples propias de VJ) — ver [DATA_MODEL.md](../DATA_MODEL.md). Renderizado por `vjStatusView()` en `main.js`, editable vía el modal de `openVjState()`.
@@ -52,6 +64,14 @@ Auditoría de los tres huecos restantes de VistaJet (proceeding, maleta, adminis
 - **`vistajet_get_status`** incluye ahora `admin: {elearnings: {pending, overdue, next_due}, facturas: {...}}`, independiente del avión actual (son obligaciones generales, no de una rotación concreta).
 - Puramente informativo — sin flujo de Intervention: a diferencia de sueño/pasaporte, resolver un e-learning o una factura vencida es una acción en la app (marcar la tarea como `done`), no una respuesta conversacional que Isabel pueda registrar directamente.
 - Sin tabla nueva, sin UI nueva, sin duplicar datos — la única "duplicación" es de lógica de categorización entre dos runtimes (frontend/backend), inevitable dado que son procesos distintos; el dato en sí vive en un solo sitio.
+
+### 5. Confirmación de feedback por correo (2026-09-22)
+Pedido de la usuaria tras un handover confuso del 9H-VCF: no existe (ni existirá) ninguna forma de verificar que un correo salió de verdad — son dos confirmaciones puramente conversacionales, mismo principio que el resto de Interventions (se anota lo que ella confirma, nunca se ejecuta ni se comprueba nada).
+
+- **Al recibir un avión nuevo**: `vistajet_update_status` detecta una transición de un avión real a OTRO avión real dentro de una rotación (`shouldAskAircraftFeedback` — no dispara en la primera rotación, sin avión anterior del que preguntar, ni si se queda en el mismo avión) y devuelve `feedback_email_check: {should_ask, previous_aircraft, intervention_id}`. Isabel pregunta en la misma respuesta si ya mandó el feedback del avión anterior; la respuesta se registra con la tool genérica `lifeos_answer_question` (`domain:"VistaJet"`, `kind:"aircraft_feedback_email"`) — sin tool dedicada nueva.
+- **Feedback diario de vuelo**: `health_get_sleep_status` compone `getDailyFlightFeedbackStatus()` junto a la pregunta de sueño (decisión explícita de la usuaria: mismo momento, antes de dormir) y devuelve `flight_feedback: {applicable, should_ask, aircraft, intervention_id}` — `applicable` es `false` en `libre`/`standby` (nunca pregunta fuera de rotación). `decideDailyFeedbackStatus` trata la propia Intervention como fuente de verdad (a diferencia de sueño, no hay tabla `checkins` equivalente): `answered` de hoy no vuelve a preguntar; `pending` reutiliza la misma; cualquier otro caso crea una nueva. Se responde también con `lifeos_answer_question` (`domain:"VistaJet"`, `kind:"daily_flight_feedback"`).
+- **Sin tabla ni migración nueva**: ambas reutilizan `interventions` tal cual — la fila con `status:'answered'` ES el único registro de que se confirmó; no hay auditoría de qué contestó exactamente (solo el `decision` interpretado en esa misma respuesta, igual que `stale_open_context`).
+- Tests: `shouldAskAircraftFeedback` y `decideDailyFeedbackStatus` en `vistajet.test.js`.
 
 Todos los specialists: sin UI propia (conversación/MCP únicamente, igual que sueño); el modal manual de `openVjState()` sigue funcionando exactamente igual, sin cambios. Tests: `isabel-api/src/__tests__/vistajet.test.js` (lógica pura) + `vistajet.orchestration.test.js` (fake-db en memoria, 30+ escenarios). Verificado también en navegador (Readiness/HOTO/Inventario, sin errores de consola, sin regresión).
 

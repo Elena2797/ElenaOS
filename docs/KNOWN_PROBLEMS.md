@@ -217,5 +217,29 @@ Encontrado el 2026-08-07: el commit `37b0bb1` (señales de VistaJet) quedó `FAI
 ### El webhook GitHub→Railway puede quedar obsoleto sin aviso, incluso con "Auto deploy" mostrando activado
 Encontrado el 2026-08-03: con la región ya corregida, Railway seguía sin recoger el commit más nuevo de `isabel-api` — ni "Redeploy" ni "Latest deploy" ni re-seleccionar la rama en el dropdown lo resolvían (todos reconstruían el mismo commit viejo). Solo un `Disconnect` + `Connect Repo` completo del Source forzó una resincronización real. Ver `operations/RAILWAY.md`.
 
+## Herramientas nativas de OpenClaw (memoria semántica, PDF)
+
+### `memory_search` caído por proveedor de embeddings sin configurar — RESUELTO 2026-09-23
+Reportado por la usuaria: `memory_search` devolvía error de embeddings y no podía consultar el historial durante la rotación del 9H-VCF. Causa real, confirmada contra el propio `openclaw doctor` de producción (2026.6.10) — **no** contra la documentación pública, que describe un esquema de una versión más nueva (`memory.search.*`) que esta versión no reconoce: `agents.defaults.memorySearch` no estaba configurado, así que caía al default real de esta versión, `provider: "openai"`, sin `OPENAI_API_KEY` en ningún sitio.
+
+**Incidente durante el arreglo:** un primer intento escribió `memory.search.provider` (esquema equivocado) directamente en `openclaw.json` a mano — esta versión no reconoce esa clave y el Gateway quedó en bucle de reinicio, **sin acceso SSH** para deshacerlo mientras estuvo así (Telegram caído un rato). Recuperado añadiendo un paso de auto-reparación a `isabel-gateway/docker-entrypoint.sh` (retira `memory.search` si existe, antes de arrancar — commit `953fb60`, rama `incidente/control-de-gasto`, desplegado con `railway up`). Ese parche sigue ahí como red de seguridad; no hace nada si `memory.search` no existe.
+
+**Arreglo real, aplicado y verificado:** `agents.defaults.memorySearch` configurado vía `openclaw config patch --file ... --dry-run` (validado contra el schema real antes de aplicar) con `provider: "openai-compatible"`, `model: "openai/text-embedding-3-small"`, `remote.baseUrl: "https://openrouter.ai/api/v1"`, `remote.apiKey` como SecretRef a `OPENROUTER_API_KEY` (ya existía como variable de Railway, sin cuenta ni clave nueva). Reindexado con `openclaw memory index --force --agent main`: `Indexed: 2/2 files · 3 chunks`, `Dirty: no`. `openclaw memory search` responde sin error. Logs de producción sin ningún `[memory] sync failed` desde el reinicio de las 23:10 UTC.
+
+**Para la próxima vez que se toque `openclaw.json` a mano:** usar siempre `openclaw config patch --file <archivo> --dry-run` primero — valida contra el schema real de la versión instalada sin aplicar nada, y habría evitado el incidente de arriba. `openclaw config schema` imprime el schema completo si hace falta consultar la forma exacta de una clave.
+
+### La tool nativa de PDF falla con 401 — ABIERTO, causa exacta confirmada 2026-09-23
+Reportado por la usuaria: al intentar leer 2 PDFs (Laundry Form, HOTO Checklist) del handover del 9H-VCF no había ninguna tool disponible para extraer texto, y un intento de usarla devolvió 401.
+
+**Esto NO es un problema de que el host carezca de `pdftotext`/`pymupdf`/`pip`** — la tool de PDF no tiene ninguna dependencia de binario de sistema ni de pip (usa visión nativa del proveedor, o `clawpdf`/PDFium WASM de fallback). Intentar instalar herramientas de sistema en el contenedor es perseguir la causa equivocada.
+
+**Causa exacta, confirmada contra el log real de producción del 2026-09-22 18:42 UTC** (no una hipótesis): la llamada llega hasta Anthropic y Anthropic la rechaza — `Anthropic PDF request failed (401 Unauthorized): {"type":"authentication_error","message":"invalid x-api-key"}`, con `request_id` real de Anthropic (`req_011...`). El Gateway pasa por `isabel-api/src/routes/aiProxy.js` (`/ai/v1/messages`, D31/SECURITY#2 — "quitarle la llave al Gateway"): ese proxy autentica al Gateway con un token propio (no es una clave de Anthropic) y luego llama a la Anthropic real usando **la `ANTHROPIC_API_KEY` de `isabel-api`** — es esa clave, no la de `isabel-gateway` (hipótesis anterior, descartada), la que Anthropic está rechazando como inválida. Coincide con que casi ninguna conversación normal pasa por Anthropic ahora mismo (el modelo primario es DeepSeek vía OpenRouter, Anthropic queda como fallback) — así que una key rota ahí no se nota hasta que algo fuerza esa ruta, como esta llamada de visión para PDF.
+
+**Arreglo pendiente, requiere una clave que solo tiene la usuaria — no se puede completar desde una sesión de código:**
+1. Verificar/generar una `ANTHROPIC_API_KEY` válida en el dashboard de Anthropic (console.anthropic.com).
+2. Actualizar la variable de entorno `ANTHROPIC_API_KEY` del servicio **`isabel-api`** en Railway (no `isabel-gateway` — ese ya no la necesita, ver `aiProxy.js`).
+3. Railway redeploya `isabel-api` solo con el cambio de variable; confirmar `/health` sigue OK.
+4. Repetir el intento real de leer un PDF por Telegram para confirmar que ya no da 401.
+
 ## Seguridad
 Ver [SECURITY.md](SECURITY.md). Las URLs Git locales ya están limpias y `faithful-light` está detenido sin autodespliegue. Siguen abiertos el PIN visible en el bundle, (la API key del bundle se retiró y rotó en D68; RLS está cerrado, D62) la exposición histórica de tokens y la rotación pendiente de `ANTHROPIC_API_KEY`. MCP sin autenticación ya se resolvió.
