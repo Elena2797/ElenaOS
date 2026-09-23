@@ -449,9 +449,19 @@ async function loadHealthProfile() {
 const TASK_SIGNALS = new Set(['task_overdue', 'due_today', 'due_soon', 'critical_task', 'planned_today', 'important_tasks', 'pending_tasks_without_deadline']);
 function urgentStrip(priority) {
   if (!(priority.source === 'now' || priority.source === 'cached') || priority.mode !== 'urgent' || !priority.area) return '';
-  const ev = (priority.evidence || []).filter(e => e.domain === priority.area.name && e.signal !== 'no_signal' && !TASK_SIGNALS.has(e.signal));
+  // Señales débiles/informativas (ej. "344 items de inventario sin
+  // verificar", normal en cualquier rotación abierta) no son "por qué es
+  // urgente" — antes se colaban igual, y como isabelEvidenceLabel no las
+  // reconocía todas colapsaban en un "necesita atención" genérico que no
+  // decía nada (visto en producción, 2026-09-23: 5+ señales de VistaJet sin
+  // etiqueta propia, deduplicadas en una sola línea vacía).
+  const ev = (priority.evidence || []).filter(e => e.domain === priority.area.name && e.signal !== 'no_signal'
+    && !TASK_SIGNALS.has(e.signal) && e.strength !== 'weak' && e.effective_severity !== 'informational');
   if (!ev.length) return '';
   const style = isabelAttentionStyle('urgent');
+  // Red de seguridad para una señal que isabelEvidenceLabel todavía no
+  // reconoce (quedan dominios/specialists sin revisar uno a uno): mejor un
+  // aviso genérico que enseñar el nombre técnico del signal sin traducir.
   const labels = [...new Set(ev.map(e => {
     const l = isabelEvidenceLabel(e);
     return l.endsWith(`: ${e.signal}`) ? `${e.domain}: necesita atención` : l;
@@ -473,10 +483,12 @@ function homeFocusItems() {
   });
 }
 
-// Cuántas tareas seguidas "Ahora" enseña a la vez: hasta 3, y solo si son de
-// familia/área distinta entre sí — 3 tareas de Cabin Care seguidas no ayudan
-// más que 1 (para eso está el "+N más de Cabin Care" de cada una). Es tope,
-// no objetivo: con una sola cosa urgente, se enseña una.
+// Cuántas tareas seguidas "Ahora" enseña a la vez: hasta 3, y como mucho UNA
+// por área — "una tarea prioritaria por dominio", pedido explícito suyo
+// (2026-09-23) tras ver que las 3 plazas se las podía comer VistaJet solo
+// (HOTO + e-learnings + RRHH) aunque Vida Personal también tuviera algo
+// urgente ese mismo día. Es tope, no objetivo: con una sola área con algo
+// urgente, se enseña una.
 const HOME_NOW_MAX = 3;
 
 // "Hoy" (D59): hasta 3 tarjetas con lo que toca ahora (la primera grande y
@@ -491,12 +503,10 @@ function todayBlock() {
   const ordered = items.slice(offset).concat(items.slice(0, offset));
 
   const shown = [];
-  const seenKeys = new Set();
+  const seenAreas = new Set();
   for (const it of ordered) {
-    const fam = taskFamily(it.title);
-    const key = fam ? `${it.areaId}::${fam}` : `id::${it.ref}`;
-    if (seenKeys.has(key)) continue;
-    seenKeys.add(key);
+    if (seenAreas.has(it.areaId)) continue;
+    seenAreas.add(it.areaId);
     shown.push(it);
     if (shown.length === HOME_NOW_MAX) break;
   }
@@ -522,7 +532,7 @@ function todayBlock() {
     const famNote = famNoteFor(now);
     const secondaryHtml = secondary.map(it => {
       const sn = famNoteFor(it);
-      const tag = sn.count > 0 ? `+${sn.count} más de ${sn.fam}` : (it.area || '');
+      const tag = [it.area, sn.count > 0 ? `+${sn.count} más de ${sn.fam}` : null].filter(Boolean).join(' · ');
       return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--border)">
         <div onclick="focusDone('${it.ref}')" style="width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;cursor:pointer"></div>
         <div style="flex:1;min-width:0">
@@ -1433,6 +1443,16 @@ function isabelEvidenceLabel(e) {
     case 'important_tasks': return `${e.domain}: ${plural(e.value, 'tarea importante', 'tareas importantes')}`;
     case 'pending_tasks_without_deadline': return `${e.domain}: ${plural(e.count, 'tarea sin fecha', 'tareas sin fecha')}`;
     case 'rotation_active': return `${e.domain}: rotación activa · día ${e.value}`;
+    // Señales del avión (readiness/inventario/HOTO, core/specialists/vistajetSignals.js):
+    // llegan con forma distinta (evidence.count/examples, no value/detail).
+    // Sin estos casos caían todas en el "default" de abajo, y como el texto
+    // crudo del signal no es para ella, urgentStrip lo colapsaba en un
+    // "necesita atención" que no decía nada (visto en producción, 2026-09-23).
+    case 'stock_low': return `${e.domain}: ${plural(e.evidence?.count ?? 0, 'ítem con stock bajo', 'ítems con stock bajo')}`;
+    case 'inventory_discrepancies': return `${e.domain}: ${plural(e.evidence?.count ?? 0, 'discrepancia de inventario', 'discrepancias de inventario')}`;
+    case 'offload_pending': return `${e.domain}: ${plural(e.evidence?.count ?? 0, 'offload pendiente', 'offloads pendientes')}`;
+    case 'hoto_ambiguous': return `${e.domain}: HOTO con datos ambiguos por revisar`;
+    case 'magazine_renewal_needed': return `${e.domain}: ${plural(e.evidence?.count ?? 0, 'revista por renovar', 'revistas por renovar')}`;
     default: return `${e.domain}: ${e.signal}`;
   }
 }
