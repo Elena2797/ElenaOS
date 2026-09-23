@@ -1,42 +1,34 @@
-Última actualización: 2026-09-22, 17:40 Madrid — SECURITY #2 resuelto (D68); turno de noche activo
+Última actualización: 2026-09-23, mañana Madrid — análisis automático del HOTO (D69) desplegado, sin probar contra un HOTO real
 
 # Próxima sesión
 
 ## 1. Qué se terminó en esta sesión
 
-- **`npm run fallos`:** ninguno abierto.
-- **Turno de noche y buscador activados** (ella, 14:48Z): cron `turno-noche-0400`, parte de las 08:30 con `night_shift_report`, `mcp reload` (48 tools). El `dry_run` del script falló por las comillas de PowerShell; el hecho desde Git Bash salió bien (`operations/TURNO_NOCHE.md` §3).
-- **Coach 17:00:** primer disparo bueno (15:00:04Z, `delivered`).
-- **SECURITY #2 resuelto (D68):** `/v1` entra con token de app, llave privada, `API_KEY` o ticket de PDF; el bundle no lleva llave. `isabel-api` `2fcdb0b`, `life-os-app` `6c726b3`, `isabel-gateway` `1c38740`. Ella rotó `API_KEY`: `isabel-api-2026` da 401 en `/v1`, MCP y OAuth; los ticks usan `ISABEL_MCP_KEY`; la app carga en su móvil.
+- **Análisis automático del HOTO (D69):** `isabel-api/src/hoto/{analysis,autoTasks}.js`, enganchado en `routes/hoto.js`. Cada vez que se crea/edita/añade un item/importa el HOTO activo, revisa Cabin Care/Shopping/Defects/Offload/Monthly Focus/cabecera y apunta tareas reales en VistaJet, sin que Estefanía lo pida. 27 tests nuevos, suite completa 876/876. Desplegado (`isabel-api` `cca4433`, push directo a `main`, `/health` 200 verificado).
 
 ## 2. Qué quedó pendiente
 
-- **Esta noche empieza avión nuevo** (HOTO, inventario y Laundry Form nuevos). El ticket de PDF se probó en el servidor (HOTO de D-AFBS: 200); falta verlo en el visor de su móvil, y Laundry no tiene ningún registro aún (el de hoy será el primero). "Exportar UPLIFT" ya está en VistaJet (`e40f0b1`).
-- Limpieza sin prisa: borrar `ISABEL_API_KEY` del Gateway y `VITE_ISABEL_KEY` de Vercel (ya no se usan); retirar la página vieja de inventario `isabel-api/public/` (ya no funciona; su UPLIFT pasó a la app) si ella no la echa de menos.
-- **Primera noche real** (23 de septiembre, 04:00): la fila `isabel:turno_noche` de hoy, las `isabel:taller` y el parte de las 08:30.
-- **O5 canary sin uso real:** el ledger (`lifeos:knowledge`) solo tiene las frases de prueba olvidadas.
-- Clave de Anthropic caduca el 2026-10-20. Gasto de OpenRouter fuera del control de presupuesto. memory-core de OpenClaw pide clave de OpenAI.
-- Visto al pasar: cada turno de Isabel en Telegram lleva unos 128 000 tokens de entrada (`eventos` `ai:conversation:gateway:main`, 14:30Z). Con DeepSeek es barato, pero conviene mirar qué infla el contexto.
+- **Confirmar contra un HOTO real** que D69 crea tareas de verdad (solo probado con Supabase falso en memoria).
+- **`npm run fallos` sigue listando 2 fallos abiertos** (`fc538e27…`, lectura de PDF/Laundry Form rota; `b36d574b…`, PDF con proveedor no reconocido) — ambos del 2026-09-22. El `CHANGELOG.md` de una sesión distinta de hoy mismo ("memory_search resuelto...") dice que la causa raíz del 401 de PDF ya se corrigió (clave de Anthropic + perfil de credenciales obsoleto). Falta confirmarlo probando de verdad y, si es cierto, dejar de listarlos como abiertos.
+- **Gap de documentación detectado al cerrar esta sesión:** el commit `df1da17` de `isabel-api` ("tool temporal para abrir sesion de inventario (bug RLS)", 2026-09-23 04:47Z) llegó a `main` desde fuera de esta conversación, sin entrada en `CHANGELOG.md`/`DECISIONS.md`. Probablemente resuelve el punto 4 del fallo `fc538e27` (`vistajet_open_inventory_sessions` solo consultaba, nunca abría sesión). El propio mensaje del commit dice "temporal": falta entender qué bug de RLS resolvía y si hay que revertirlo o dejarlo fijo, y documentarlo donde corresponda (`modules/VISTAJET_INVENTORY.md` probablemente).
+- **Primera noche real del turno nocturno** (04:00 del 23) sin confirmar cómo salió — revisar con ella si lo que dejó fue útil o relleno.
 
 ## 3. Qué hacer inmediatamente después
 
-1. `npm run fallos` en `isabel-api` (con su `.env`, desde un worktree limpio de `origin/main`).
-2. Revisar la primera noche con ella: si lo que dejó es útil o relleno, y si quiere un turno de día.
-3. Revisar con ella lo que Isabel guarde de verdad en O5 (`operations/O5_CANARY.md`).
-4. Reconectar Instagram o Google ahora pide la `API_KEY` nueva (está en Railway; `?api_key=` en `/oauth/*/start`) o la llave privada.
+1. `npm run fallos` en `isabel-api` — revisar si los dos abiertos siguen vigentes.
+2. Editar o importar el HOTO activo desde la app y confirmar que aparecen tareas nuevas en VistaJet (D69) — si no aparecen, revisar logs de Railway (`[hoto] analysis ...`).
+3. Preguntar por `df1da17`: qué bug de RLS resolvía, si es temporal de verdad, documentarlo.
+4. Revisar con ella la primera noche real del turno nocturno.
 
 ## 4. Qué no debe romperse
 
-- `/v1` nunca vuelve a aceptar una llave que esté en el bundle. La app entra solo con su token de app; los PDF, con ticket (`src/core/access.js`).
-- `/v1/app` va montado **antes** de `requireAccess` (conectar el móvil no pide llave). Límite de códigos: 3 cada 10 minutos y 10 al día.
-- Que un tick del Gateway diga `ok` no prueba nada: el `curl` descarta la respuesta. Para ver el HTTP, repetir la llamada con la llave privada por `printf … | railway ssh -- sh -s` desde Git Bash.
-- O5 solo por `src/core/knowledgeCanary.js` (guard). `LIVE` no se usa.
-- Tabla nueva en `public` → volver a ejecutar `rls_owner_only.sql` (D62).
-- Nunca `railway up` en `isabel-api`: push a `main` desde un worktree limpio de `origin/main`.
-- No reiniciar el Gateway en :00/:15/:30/:45 ni a la hora de un cron. Para tools nuevas basta `openclaw mcp reload`.
-- A Claude el clasificador le bloquea escribir en el Gateway, los secretos de Railway y guardar scripts en `isabel-gateway`: eso lo lanza ella.
-- Sin chat dentro de LIFEOS (D55). Inicio solo con lo suyo (D59). El turno de noche nunca toca VistaJet.
+- El análisis del HOTO (D69) es **determinista, sin modelo** — mismo principio que Aircraft Readiness. No meter a Isabel/un LLM a decidir qué tarea crear.
+- Un defect/offload de D69 se resuelve **borrando la línea de origen** (`DELETE /hoto/items/:id`), no solo completando la tarea — si no, se recrea en el próximo análisis (documentado, no es bug).
+- `/v1` nunca vuelve a aceptar una llave que esté en el bundle (D68); `/v1/app` va montado antes de `requireAccess`.
+- Nunca `railway up` en `isabel-api`: push a `main` desde un worktree limpio de `origin/main`. En `isabel-gateway` es al revés (sin remoto, se despliega con `railway up`) — no confundir los dos repos.
+- A Claude el clasificador le bloquea escribir en el Gateway y los secretos de Railway: eso lo lanza ella.
+- Sin chat dentro de LIFEOS (D55). El turno de noche nunca toca VistaJet.
 
 ## 5. Qué documentos leer
 
-`CURRENT_STATE.md` → `DECISIONS.md` D68 (y D62–D67) → `operations/TURNO_NOCHE.md` → `operations/O5_CANARY.md`.
+`CURRENT_STATE.md` → `DECISIONS.md` D69 (y D62–D68) → `modules/VISTAJET_HOTO.md` → `operations/TURNO_NOCHE.md` si toca el turno de noche.

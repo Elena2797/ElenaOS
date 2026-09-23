@@ -21,6 +21,14 @@ Continuación de la sesión del 2026-09-22, ahora con acceso a `railway` (CLI ya
 
 Ver `KNOWN_PROBLEMS.md` § Herramientas nativas de OpenClaw para el detalle completo de los puntos 1-4.
 
+## 2026-09-23, mañana (análisis automático del HOTO crea tareas reales — D69)
+
+Sesión distinta a la de arriba (mismo día): pedido reenviado de Isabel a Claude ("cada vez que el HOTO se actualice, revisa Cabin Care/Shopping/Defects/Offload/Monthly Focus/cabecera y apunta lo que haga falta, sin esperar a que lo pida"). Antes de escribir código se acordaron con ella tres decisiones de diseño (`AskUserQuestion`): disparo en cada actualización del HOTO, deduplicación por "fingerprint" de cada hallazgo, e implementarlo ya mismo.
+
+1. **`isabel-api/src/hoto/analysis.js` (funciones puras) + `hoto/autoTasks.js` (`runHotoAnalysis()`).** Analiza el HOTO activo y sus `vj_hoto_items`, y crea tareas reales con `createTask()` (área VistaJet) — mismo specialist que ya usa `tasks_create`, mismo dedup por título+área, mismo evento de auditoría. Se dispara desde `routes/hoto.js` tras crear/editar/añadir un item/importar, en segundo plano para no añadir latencia al guardado no optimista de la app. Detalle completo de las reglas por sección y del límite conocido de Defects/Offload (se recrea si se completa la tarea sin borrar la línea de origen) en `DECISIONS.md` D69.
+2. **27 tests nuevos** (puros + orquestación con Supabase falso en memoria, mismo patrón que `vistajet.orchestration.test.js`/`hotoImport.orchestration.test.js`). Suite completa: 876/876 — el fallo que había antes en `o5DisconnectedGuard.test.js` (`src/mcp.js` desfasado) ya venía resuelto de la sesión anterior de este mismo día (commit `df1da17`, ajeno a este trabajo).
+3. **Desplegado:** `isabel-api` `cca4433`, push directo a `main` (sin `railway up`), `/health` verificado 200 tras el push. **No probado todavía contra un HOTO real** — falta que Estefanía edite o importe el HOTO activo y confirme que aparecen tareas nuevas en VistaJet.
+
 ## 2026-09-22 (tools de chat del Laundry & Cleaning Form + diagnóstico de 3 problemas reportados en producción)
 
 Sesión disparada por 5 problemas que Estefanía reportó tras recibir el 9H-VCF y enviarle a Isabel el handover (Laundry Form PDF, HOTO PDF, Inventory Checklist Excel) por Telegram. **Nota honesta:** esta sesión trabajó solo sobre los repos locales (`isabel-api`, docs) — no tiene acceso a Railway/`railway ssh`, así que no pudo desplegar nada ni ejecutar comandos contra producción. `CURRENT_STATE.md` y `NEXT_SESSION.md` de esta carpeta no se han tocado: llevan desde 2026-08-10 sin actualizar (esta ruta de `/docs` quedó fuera del ciclo de desarrollo activo, que se mueve por Telegram — ver nota en `README.md` § relación con la raíz) y no hay forma de verificar el estado real de producción desde aquí para reescribirlos con honestidad.

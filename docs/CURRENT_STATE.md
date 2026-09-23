@@ -1,9 +1,14 @@
 Estado: fotografía operativa vigente
-Última verificación: 2026-09-22
+Última verificación: 2026-09-23
 
 # Estado actual de LIFEOS
 
-## Actualización — 2026-09-22, 17:30 Madrid (manda sobre las de abajo)
+## Actualización — 2026-09-23, mañana (manda sobre las de abajo)
+
+- **Análisis automático del HOTO crea tareas reales (D69):** cada vez que se crea, edita, se añade un defect/offload o se importa el HOTO activo, un specialist determinista (sin modelo) revisa Cabin Care/Shopping/Defects/Offload/Monthly Focus/cabecera y apunta lo que haga falta en VistaJet, sin que Estefanía lo pida. `isabel-api` `cca4433` (876/876), desplegado, `/health` 200 verificado tras el push. **Sin probar todavía contra un HOTO real de producción** — falta que ella edite o importe el activo y confirme que aparecen tareas nuevas. Detalle: `modules/VISTAJET_HOTO.md`, `DECISIONS.md` D69.
+- **Nota honesta, gap detectado al cerrar esta sesión:** entre la actualización de las 17:30 de ayer y esta, se subió a `main` de `isabel-api` el commit `df1da17` ("tool temporal para abrir sesion de inventario (bug RLS)", 04:47Z) desde fuera de esta conversación — toca `inventorySessions.js`, `mcp.js` y el checkpoint de `o5DisconnectedGuard.test.js`. No se documentó en su momento (ni aquí ni en `CHANGELOG.md`) y esta sesión no tiene el contexto de qué bug de RLS resolvía ni si es temporal de verdad. Pendiente de que quien lo hizo (o Estefanía) lo explique para documentarlo — ver `NEXT_SESSION.md`.
+
+## Actualización — 2026-09-22, 17:30 Madrid
 
 - **La app ya no lleva llave (D68, SECURITY #2):** `/v1` acepta el token de app, la llave privada del Gateway, `API_KEY` (solo Railway, sin valor por defecto) o un ticket de PDF de 30 minutos. `isabel-api` `2fcdb0b` (866/867) y `life-os-app` `6c726b3` (63/63) desplegados y verificados en producción. `API_KEY` rotada por ella a las ~15:35Z: `isabel-api-2026` da 401 en `/v1`, MCP y OAuth; los ticks usan la llave privada. SECURITY #2 resuelto. La app carga en su móvil con el token.
 - **Turno de noche activo:** el cron `turno-noche-0400` existe desde las 14:48Z; Isabel ve `night_shift_report` y `web_research` (48 tools). Primer `dry_run` bueno (sin escribir). La primera noche real es la del 23.
