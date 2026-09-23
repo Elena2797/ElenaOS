@@ -185,10 +185,22 @@ async function initApp() {
   await startApp();
 }
 
-async function ensureDbSession() {
+// Incidente RLS (2026-09-23): esta comprobación antes solo miraba si
+// getSession() devolvía *algo* en local storage, sin verificar que ese algo
+// siguiera siendo válido contra el servidor. Si el refresco automático de
+// supabase-js se queda sin disparar (pestaña en segundo plano, app en background
+// en el móvil) el token expira sin que salte 'SIGNED_OUT', así que nada vuelve
+// a pedir sesión: las peticiones de escritura siguientes salen sin Authorization
+// de usuario, corren como `anon`, y la política RLS `lifeos_owner_only` las
+// rechaza con "new row violates row-level security policy" — un error que
+// parece de permisos pero es de sesión caducada. getUser() sí valida contra el
+// servidor (no solo local storage), así que detecta esto y fuerza reemitir.
+async function ensureDbSession({ forceRefresh = false } = {}) {
   try {
-    const { data } = await db.auth.getSession();
-    if (data?.session) return true;
+    if (!forceRefresh) {
+      const { data: userData, error: userErr } = await db.auth.getUser();
+      if (!userErr && userData?.user) return true;
+    }
     if (!appClient().isLinked()) return false;
     const r = await appClient().post('/v1/app/session');
     if (!r?.ok || !r.session) return false;
@@ -4942,6 +4954,15 @@ async function invCreateSession() {
   if (!_invParsedItems.length) { alert('Sube un archivo Excel válido primero'); return; }
   if (!confirmTailMismatch(reg,'inventario')) return;
 
+  // Reconfirmar sesión real justo antes de escribir (no basta con que la
+  // hubiera al cargar la app — ver comentario en ensureDbSession). Si ha
+  // caducado en silencio, esto la reemite antes de que el insert falle por RLS.
+  if (!(await ensureDbSession())) {
+    alert('Tu sesión ha caducado. Vuelve a entrar desde el enlace de Telegram.');
+    showLoginGate();
+    return;
+  }
+
   try {
     // Subir Excel original a Supabase Storage antes de crear la sesión
     if (_invParsedFile) {
@@ -4966,6 +4987,7 @@ async function invCreateSession() {
     _invParsedColumnMap = null;
     render();
   } catch(e) {
+    console.error('inv create session', { message: e.message, code: e.code, details: e.details, hint: e.hint });
     alert('Error creando sesión: ' + e.message);
   }
 }
