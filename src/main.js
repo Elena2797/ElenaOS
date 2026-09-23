@@ -1358,14 +1358,21 @@ function workQueue() {
     .forEach(p => items.push({ id: 'proj_next_' + p.id, title: 'Definir próxima acción: ' + p.title, impact: 'medio', weight: 2,
       time: '~5 min', reason: 'Sin próxima acción definida', area: areaName(p.area_id), areaId: p.area_id, type: 'project_next', ref: p.id }));
 
-  // Dentro del mismo peso (ej. cinco tareas "crítico"), sin esto el orden era
-  // el que devolviera Supabase — arbitrario, no "la que más falta hace
-  // primero". Mismo criterio que sortByPriority: fecha, luego antigüedad.
+  // Dentro del mismo peso (ej. una tarea "medium" que vence hoy y cinco
+  // "critical" de Cabin Care caen TODAS en weight:5 por el primer filtro de
+  // arriba, que solo mira la fecha, no la prioridad real de la tarea) hace
+  // falta desempatar por la prioridad real primero — si no, "Ahora" podía
+  // enseñar la medium más antigua por delante de las critical (visto en
+  // producción, 2026-09-23: "Physical Felgueiras" (medium) delante de Cabin
+  // Care (critical), las dos vencían hoy). Fecha y antigüedad quedan como
+  // desempate final, no como criterio principal.
   const taskById = new Map(S.tasks.map(t => [t.id, t]));
+  const priorityRank = { critical: 0, high: 1, medium: 2, low: 3 };
   return items.sort((a, b) => {
     if (b.weight !== a.weight) return b.weight - a.weight;
     const ta = taskById.get(a.ref), tb = taskById.get(b.ref);
-    return String(ta?.due_date || '9999-12-31').localeCompare(String(tb?.due_date || '9999-12-31'))
+    return (priorityRank[ta?.priority] ?? 9) - (priorityRank[tb?.priority] ?? 9)
+      || String(ta?.due_date || '9999-12-31').localeCompare(String(tb?.due_date || '9999-12-31'))
       || String(ta?.created_at || '').localeCompare(String(tb?.created_at || ''));
   });
 }
