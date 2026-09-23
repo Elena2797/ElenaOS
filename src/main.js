@@ -473,16 +473,45 @@ function homeFocusItems() {
   });
 }
 
-// "Hoy" (D59): UNA tarjeta con lo que toca ahora, lo siguiente y su día en
-// orden de hora. Con TDAH, una sola tarea grande y un botón grande pesan
-// menos que tres tareas con nueve botones. "Siguiente" pasa a la próxima sin
-// tener que decidir (solo en esta pantalla; no cambia nada).
+// Cuántas tareas seguidas "Ahora" enseña a la vez: hasta 3, y solo si son de
+// familia/área distinta entre sí — 3 tareas de Cabin Care seguidas no ayudan
+// más que 1 (para eso está el "+N más de Cabin Care" de cada una). Es tope,
+// no objetivo: con una sola cosa urgente, se enseña una.
+const HOME_NOW_MAX = 3;
+
+// "Hoy" (D59): hasta 3 tarjetas con lo que toca ahora (la primera grande y
+// accionable, el resto compactas) y su día en orden de hora. Con TDAH pedido
+// explícitamente por ella: más de 3, o repetir la misma familia, vuelve a ser
+// ruido — por eso el tope y el dedup, no una lista sin límite. "Siguiente"
+// pasa a la próxima sin tener que decidir (solo en esta pantalla; no cambia
+// nada en los datos).
 function todayBlock() {
   const items = homeFocusItems();
   const offset = items.length ? (S.focusOffset || 0) % items.length : 0;
   const ordered = items.slice(offset).concat(items.slice(0, offset));
-  const now = ordered[0];
-  const next = ordered.slice(1, 3);
+
+  const shown = [];
+  const seenKeys = new Set();
+  for (const it of ordered) {
+    const fam = taskFamily(it.title);
+    const key = fam ? `${it.areaId}::${fam}` : `id::${it.ref}`;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    shown.push(it);
+    if (shown.length === HOME_NOW_MAX) break;
+  }
+  const now = shown[0];
+  const secondary = shown.slice(1);
+  const shownRefs = new Set(shown.map(it => it.ref));
+  const restCount = ordered.filter(it => !shownRefs.has(it.ref)).length;
+
+  // Cuántas más hay de la misma familia que `it` (ej. 5 críticas de Cabin
+  // Care): no basta con enseñar la primera y callar las otras 4.
+  const famNoteFor = (it) => {
+    const fam = taskFamily(it.title);
+    const count = fam ? items.filter(x => x.ref !== it.ref && taskFamily(x.title) === fam).length : 0;
+    return { fam, count, text: count > 0 ? ` · +${count} más de ${fam}` : '' };
+  };
 
   let nowHtml;
   if (!now) {
@@ -490,16 +519,29 @@ function todayBlock() {
       <div style="font-size:12px;color:var(--t3)">Si quieres adelantar algo, está en tus tareas.</div>`;
   } else {
     const urgentReason = /Vencida|Vence hoy|Urgente/.test(now.reason);
+    const famNote = famNoteFor(now);
+    const secondaryHtml = secondary.map(it => {
+      const sn = famNoteFor(it);
+      const tag = sn.count > 0 ? `+${sn.count} más de ${sn.fam}` : (it.area || '');
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--border)">
+        <div onclick="focusDone('${it.ref}')" style="width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;cursor:pointer"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(it.title)}</div>
+          <div style="font-size:11px;color:var(--t3)">${escHtml(it.reason)}${tag ? ' · ' + escHtml(tag) : ''}</div>
+        </div>
+      </div>`;
+    }).join('');
     nowHtml = `<div style="font-size:11px;color:var(--t3);margin-bottom:6px">Ahora</div>
       <div style="font-size:19px;font-weight:700;color:var(--text);line-height:1.3;margin-bottom:4px">${escHtml(now.title)}</div>
-      <div style="font-size:12px;color:${urgentReason ? '#A32D2D' : 'var(--t3)'};margin-bottom:14px">${escHtml(now.reason)}${now.area ? ' · ' + escHtml(now.area) : ''}</div>
+      <div style="font-size:12px;color:${urgentReason ? '#A32D2D' : 'var(--t3)'};margin-bottom:14px">${escHtml(now.reason)}${escHtml(famNote.text)}${now.area ? ' · ' + escHtml(now.area) : ''}</div>
       <button onclick="focusDone('${now.ref}')" style="width:100%;height:48px;border:none;border-radius:12px;background:#0F6E56;color:#fff;font-size:16px;font-weight:600;cursor:pointer">✓ Hecho</button>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button onclick="focusTomorrow('${now.ref}')" style="${HOME_BTN};flex:1;padding:9px">Mañana</button>
-        ${items.length > 1 ? `<button onclick="focusNext()" style="${HOME_BTN};flex:1;padding:9px">Siguiente</button>` : ''}
+        ${items.length > shown.length ? `<button onclick="focusNext()" style="${HOME_BTN};flex:1;padding:9px">Siguiente</button>` : ''}
         <button onclick="focusDiscard('${now.ref}')" style="${HOME_BTN};flex:1;padding:9px">Quitar</button>
       </div>
-      ${next.length ? `<div style="font-size:12px;color:var(--t2);margin-top:12px;line-height:1.5">Después: ${next.map(n => escHtml(n.title)).join(' · ')}</div>` : ''}`;
+      ${secondaryHtml}
+      ${restCount ? `<div style="font-size:12px;color:var(--t2);margin-top:12px">Y ${restCount} pendiente${restCount !== 1 ? 's' : ''} más hoy.</div>` : ''}`;
   }
 
   // Su día en orden de hora: agenda (con la app conectada) y recordatorios,
@@ -1034,16 +1076,34 @@ function openDomainTasks(area) {
   return [...generic,...vj];
 }
 
-// El pendiente que la tarjeta pone delante: mismo orden que `tasks_list` de
-// Isabel (prioridad, fecha, antigüedad) más el horizonte, para que la app y el
-// chat nombren el mismo primero.
-function nextDomainTask(area) {
+// Mismo orden que `tasks_list` de Isabel (prioridad, fecha, antigüedad) más
+// el horizonte, para que la app y el chat nombren las mismas primero. Antes
+// solo se usaba para elegir el pendiente que la tarjeta pone delante — el
+// listado completo de "Tareas" de cada área y "Todas las tareas" venían del
+// orden crudo de Supabase (sin .order()), así que una tarea crítica podía
+// quedar enterrada debajo de una `medium` más antigua.
+// Familia de una tarea generada en lote (D69: "Cabin Care: X", "Offload
+// pendiente: X", "Reportar a Marnie: X"...): el texto antes de los dos
+// puntos. Sirve para no enseñar 5 tareas de Cabin Care como si fueran 5 cosas
+// sueltas: se enseña la más prioritaria y se cuenta el resto de la misma
+// familia, en vez de un batch genérico ("Revisar Cabin Care: 5 pendientes")
+// que no dice cuál hacer primero.
+function taskFamily(title) {
+  const m = /^([^:]{3,40}):/.exec(String(title || ''));
+  return m ? m[1].trim() : null;
+}
+
+function sortByPriority(tasks) {
   const rank={critical:0,high:1,medium:2,low:3}, hz={today:0,this_week:1,this_month:2,next_month:3};
-  return openDomainTasks(area).sort((a,b)=>
+  return [...tasks].sort((a,b)=>
     (rank[a.priority]??9)-(rank[b.priority]??9)
     || String(a.due_date||'9999-12-31').localeCompare(String(b.due_date||'9999-12-31'))
     || (hz[a.horizon]??9)-(hz[b.horizon]??9)
-    || String(a.created_at||'').localeCompare(String(b.created_at||'')))[0]||null;
+    || String(a.created_at||'').localeCompare(String(b.created_at||'')));
+}
+
+function nextDomainTask(area) {
+  return sortByPriority(openDomainTasks(area))[0]||null;
 }
 
 function clip(text, max) {
@@ -1298,7 +1358,16 @@ function workQueue() {
     .forEach(p => items.push({ id: 'proj_next_' + p.id, title: 'Definir próxima acción: ' + p.title, impact: 'medio', weight: 2,
       time: '~5 min', reason: 'Sin próxima acción definida', area: areaName(p.area_id), areaId: p.area_id, type: 'project_next', ref: p.id }));
 
-  return items.sort((a, b) => b.weight - a.weight);
+  // Dentro del mismo peso (ej. cinco tareas "crítico"), sin esto el orden era
+  // el que devolviera Supabase — arbitrario, no "la que más falta hace
+  // primero". Mismo criterio que sortByPriority: fecha, luego antigüedad.
+  const taskById = new Map(S.tasks.map(t => [t.id, t]));
+  return items.sort((a, b) => {
+    if (b.weight !== a.weight) return b.weight - a.weight;
+    const ta = taskById.get(a.ref), tb = taskById.get(b.ref);
+    return String(ta?.due_date || '9999-12-31').localeCompare(String(tb?.due_date || '9999-12-31'))
+      || String(ta?.created_at || '').localeCompare(String(tb?.created_at || ''));
+  });
 }
 
 function isabelContributions(areaId=null, limit=4) {
@@ -1747,9 +1816,12 @@ function areaView() {
 
     const isAircraftTask=t=>/\bho\b|hoto|hand.?over|inventar|laundry|lavand|uplift|catering|amenities|defect|kettle|polish|leather|drawer/i.test(t.title);
     const isAdminTask=t=>/factura|elearning|e.?learning|visa|revis|correo|revista/i.test(t.title);
-    const aircraftPend=pendTasks.filter(isAircraftTask);
-    const adminPend=pendTasks.filter(isAdminTask);
-    const allAircraftPend=[...aircraftPend,...pendTasks.filter(t=>!isAircraftTask(t)&&!isAdminTask(t))];
+    // Ordenadas por prioridad real (D69 puede dejar varias "critical" a la
+    // vez, ej. 5 de Cabin Care): antes salían en el orden crudo de Supabase,
+    // así que "una cosa antes de salir" podía no ser la más urgente de verdad.
+    const aircraftPend=sortByPriority(pendTasks.filter(isAircraftTask));
+    const adminPend=sortByPriority(pendTasks.filter(isAdminTask));
+    const allAircraftPend=[...aircraftPend,...sortByPriority(pendTasks.filter(t=>!isAircraftTask(t)&&!isAdminTask(t)))];
 
     const alerts=[];
     pendTasks.forEach(t=>{
@@ -2838,7 +2910,7 @@ function areaView() {
       </div>`;
     }).join('')}
   </div>`:''}
-  ${section('✓','Tareas',ts.map(t=>taskEl(t)).join('')||empty('Sin tareas'))}
+  ${section('✓','Tareas',sortByPriority(ts).map(t=>taskEl(t)).join('')||empty('Sin tareas'))}
   ${ws.length?section('⏳','Esperando',ws.map(wfEl).join('')):''}
   ${ds.length?section('❓','Decisiones',ds.map(decEl).join('')):''}`;
 }
@@ -2846,7 +2918,7 @@ function areaView() {
 function globalView() {
   return `
   <p class="section-title">Todas las tareas</p>
-  ${section('','',S.tasks.map(t=>taskEl(t)).join('')||empty('Sin tareas'))}
+  ${section('','',sortByPriority(S.tasks).map(t=>taskEl(t)).join('')||empty('Sin tareas'))}
   <p class="section-title">Waiting For</p>
   ${section('','',S.wf.map(wfEl).join('')||empty('Sin elementos'))}
   <p class="section-title">Decisiones</p>
