@@ -75,3 +75,9 @@ Todo lo no descrito arriba (historial, conexión con otros módulos, reset por s
 
 # Próximo hito
 Ya integrado y desplegado, con tools de chat. Pendiente real: probar `laundry_update_items` con una frase real de Estefanía en producción (verificado hasta ahora por lectura de código + tests, no en conversación real con Isabel).
+
+# Primer uso real (2026-09-25)
+Primer formulario real: 9H-VCF, ICAO EGKB, fecha 2026-09-25, CH "Elena" (`ole@vistajet.com`), teléfono y fecha de salida vacíos por decisión suya. 10 filas con solo **Given**: Tablecloth S 6, Napkins 8, Microfiber Cloth 4, Dinner Plate 2, Dessert Plate 1, Coffee Cup 1, Dessert Knife 3, Dessert Fork 3, Menu Spoon 3, Tumbler 2. Creado por script con las funciones de `data.js` (`createLaundryCleaning` + `updateLaundryCleaning`), **no** con las tools `laundry_*` — su prueba real en conversación sigue pendiente.
+- **Regla suya:** todo el linen que sale en sus notas de inventario es para lavar y va aquí. La lista de platos/cubiertos de un día caduca cuando los lava; el linen no.
+- **Falta un sistema para acumular** lo sucio durante la rotación (entre entrega y entrega solo se llevó de cabeza en la conversación). Hoy las tools `laundry_update_items` fijan un valor, no suman; una idea es "ensuciar +N" que acumule en `given`.
+- **Un mismo objeto no debe estar en inventario y en lavado a la vez** (ver "Qué no existe": sin sincronización entre módulos).

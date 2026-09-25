@@ -2022,7 +2022,7 @@ function areaView() {
       return `${head}
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:9px">
         <span style="font-size:11px;font-weight:700;color:${rm.color};background:${rm.bg};border-radius:999px;padding:3px 10px">${rm.label}</span>
-        <span style="font-size:10px;color:var(--t3)">${R.readiness==='unknown'?R.phase:`confianza ${cf} · ${R.phase}`}</span>
+        <span style="font-size:10px;color:var(--t3)">${R.readiness==='unknown'?R.phase:`evidencia ${cf} · ${R.phase}`}</span>
         <button onclick="readiRefresh()" title="Recalcular" style="border:none;background:none;color:var(--t3);cursor:pointer;font-size:13px;padding:0;margin-left:auto"><i class="ti ti-refresh"></i></button>
       </div>
       <div style="font-size:14px;font-weight:500;color:var(--text);line-height:1.55;margin-bottom:10px">${R.recommendation}</div>
@@ -2034,10 +2034,29 @@ function areaView() {
       ${detail}`;
     })();
 
+    // Documentos de entrega: los tres a mano, justo bajo la tarjeta (antes "Exportar Excel" estaba al final
+    // de la pantalla, tras todos los bloques, y el día de la entrega no se encontraba).
+    const docsCard=(()=>{
+      const sg=S.vjSignals||{};
+      const okInv=!!S.invSession, okHoto=!!sg.hoto?.id, okLl=!!sg.laundry?.id;
+      const b=(on,icon,label,fn)=>`<button onclick="${on?fn:''}" ${on?'':'disabled'} style="display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 8px;border:0.5px solid var(--border);border-radius:10px;background:${on?'var(--text)':'var(--surface)'};color:${on?'#fff':'var(--t3)'};font-size:12px;font-weight:600;cursor:${on?'pointer':'not-allowed'}"><i class="ti ${icon}"></i>${label}</button>`;
+      if(!vj.aircraft) return '';
+      return `<div style="background:var(--surface);border-radius:12px;padding:14px 16px;margin-bottom:10px;border:0.5px solid var(--border)">
+        <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:8px">Documentos de entrega</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          ${b(okInv,'ti-file-spreadsheet','Inventario','invExport()')}
+          ${b(okHoto,'ti-file-text','HOTO','vjExportHoto()')}
+          ${b(okLl,'ti-shirt','Laundry','vjExportLaundry()')}
+        </div>
+        <div style="font-size:11px;color:var(--t3);margin-top:8px;line-height:1.5">Excel del inventario, PDF del HOTO y PDF del Laundry (las firmas del Laundry son a mano).</div>
+      </div>`;
+    })();
+
     return `
     <div style="background:var(--surface);border-radius:12px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)">
       ${readiCard}
     </div>
+    ${docsCard}
 
     ${(()=>{
       // "Bajo control" exige evidencia real de HOTO+Inventario del avión
@@ -3744,6 +3763,18 @@ async function invExport(mode){
   }catch(e){ alert('Error exportando: '+e.message); }
 }
 
+// Atajos de la pantalla de VistaJet: HOTO y Laundry en PDF (el visor del móvil, igual que sus pantallas).
+function vjExportHoto(){
+  const id=S.vjSignals?.hoto?.id; if(!id) return;
+  const tail=(S.vjState?.aircraft||'').replace(/[^A-Za-z0-9-]/g,'');
+  const day=new Date().toISOString().slice(0,10);
+  openPdf(`/v1/hoto/${id}/export`,{inline:'1',filename:`HOTO_${tail}_${day}`});
+}
+function vjExportLaundry(){
+  const id=S.vjSignals?.laundry?.id; if(!id) return;
+  openPdf(`/v1/laundry-cleaning/${id}/export`,{inline:'1'});
+}
+
 // ═══ Aircraft Readiness ═══════════════════════════════════════════════════════
 function readiRefresh(){ S._readiLoaded=false; S.vjReadiness=null; S.vjSignals=null; render(); }
 function readiToggleDetail(){ S.readiDetail=!S.readiDetail; render(); }
@@ -5249,7 +5280,7 @@ Object.assign(window, {
   hotoCareToggle, hotoCareToday, hotoCareUnknown, hotoCareDate, hotoCareNote,
   hotoShopToggle, hotoShopSet, hotoResetSection,
   hotoMagToggle, hotoMagAdd, hotoMagSet, hotoMagDel, hotoMagDropLegacy,
-  readiRefresh, readiToggleDetail,
+  readiRefresh, readiToggleDetail, vjExportHoto, vjExportLaundry,
   llcBack, llcCreate, llcField, llcItemField, llcExport,
 });
 

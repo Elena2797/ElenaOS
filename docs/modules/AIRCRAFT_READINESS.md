@@ -53,3 +53,28 @@ Fase de rotación calibrada por fecha de entrega (bloqueada por la ausencia de `
 
 # Próximo hito
 Ninguno decidido explícitamente.
+
+# Rediseño acordado con ella (2026-09-25) — IMPLEMENTADO el mismo día
+**Qué es la tarjeta, en sus palabras:** un nivel de **confianza para entregar el avión tal como está**, según lo que le falta *a ella* por hacer. NO es el estado técnico del avión: un jump seat inoperativo o un AOG "es problema del avión", no suyo, y no deben sumar ni restar (hoy "6 defects documentados" sale como fortaleza — incorrecto).
+
+**Lo que le quita confianza (sus 4 pilares):**
+1. **Inventario sin actualizar.** Distinguir *contado de verdad* de *estimado / puesto al estándar* (hoy los dos cuentan como "verificado"). "30/345" y "19 discrepancias" no son señal útil: una discrepancia es solo "gastado", no un problema; pedir verificar 315 ítems tampoco es realista.
+2. **Laundry & Cleaning Form sin rellenar el día de la entrega** (y sin Received / exportar / firmar).
+3. **Haberse ido sin limpiar bien** (caso del microondas, 2026-09-23): las 47 **Daily duties** del HOTO sin marcar deben bajar la confianza — hoy la tarjeta ni las mira.
+4. **Documentos sin enviar:** al cerrar, hay que mandar el correo (HOTO / inventario / laundry). Isabel debe recordárselo. Tampoco se mira hoy el **feedback del vuelo** (máx. 24 h) ni el feedback del avión (1-2 días).
+
+**Otros fallos de la tarjeta detectados ese día (simulando `assess()` con datos reales):** Shopping "13/13 ✅" solo cuenta casillas rellenas (no ve que no hay leche/hierbas/apio); Cabin Care "12/17 ✅" da por bueno lo que no tiene fecha; "Sin fecha de entrega" — no sabe que hoy deja el avión (falta un estado "dejando el avión" que active este modo); "Laundry actualizado ✅" solo mira que haya algo escrito.
+
+**Principio:** la tarjeta pregunta "¿cuánta confianza me da entregar así?" y cada motivo de baja confianza debe ser algo que ella pueda **hacer** (contar, marcar, rellenar, enviar). Nunca juzgar el avión.
+
+## Cómo quedó implementado (2026-09-25)
+`services/readiness.js` reescrito manteniendo el contrato (`readiness`/`confidence`/`modules`…), así la tarjeta "Copiloto de entrega" no cambia de forma. Se evalúa SIEMPRE "como si entregaras ahora" (no hay fase por fecha de entrega).
+- **Módulos nuevos:** Inventario · Laundry Form · Limpieza y HOTO · Documentos y feedback · Por comprar (informativo) · Administrativo. **Desaparece** "Estado del avión": los defectos del avión (jump seat, AOG) no puntúan.
+- **Inventario:** sesión abierta con 0 ítems tocados → bloqueo; estimados (`notes` "estimado…", D70) → aviso; "30/345 verificados" y las discrepancias ya no se muestran como problema; "por reponer" es solo informativo (saldrá en el UPLIFT).
+- **Laundry:** sin formulario abierto (habiendo HOTO e inventario reales) o vacío → bloqueo; sin actualizar >1 día → aviso; siempre recuerda exportar y firmar (no puede verlo).
+- **Limpieza:** las 47 tareas diarias del HOTO (`daily_duties`): 0 marcadas → bloqueo; <70 % → aviso; su caso real (37/47, algunas no aplican al CL350) NO baja la confianza. Cabecera del HOTO incompleta (CH, fecha, días, ICAO) → aviso. Cabin Care sin fechas no puntúa.
+- **Documentos:** feedback del vuelo pendiente (24 h) y del avión (1-2 días) → aviso (la tarea combinada "feedback de vuelos + feedback HOTO" cuenta como de VUELO); el correo del handover se recuerda siempre ("no puedo comprobar si salió").
+- **Honestidad conservada:** sin HOTO e inventario reales del avión actual no hay bloqueos inventados: "no tengo evidencia suficiente" (tests D15/D34 intactos).
+- **UI:** el texto "confianza alta/media/baja" pasa a **"evidencia"** (es la fiabilidad de la evaluación, no tu confianza de entrega, que es el chip Listo/Casi listo/No entregaría). Nuevo bloque **"Documentos de entrega"** justo bajo la tarjeta con Inventario (Excel) · HOTO (PDF) · Laundry (PDF).
+- **Pendiente:** un estado explícito "dejando el avión"; que el correo del handover pueda marcarse como enviado (hoy solo se recuerda); mostrar contado vs estimado dentro de la vista de inventario; el PDF de lavandería en el visor del móvil sigue mostrando "export" como nombre.
+- Tests: `services/__tests__/readinessRedesign.test.js` (23) + los de D15/D34.
