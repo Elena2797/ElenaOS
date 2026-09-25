@@ -18,7 +18,7 @@ Estado: conocimiento vigente
 - **Valores por confirmar del 9H-VCF:** Lime (dijo "habían seis", sigue 1), Orange (2, "no me acuerdo"), Coca Cola/Ginger/Tonic/Coke Light/Coke Zero puestos al estándar sin contar.
 - `npm run fallos`: revisar los HOTO abiertos (Focus of the Month sin cerrar la tarea, recordatorio de feedback al subir un HOTO, horario diario) y los de PDF del 22 (posiblemente ya resueltos).
 - **HOTO del 9H-VCF:** listo para exportar; faltan 5 fechas de Cabin Care que ella no sabe (quedan vacías) y marcar las Daily duties en la app. Tarea vieja "HOTO: Offload plates to Sores" ya no aplica. Hay tareas duplicadas de Cabin Care/defects de Isabel por limpiar.
-- **Importador de HOTO descarta las revistas** (ver CHANGELOG 2026-09-25 punto 8) — arreglar y que Isabel diga qué revistas comprar.
+- **Revistas:** el import ya las interpreta (`d698f28`). **Falta:** que Isabel diga qué comprar (`missing`/`needs_renewal`) y las revise una vez al recibir el avión.
 - **Contado vs estimado en la APP y en la tarjeta de confianza** (el backend ya lo distingue desde `d2147fa`; los datos del 9H-VCF del 25/09 quedaron sin marcar).
 - Reglas nuevas: siempre Pattern 2; inventario y Shopping del HOTO deben coincidir (pero "creerle al HOTO" fue solo para el apio, NO una regla).
 - **Rediseño de la tarjeta de Aircraft Readiness (confianza para entregar):** especificación en `modules/AIRCRAFT_READINESS.md § Rediseño acordado 2026-09-25`. Sin construir. Depende de: contado-vs-estimado en el inventario, Daily duties del HOTO, estado "dejando el avión", feedbacks y envío de documentos.
