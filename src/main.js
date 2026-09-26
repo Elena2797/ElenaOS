@@ -3751,9 +3751,11 @@ function agendaDayLabel(iso){ return agendaDayLabelFor(iso,madridDate(0),madridD
 function agendaEntryHtml(e){
   if(e.kind==='rot') return `<div style="background:var(--bg);border:0.5px dashed var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--t2)"><b style="color:var(--text)">ROT</b> · día de rotación, aún sin vuelos definidos</div>`;
   const chip=(t)=>`<span style="font-size:10px;font-weight:600;color:${t==='FERRY'?'#854F0B':'#4B5563'};background:${t==='FERRY'?'#FAEEDA':'#F1F1F1'};border-radius:999px;padding:2px 8px;margin-left:4px">${escHtml(t)}</span>`;
-  return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:12px 14px">
+  // Estado contra AHORA (lo calcula el servidor): aterrizado se apaga, en el aire se marca.
+  const live=e.status==='in_flight'?'<span style="font-size:10px;font-weight:600;color:#0F6E56;background:#E1F5EE;border-radius:999px;padding:2px 8px;margin-left:4px">EN VUELO</span>':e.status==='landed'?'<span style="font-size:10px;color:var(--t3);margin-left:4px">aterrizado</span>':'';
+  return `<div style="background:var(--surface);border:0.5px solid ${e.status==='in_flight'?'#0F6E56':'var(--border)'};border-radius:12px;padding:12px 14px;${e.status==='landed'?'opacity:.55':''}">
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
-      <div style="font-size:15px;font-weight:600;color:var(--text)">${escHtml(e.dep_icao)} → ${escHtml(e.arr_icao)}</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text)">${escHtml(e.dep_icao)} → ${escHtml(e.arr_icao)}${live}</div>
       <div style="font-size:13px;color:var(--text);white-space:nowrap">${escHtml(e.dep_local)}${e.arr_local?' – '+escHtml(e.arr_local)+(e.arr_next_day?' <span style="font-size:10px;color:var(--t3)">+1</span>':''):''}</div>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:11px;color:var(--t2)">
