@@ -61,3 +61,9 @@ Estado: conocimiento vigente
 - Pendiente de Fresh Items: "Por comprar" se apoya en la tarea "Comprar X" del análisis del HOTO (no hay lista propia); Soya/Skimmed/Oat/Almond sin sincronía (no existen en su inventario); Evian/Volvic aparte.
 - Conteos de tablecloths/napkins/DR kits: solo texto libre en pre-HOTO (siempre `review`).
 - Guard O5 del frontend (`main.js`) sigue rojo desde antes; `main.js` cambió de hash otra vez con la Agenda.
+
+## 7. Repaso del 26/09 noche (qué queda tras cerrar huecos)
+
+- **Cerrado:** pantalla Fresh Items, Inicio (más hoy / Urgente multi-dominio), guard O5, "Documentos de entrega" (ya existía), avisos de feedback con agenda, "¿recibiste el avión?", revistas a comprar. Ver CHANGELOG 2026-09-26 (repaso).
+- **Sigue abierto:** ver en el móvil de ella las pantallas Agenda y Fresh Items con datos reales (yo no pude: pide su PIN); modo "dejando el avión" (pregunta dónde lo deja + ICAO); Isabel debe cumplir las reglas nuevas tras `openclaw mcp reload` (agenda_*, hoto_pre_*, magazines); tareas `🔴 HOTO:` hechas a mano y D69; primera noche del turno nocturno.
+- **Ojo Agenda:** si una foto trae horas UPDATED, Isabel debe pasar `replace_days` solo con el día entero a la vista; con la lista (cortada) nunca.

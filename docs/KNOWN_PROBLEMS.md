@@ -246,8 +246,8 @@ Ver [SECURITY.md](SECURITY.md). Las URLs Git locales ya están limpias y `faithf
 
 ## Inicio y prioridad (2026-09-23)
 
-### El guard O5 del frontend está en rojo: `main.js` ya no coincide con el checkpoint aprobado
+### El guard O5 del frontend estaba en rojo — RESUELTO 2026-09-26 (re-aprobado con nota)
 `src/services/__tests__/o5HomeFixtures.test.js` compara el SHA-256 de `src/main.js` con `MAIN_CHECKPOINT_SHA256` (frontend 84/85 al 2026-09-26; el único rojo). Falla ya antes de la sesión del 2026-09-23 y cualquier cambio de Inicio lo mantiene rojo: no es una regresión de esa sesión, es que el "checkpoint aprobado" quedó atrás. Decidir con ella: re-aprobar el hash actual o retirar el guard; no actualizarlo a ciegas.
 
-### Inicio: lo que queda abierto de D71
+### Inicio: lo que queda abierto de D71 — RESUELTO en su mayoría 2026-09-26 (noche)
 "Y N pendientes más hoy" cuenta también lo sin fecha; la tarjeta "Urgente" enseña un solo dominio; las tareas `🔴 HOTO:` hechas a mano no las deduplica D69. Detalle en `DECISIONS.md` D71 (Pendiente).
