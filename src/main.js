@@ -14,7 +14,7 @@ import { financeStateSummary } from './services/financeReadModel.js';
 import { buildLearnedModel, kindLabel, learnedMeta } from './services/knowledgeLearned.js';
 import { buildNightWorkModel } from './services/nightWork.js';
 import { reviewNotices } from './services/deliveryNotices.js';
-import { dayLabel as agendaDayLabelFor, cardSummary as agendaCardModel, lastLegOf as agendaLastLegOf, todayRows as agendaTodayRows } from './services/agendaModel.js';
+import { dayLabel as agendaDayLabelFor, cardSummary as agendaCardModel, lastLegOf as agendaLastLegOf, todayRows as agendaTodayRows, looksLikeAgendaFlight } from './services/agendaModel.js';
 // Definiciones del dominio HOTO: fuente única en src/hoto/model.js.
 // Se importan con los nombres VJ_* históricos para no tocar sus usos.
 import {
@@ -576,7 +576,9 @@ function todayBlock() {
   const hm = new Date().toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' });
   const rows = [];
   if (linked && ag && ag.ok) {
-    (ag.events || []).forEach(e => rows.push({
+    // Sin vuelos duplicados: los que Isabel llegó a crear en Google Calendar no se repiten si ya están en la agenda.
+    const agendaFlightsToday = ((S.agenda || []).find(d => d.day === madridDate(0)) || { entries: [] }).entries.filter(e => e.kind === 'flight');
+    (ag.events || []).filter(e => !looksLikeAgendaFlight(e.title, agendaFlightsToday)).forEach(e => rows.push({
       at: e.all_day ? '' : String(e.start || '').slice(11, 16),
       label: e.all_day ? 'todo el día' : String(e.start || '').slice(11, 16),
       text: e.title, icon: 'ti-calendar',

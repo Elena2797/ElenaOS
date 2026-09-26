@@ -40,6 +40,20 @@ export function cardSummary({ days, today, linked }) {
 }
 
 /**
+ * ¿Este evento de Google Calendar es un vuelo que YA está en la agenda? Isabel llegó a crear vuelos en el calendario
+ * (26/09, "no los quiero ahí"): si siguen ahí, "Tu día" los enseñaría dos veces. Solo cuenta como duplicado si HOY hay
+ * vuelos en la agenda y el título trae una ruta "XXXX → YYYY" o un ICAO de uno de esos vuelos junto a una palabra de vuelo.
+ */
+export function looksLikeAgendaFlight(title, todayFlights) {
+  if (!todayFlights || !todayFlights.length) return false;
+  const t = String(title || '');
+  if (/\b[A-Z]{4}\b\s*(?:→|->|–|-|>)\s*\b[A-Z]{4}\b/.test(t)) return true;
+  const icaos = new Set(todayFlights.flatMap((f) => [f.dep_icao, f.arr_icao]).filter(Boolean));
+  const hasIcao = [...icaos].some((c) => new RegExp('\\b' + c + '\\b').test(t));
+  return hasIcao && /vuelo|flight|ferry|✈|9H-/i.test(t);
+}
+
+/**
  * Filas de "Tu día" de Inicio para hoy: los vuelos (hora local visible, ordenados por la hora real de Madrid) y el
  * día ROT. `at` es lo que se enseña; `sortAt` lo que ordena y marca "ahora".
  */

@@ -38,8 +38,8 @@ const MAIN_URL = new URL('../../main.js', import.meta.url);
 // Re-aprobado el 2026-09-26 (noche), a conciencia: el checkpoint llevaba rojo desde antes de D71. Desde entonces main.js
 // ganó la pantalla Agenda de vuelos, la pantalla Fresh Items (ya no el "próximamente"), la tarjeta Urgente con
 // varios dominios y "más hoy" sin contar lo que no tiene fecha; luego vuelos en "Tu día", preguntas de Isabel en su dominio y enlaces
-// entre agenda, HOTO y Fresh Items; luego la lógica de la agenda pasó a services/agendaModel.js (con tests) y el Copiloto ganó avisos "para repasar" (services/deliveryNotices.js); al volver a la app se relee la agenda/Fresh Items/pre-HOTO. Comprobado: main.js no importa ningún fixture O5.
-const MAIN_CHECKPOINT_SHA256 = '0198B63A88DEFB9E93A3E22258084B8A8372BDCC7CEE5FC65DD8DB525CD2BB88';
+// entre agenda, HOTO y Fresh Items; luego la lógica de la agenda pasó a services/agendaModel.js (con tests) y el Copiloto ganó avisos "para repasar" (services/deliveryNotices.js); al volver a la app se relee la agenda/Fresh Items/pre-HOTO y Tu día no duplica vuelos del Calendar. Comprobado: main.js no importa ningún fixture O5.
+const MAIN_CHECKPOINT_SHA256 = '00D31DAC603F9B6F01A434E575C1DD376860211655F903341BA3E28C096F4A9B';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

@@ -64,3 +64,25 @@ describe('todayRows (Tu día)', () => {
     assert.ok(!todayRows(days, '2026-09-28')[0].text.includes('pax'));
   });
 });
+
+import { looksLikeAgendaFlight } from '../agendaModel.js';
+describe('looksLikeAgendaFlight (no duplicar vuelos del Calendar en Tu día)', () => {
+  const flights = [{ dep_icao: 'ESSB', arr_icao: 'LIMJ' }];
+  test('ruta ICAO en el título → duplicado', () => {
+    assert.equal(looksLikeAgendaFlight('ESSB → LIMJ', flights), true);
+    assert.equal(looksLikeAgendaFlight('9H-VCC LIMJ-LDZD 15:50', flights), true);
+  });
+  test('ICAO de uno de hoy + palabra de vuelo → duplicado', () => {
+    assert.equal(looksLikeAgendaFlight('Vuelo a LIMJ', flights), true);
+    assert.equal(looksLikeAgendaFlight('Ferry desde ESSB', flights), true);
+  });
+  test('eventos normales no se tocan', () => {
+    assert.equal(looksLikeAgendaFlight('Dentista', flights), false);
+    assert.equal(looksLikeAgendaFlight('Comida con Marta', flights), false);
+    assert.equal(looksLikeAgendaFlight('Revisión LIMJ del contrato', flights), false);   // ICAO suelto sin palabra de vuelo
+  });
+  test('sin vuelos en la agenda nunca se oculta nada', () => {
+    assert.equal(looksLikeAgendaFlight('ESSB → LIMJ', []), false);
+    assert.equal(looksLikeAgendaFlight('Vuelo', null), false);
+  });
+});
