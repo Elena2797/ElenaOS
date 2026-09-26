@@ -35,7 +35,10 @@ const MAIN_URL = new URL('../../main.js', import.meta.url);
 // un ticket corto. Solo cómo se autentica; Home no cambia. Sin O5.
 // Y otra el mismo día: botón "Exportar UPLIFT" en VistaJet (antes solo en la
 // página vieja de isabel-api). Home no cambia. Sin O5.
-const MAIN_CHECKPOINT_SHA256 = 'CDC65864118AEF92824E9B16E20B4C5B449C86E63D14874BD7EA8AB655948FAE';
+// Re-aprobado el 2026-09-26 (noche), a conciencia: el checkpoint llevaba rojo desde antes de D71. Desde entonces main.js
+// ganó la pantalla Agenda de vuelos, la pantalla Fresh Items (ya no el "próximamente"), la tarjeta Urgente con
+// varios dominios y "más hoy" sin contar lo que no tiene fecha. Comprobado: main.js no importa ningún fixture O5.
+const MAIN_CHECKPOINT_SHA256 = '9A3074E4319E571F773B395476A1FC52CA83B85C5F031EDB2224861A3F3A6FA3';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

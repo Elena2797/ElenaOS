@@ -447,16 +447,23 @@ async function loadHealthProfile() {
 // Solo lo urgente que NO es una tarea (entrega del avión, esperas, alertas…):
 // las tareas ya salen en "Tu foco de hoy" y no se repiten.
 const TASK_SIGNALS = new Set(['task_overdue', 'due_today', 'due_soon', 'critical_task', 'planned_today', 'important_tasks', 'pending_tasks_without_deadline']);
+// Señales que SÍ interrumpen: bloqueantes o sensibles al tiempo (mismo criterio que el Core).
+const URGENT_SEVERITIES = new Set(['blocking', 'time_sensitive']);
 function urgentStrip(priority) {
   if (!(priority.source === 'now' || priority.source === 'cached') || priority.mode !== 'urgent' || !priority.area) return '';
-  // Señales débiles/informativas (ej. "344 items de inventario sin
-  // verificar", normal en cualquier rotación abierta) no son "por qué es
-  // urgente" — antes se colaban igual, y como isabelEvidenceLabel no las
-  // reconocía todas colapsaban en un "necesita atención" genérico que no
-  // decía nada (visto en producción, 2026-09-23: 5+ señales de VistaJet sin
-  // etiqueta propia, deduplicadas en una sola línea vacía).
-  const ev = (priority.evidence || []).filter(e => e.domain === priority.area.name && e.signal !== 'no_signal'
+  // Señales débiles/informativas (ej. "344 items de inventario sin verificar", normal en cualquier rotación
+  // abierta) no son "por qué es urgente". Antes solo se enseñaba el dominio que elige el Core; si otro
+  // dominio también tenía algo urgente (VistaJet y Vida Personal a la vez) quedaba callado. Ahora salen
+  // todos los dominios con una señal realmente urgente, el del Core primero.
+  const strong = (priority.evidence || []).filter(e => e.signal !== 'no_signal'
     && !TASK_SIGNALS.has(e.signal) && e.strength !== 'weak' && e.effective_severity !== 'informational');
+  const primary = priority.area;
+  const others = [...new Set(strong.filter(e => e.domain !== primary.name && URGENT_SEVERITIES.has(e.effective_severity)).map(e => e.domain))]
+    .map(name => (S.areas || []).find(a => a.name === name)).filter(Boolean);
+  return [primary, ...others].map(area => urgentCard(area, strong.filter(e => e.domain === area.name))).join('');
+}
+
+function urgentCard(area, ev) {
   if (!ev.length) return '';
   const style = isabelAttentionStyle('urgent');
   // Red de seguridad para una señal que isabelEvidenceLabel todavía no
@@ -467,9 +474,9 @@ function urgentStrip(priority) {
     return l.endsWith(`: ${e.signal}`) ? `${e.domain}: necesita atención` : l;
   }))].slice(0, 3);
   return `<div style="${HOME_CARD};border-left:3px solid ${style.fg}">
-    <div style="${HOME_LABEL};color:${style.fg}">Urgente · ${priority.area.name}</div>
+    <div style="${HOME_LABEL};color:${style.fg}">Urgente · ${area.name}</div>
     ${labels.map(l => `<div style="font-size:13px;color:var(--text);line-height:1.5">· ${escHtml(l)}</div>`).join('')}
-    <button onclick="go('area','${priority.area.id}')" style="margin-top:10px;background:${style.fg};color:#fff;border:none;border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">Ir a ${priority.area.name} →</button>
+    <button onclick="go('area','${area.id}')" style="margin-top:10px;background:${style.fg};color:#fff;border:none;border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">Ir a ${area.name} →</button>
   </div>`;
 }
 
@@ -513,7 +520,12 @@ function todayBlock() {
   const now = shown[0];
   const secondary = shown.slice(1);
   const shownRefs = new Set(shown.map(it => it.ref));
-  const restCount = ordered.filter(it => !shownRefs.has(it.ref)).length;
+  // "Más hoy" = lo que de verdad es de hoy (vence hoy o vencido). Lo SIN fecha no es "de hoy": se cuenta aparte
+  // (18 tareas sin fecha se leían como "18 pendientes más hoy").
+  const rest = ordered.filter(it => !shownRefs.has(it.ref));
+  const isUndated = (it) => { const t = S.tasks.find(x => x.id === it.ref); return !t || !t.due_date; };
+  const restCount = rest.filter(it => !isUndated(it)).length;
+  const undatedCount = rest.filter(isUndated).length;
 
   // Cuántas más hay de la misma familia que `it` (ej. 5 críticas de Cabin
   // Care): no basta con enseñar la primera y callar las otras 4.
@@ -551,7 +563,8 @@ function todayBlock() {
         <button onclick="focusDiscard('${now.ref}')" style="${HOME_BTN};flex:1;padding:9px">Quitar</button>
       </div>
       ${secondaryHtml}
-      ${restCount ? `<div style="font-size:12px;color:var(--t2);margin-top:12px">Y ${restCount} pendiente${restCount !== 1 ? 's' : ''} más hoy.</div>` : ''}`;
+      ${restCount ? `<div style="font-size:12px;color:var(--t2);margin-top:12px">Y ${restCount} pendiente${restCount !== 1 ? 's' : ''} más hoy.</div>` : ''}
+      ${undatedCount ? `<div style="font-size:11px;color:var(--t3);margin-top:${restCount ? 4 : 12}px">${undatedCount} más sin fecha, en tus tareas.</div>` : ''}`;
   }
 
   // Su día en orden de hora: agenda (con la app conectada) y recordatorios,
@@ -1969,9 +1982,9 @@ function areaView() {
     const llcSB=!S.llcRec&&status==='rotacion'?'#FAEEDA':!S.llcRec?'#F5F5F5':'#EEF4FD';
     const llcSummary=S.llcRec&&llcFilledCount>0?'Registrado: '+llcFilledCount+' de '+llcTotal+' ítems':status==='rotacion'?'Se completa durante la rotación':status==='standby'?'Cuando te asignen avión':'Disponible en rotación';
 
-    const freshSL=status==='rotacion'?'Recomendado':'No activo';
-    const freshSC=status==='rotacion'?'#185FA5':'#9CA3AF';
-    const freshSB=status==='rotacion'?'#EEF4FD':'#F5F5F5';
+    if(status==='rotacion') loadFresh();
+    const freshInfo=freshCardInfo(status);
+    const freshSL=freshInfo.sl, freshSC=freshInfo.sc, freshSB=freshInfo.sb;
 
     const elearSL=elearningTasks.length>0?elearningTasks.length+' pendiente'+(elearningTasks.length>1?'s':''):'Al día';
     const elearSC=elearningTasks.length>0?'#854F0B':'#0F6E56';
@@ -2102,7 +2115,7 @@ function areaView() {
       ${toolCard('📋','HOTO',hotoSL,hotoSC,hotoSB,hotoSummary,'vj_hoto')}
       ${toolCard('📦','Inventario',inventSL,inventSC,inventSB,inventSummary,'vj_inventario')}
       ${toolCard('🧺','Laundry & Cleaning Form',llcSL,llcSC,llcSB,llcSummary,'vj_laundry_cleaning')}
-      ${toolCard('🥗','Fresh Items Plan',freshSL,freshSC,freshSB,'Basado en sectores y pasajeros','vj_fresh')}
+      ${toolCard('🥗','Fresh Items',freshSL,freshSC,freshSB,freshInfo.summary,'vj_fresh')}
     </div>
 
     <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:16px 0 8px">Administrativo y personal</div>
@@ -3745,15 +3758,62 @@ function vjAgendaView(){
     <div style="display:grid;gap:8px">${d.entries.map(agendaEntryHtml).join('')}</div></div>`).join('');
 }
 
+// ── Fresh Items: inventario + Shopping del HOTO + lo que toca contar hoy ───────
+// Lo junta isabel-api (/v1/app/fresh): la app no repite la lógica de qué ítem es Fresh Item.
+async function loadFresh(force){
+  const tail=S.vjState.aircraft;
+  if(!tail||!appClient().isLinked()||S._freshLoading) return;
+  if(!force&&S._freshTail===tail&&Date.now()-(S._freshAt||0)<60000) return;
+  S._freshLoading=true; S._freshTail=tail;
+  try{
+    const r=await appClient().get('/v1/app/fresh?tail='+encodeURIComponent(tail));
+    S.fresh=r&&r.ok?r:null; S._freshError=!(r&&r.ok);
+  }catch(e){ S.fresh=null; S._freshError=true; }
+  S._freshAt=Date.now(); S._freshLoading=false;
+  if(S.view==='vj_fresh'||S.view==='area') render();
+}
+function freshCardInfo(status){
+  if(status!=='rotacion') return {sl:'No activo',sc:'#9CA3AF',sb:'#F5F5F5',summary:'Se cuenta durante la rotación'};
+  const f=S.fresh;
+  if(!f) return {sl:'…',sc:'#9CA3AF',sb:'#F5F5F5',summary:'Lo que hay a bordo, contado y por comprar'};
+  if(!f.has_inventory) return {sl:'Sin inventario',sc:'#9CA3AF',sb:'#F5F5F5',summary:'Abre el inventario del avión para contarlos'};
+  const buy=f.items.filter(i=>i.buy).length;
+  const today=f.items.find(i=>i.key===f.today);
+  const summary=today?'Hoy toca contar: '+today.label:'Lo que hay a bordo, contado y por comprar';
+  return buy>0?{sl:buy+' por comprar',sc:'#854F0B',sb:'#FAEEDA',summary}:{sl:'Al día',sc:'#0F6E56',sb:'#E1F5EE',summary};
+}
+function freshRowHtml(i,isToday){
+  const state=!i.in_inventory?'<span style="color:var(--t3)">no está en tu inventario</span>'
+    :(i.counted?'<span style="color:#0F6E56">contado</span>':'<span style="color:#854F0B">estimado, sin contar</span>');
+  const qty=i.in_inventory?(i.qty==null?'–':i.qty):'–';
+  return `<div style="background:var(--surface);border:0.5px solid ${isToday?'var(--text)':'var(--border)'};border-radius:12px;padding:12px 14px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+      <div style="font-size:14px;font-weight:600;color:var(--text)">${escHtml(i.label)}${isToday?' <span style="font-size:10px;font-weight:600;color:var(--t2);margin-left:4px">HOY</span>':''}</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text)">${escHtml(qty)}${i.std_qty!=null&&i.in_inventory?'<span style="font-size:11px;font-weight:400;color:var(--t3)"> / '+escHtml(i.std_qty)+'</span>':''}</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:11px;color:var(--t2)">
+      <div>${state}</div>
+      <div>${i.hoto!=null?'HOTO: '+escHtml(i.hoto):'<span style="color:var(--t3)">HOTO: sin dato</span>'}${i.buy?'<span style="font-size:10px;font-weight:600;color:#854F0B;background:#FAEEDA;border-radius:999px;padding:2px 8px;margin-left:6px">Por comprar</span>':''}</div>
+    </div>
+  </div>`;
+}
 function vjFreshView(){
-  const status=S.vjState.status||'libre';
-  return `<div class="ph"><button class="back" onclick="go('area','${S.areaId}')"><i class="ti ti-arrow-left"></i></button><h2>Fresh Items Plan</h2></div>
-  <div style="background:var(--surface);border-radius:12px;padding:24px 16px;text-align:center;border:0.5px solid var(--border);margin-bottom:12px">
-    <div style="font-size:32px;margin-bottom:12px">🥗</div>
-    <div style="font-size:14px;font-weight:500;color:var(--text);margin-bottom:8px">Fresh Items Plan</div>
-    <div style="font-size:12px;color:var(--t2);line-height:1.6">Las recomendaciones de catering fresco basadas en sectores y pasajeros estarán disponibles próximamente. Habla con Isabel para planificar el catering del próximo sector.</div>
-  </div>
-  ${status==='rotacion'?`<button onclick="openIsabel()" style="width:100%;padding:14px;border:none;background:var(--text);color:#fff;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer">Planificar con Isabel →</button>`:''}`;
+  loadFresh();
+  const head=`<div class="ph"><button class="back" onclick="go('area','${S.areaId}')"><i class="ti ti-arrow-left"></i></button><h2>Fresh Items</h2></div>`;
+  const note=(t)=>head+`<div style="padding:24px 16px;text-align:center;font-size:13px;color:var(--t2);line-height:1.6">${t}</div>`;
+  if(!S.vjState.aircraft) return note('Sin avión asignado todavía.');
+  if(!appClient().isLinked()) return note('Conecta la app con Isabel para ver tus Fresh Items.');
+  if(S._freshLoading&&!S.fresh) return head+`<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--t3);font-size:13px">Cargando…</div>`;
+  const f=S.fresh;
+  if(!f) return note('No pude leerlos ahora mismo. Prueba otra vez en un momento.');
+  const today=f.items.find(i=>i.key===f.today);
+  return head
+    +(today?`<div style="background:var(--surface);border-radius:12px;padding:12px 14px;border:0.5px solid var(--border);margin-bottom:12px;font-size:13px;color:var(--text)">Hoy toca contar <b>${escHtml(today.label)}</b>. Isabel te lo preguntará.</div>`:'')
+    +(!f.has_inventory?`<div style="font-size:12px;color:var(--t2);margin-bottom:10px">No hay inventario abierto de ${escHtml(f.aircraft)}: sin él no se pueden contar.</div>`:'')
+    +(!f.has_hoto?`<div style="font-size:12px;color:var(--t2);margin-bottom:10px">${f.ambiguous_hoto?'Hay más de un HOTO activo: no se elige solo.':'Todavía no hay HOTO de este avión.'}</div>`:'')
+    +`<div style="display:grid;gap:8px;margin-bottom:12px">${f.items.map(i=>freshRowHtml(i,i.key===f.today)).join('')}</div>`
+    +`<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-bottom:12px">Cuenta hablando con Isabel: "tengo 2 limas", "tiré 1 apio", "pedí 3 limones". El Shopping del HOTO se actualiza solo.</div>`
+    +`<button onclick="openIsabel()" style="width:100%;padding:14px;border:none;background:var(--text);color:#fff;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer">Contar con Isabel →</button>`;
 }
 
 function vjStatusView(){
