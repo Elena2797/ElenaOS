@@ -5533,6 +5533,9 @@ const surfaceRevalidator = createSurfaceRevalidator({
   refreshActiveDomain: async () => {
     const inVJ = (S.view === 'area' && S.areas.find(a => a.id === S.areaId)?.name === 'VistaJet')
       || VJ_SUBVIEWS.includes(S.view);
+    // Si Isabel abrió un inventario/HOTO (provisional o no) mientras la app estaba en segundo plano, la pantalla que decía
+    // "no hay" lo relee al volver. Lo que ya tiene datos no se toca (no se pierde lo que estés escribiendo).
+    if (inVJ) { if (!S.invSession) S._invLoaded = false; if (!S.hotoRec) S._hotoLoaded = false; }
     if (inVJ) await refreshVjContext();
     if (S.view === 'aprendido') await loadLearned();
   },
