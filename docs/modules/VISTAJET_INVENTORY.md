@@ -74,3 +74,12 @@ Especialista invocable por un Core genérico (ver `core/SPECIALISTS_PROTOCOL.md`
 
 # Próximo hito
 Fase 2 del lenguaje (D70): atrás+adelante como suma, "no queda ninguno"=0, "estándar", "me subieron"=entrada, equivalencias de unidad por ítem, y linen → Laundry Form. Lo no entendido debe apuntarse como fallo, no perderse.
+
+# Inventario PROVISIONAL (2026-09-26)
+
+Para empezar a contar sin el Excel oficial. Se clona del estándar del último inventario con plantilla (`core/inventoryProvisional.js`):
+mismos códigos/categorías/cantidades estándar/filas de Excel, todo `verified=false` "al estándar, sin contar". Se reconoce por
+`column_map.provisional`. Botón en la pantalla de Inventario (sin sesión) y tool `inventory_start_provisional` para Isabel.
+Al subir el Excel oficial estando el provisional abierto, `POST /v1/app/inventory/integrate` pasa lo contado (por código, luego por
+nombre exacto), lista lo que no cuadra y cierra el provisional. Si no llega el oficial, se exporta a Excel con la misma plantilla.
+No usar para notas sueltas de defectos/revistas: eso es pre-HOTO (`hoto_pre_*`).

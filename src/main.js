@@ -14,6 +14,7 @@ import { financeStateSummary } from './services/financeReadModel.js';
 import { buildLearnedModel, kindLabel, learnedMeta } from './services/knowledgeLearned.js';
 import { buildNightWorkModel } from './services/nightWork.js';
 import { reviewNotices } from './services/deliveryNotices.js';
+import { isProvisional as invIsProvisional, provisionalFrom as invProvisionalFrom, startResult as invStartResult, integrationMessage as invIntegrationMessage } from './services/inventoryProvisional.js';
 import { dayLabel as agendaDayLabelFor, cardSummary as agendaCardModel, lastLegOf as agendaLastLegOf, todayRows as agendaTodayRows, looksLikeAgendaFlight } from './services/agendaModel.js';
 // Definiciones del dominio HOTO: fuente única en src/hoto/model.js.
 // Se importan con los nombres VJ_* históricos para no tocar sus usos.
@@ -3448,8 +3449,15 @@ function vjInventarioView(){
   if(!sess){
     return `<div class="ph"><button class="back" onclick="invBack()"><i class="ti ti-arrow-left"></i></button><h2>Inventario</h2></div>
 
+    <div style="background:var(--surface);border-radius:12px;padding:18px;border:0.5px solid var(--text);margin-bottom:12px">
+      <div style="font-size:14px;font-weight:600;color:var(--text)">¿Aún no tienes el Excel del inventario?</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.55;margin:6px 0 12px">Empieza un <b>inventario provisional</b>: se copia del estándar del último avión (mismas categorías, códigos y cantidades estándar) y lo que aún no has contado queda «al estándar, sin contar». Cuéntalo como cualquier inventario. Si llega el Excel oficial, lo que contaste se integra solo; si no llega, este es tu inventario y lo puedes exportar.</div>
+      <button onclick="invStartProvisional()" style="width:100%;padding:13px;border:none;background:var(--text);color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Empezar inventario provisional</button>
+      <div id="inv-prov-msg" style="font-size:12px;color:var(--t2);margin-top:8px;line-height:1.5"></div>
+    </div>
+
     <div style="background:var(--surface);border-radius:12px;padding:20px;border:0.5px solid var(--border);margin-bottom:12px">
-      <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:14px">Nueva sesión de inventario</div>
+      <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:14px">Nueva sesión de inventario (con el Excel oficial)</div>
 
       <div style="margin-bottom:12px">
         <label style="font-size:11px;font-weight:600;color:var(--t2);display:block;margin-bottom:4px">Matrícula</label>
@@ -3526,6 +3534,18 @@ function vjInventarioView(){
   }).join('');
 
   return `<div class="ph"><button class="back" onclick="invBack()"><i class="ti ti-arrow-left"></i></button><h2>Inventario</h2></div>
+
+  ${invIsProvisional(sess)?`<div style="background:#FAEEDA;border-radius:12px;padding:14px 16px;margin-bottom:10px">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#854F0B">Inventario provisional</div>
+    <div style="font-size:12px;color:#5C3D0A;line-height:1.55;margin:4px 0 8px">Copiado del estándar${invProvisionalFrom(sess)?' del '+escHtml(invProvisionalFrom(sess)):''}. Lo que no has contado está «al estándar» (Pendiente). Cuenta como siempre; si llega el Excel oficial, lo que contaste se integra solo.</div>
+    <details><summary style="font-size:12px;font-weight:600;color:#854F0B;cursor:pointer">Ya llegó el Excel oficial</summary>
+      <div style="margin-top:10px">
+        <input id="inv-reg" type="hidden" value="${escHtml(sess.aircraft_registration)}"><input id="inv-type" type="hidden" value="${escHtml(sess.aircraft_type||'CL350')}"><input id="inv-date" type="hidden" value="${new Date().toISOString().slice(0,10)}">
+        <input id="inv-file" type="file" accept=".xlsx" onchange="invPreviewFile(this)" style="width:100%;box-sizing:border-box;padding:6px 0;font-size:13px">
+        <div id="inv-preview" style="margin:6px 0 8px;font-size:12px;color:#5C3D0A"></div>
+        <button onclick="invCreateSession()" style="width:100%;padding:11px;border:none;background:#854F0B;color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">Subir el oficial e integrar lo contado</button>
+      </div></details>
+  </div>`:''}
 
   <!-- Cabecera de sesión -->
   <div style="background:var(--surface);border-radius:12px;padding:14px 16px;margin-bottom:10px;border:0.5px solid var(--border)">
@@ -3830,7 +3850,7 @@ function vjFreshView(){
   const today=f.items.find(i=>i.key===f.today);
   return head
     +(today?`<div style="background:var(--surface);border-radius:12px;padding:12px 14px;border:0.5px solid var(--border);margin-bottom:12px;font-size:13px;color:var(--text)">Hoy toca contar <b>${escHtml(today.label)}</b>. Isabel te lo preguntará.</div>`:'')
-    +(!f.has_inventory?`<div style="font-size:12px;color:var(--t2);margin-bottom:10px">No hay inventario abierto de ${escHtml(f.aircraft)}: sin él no se pueden contar.</div>`:'')
+    +(!f.has_inventory?`<div style="background:var(--surface);border-radius:12px;padding:14px;border:0.5px solid var(--text);margin-bottom:12px"><div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:10px">No hay inventario abierto de ${escHtml(f.aircraft)}: sin él no se pueden contar. Si aún no tienes el Excel, empieza uno provisional.</div><button onclick="go('vj_inventario')" style="width:100%;padding:12px;border:none;background:var(--text);color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">Ir a Inventario</button></div>`:'')
     +(!f.has_hoto?`<div style="font-size:12px;color:var(--t2);margin-bottom:10px">${f.ambiguous_hoto?'Hay más de un HOTO activo: no se elige solo.':'Todavía no hay HOTO de este avión.'}</div>`:'')
     +`<div style="display:grid;gap:8px;margin-bottom:12px">${f.items.map(i=>freshRowHtml(i,i.key===f.today)).join('')}</div>`
     +`<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-bottom:12px">Cuenta hablando con Isabel: "tengo 2 limas", "tiré 1 apio", "pedí 3 limones". El Shopping del HOTO se actualiza solo.</div>`
@@ -5260,6 +5280,26 @@ async function invPreviewFile(input) {
   }
 }
 
+// Empezar un inventario PROVISIONAL (sin el Excel): lo clona el servidor del estándar del último inventario.
+async function invStartProvisional() {
+  const tail = S.vjState.aircraft;
+  const say = (t) => { const el = document.getElementById('inv-prov-msg'); if (el) el.textContent = t; };
+  if (!tail) { say(invStartResult({ ok: false, error: 'no_aircraft' }).message); return; }
+  if (!appClient().isLinked()) { say(invStartResult({ ok: false, error: 'not_linked' }).message); return; }
+  say('Creando el inventario provisional…');
+  const r = await appClient().post('/v1/app/inventory/provisional', { tail });
+  const res = invStartResult(r);
+  if (!res.ok) { say(res.message); return; }
+  try {
+    S.invSession = await invSvc.loadActiveSession(tail);
+    if (S.invSession) { S.invItems = await invSvc.loadSessionItems(S.invSession.id); S.invChat = await invSvc.getChatHistory(S.invSession.id, 30); }
+    S._invLoaded = true;
+    S._readiLoaded = false;          // el Copiloto se recalcula con este inventario
+  } catch (e) { say('Se creó, pero no pude abrirlo. Vuelve a entrar en Inventario.'); return; }
+  loadFresh(true);
+  render();
+}
+
 async function invCreateSession() {
   const reg = document.getElementById('inv-reg')?.value?.trim().toUpperCase();
   const type = document.getElementById('inv-type')?.value?.trim().toUpperCase() || 'CL350';
@@ -5283,6 +5323,8 @@ async function invCreateSession() {
     if (_invParsedFile) {
       await invSvc.uploadTemplate(_invParsedFile, _invParsedFilename);
     }
+    // Si había un inventario PROVISIONAL abierto de este avión, lo contado se integra en el oficial (servidor) y se cierra.
+    const prevProvisional = invIsProvisional(S.invSession) && S.invSession.aircraft_registration === reg ? S.invSession : null;
     const sess = await invSvc.createSession({
       aircraft_registration: reg,
       aircraft_type: type,
@@ -5291,6 +5333,11 @@ async function invCreateSession() {
       column_map: _invParsedColumnMap,
     });
     await invSvc.bulkInsertItems(sess.id, _invParsedItems);
+    if (prevProvisional) {
+      let integ = null;
+      try { integ = await appClient().post('/v1/app/inventory/integrate', { tail: reg, official_session_id: sess.id }); } catch (e) { integ = null; }
+      alert(invIntegrationMessage(integ));
+    }
     S.invSession = sess;
     S.invItems = await invSvc.loadSessionItems(sess.id);
     S.invChat = [];
@@ -5458,7 +5505,7 @@ Object.assign(window, {
   openProjectMenu, pauseProject, resumeProject,
   selectProposal, empezarPropuesta,
   setVjTab, toggleHotoCheck, resetHotoChecks,
-  invBack, invPreviewFile, invCreateSession, invSendMessage, invConfirm, invSetSearch, invCloseSession, invExport,
+  invBack, invPreviewFile, invCreateSession, invStartProvisional, invSendMessage, invConfirm, invSetSearch, invCloseSession, invExport,
   hotoBack, hotoCreate, hotoField, hotoAddItem, hotoDelItem,
   openHotoSaveModal, hotoSaveConfirm,
   hotoImportFileSelected, hotoImportChoose, hotoImportCancel,
