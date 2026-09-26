@@ -22,7 +22,7 @@ Estado: conocimiento vigente
 **Heredado del 25/09 (sigue vigente):**
 - Probar en producción el chat de inventario con "He usado 2 Evian 0,33 l" y "Usé 1 wine sleeve y 1 rubber band" (`/health` no confirma la versión); probar por Telegram tras `openclaw mcp reload` y que la app / `readiness.js` muestren contado vs estimado.
 - **Sistema de lavado que acumule** ("ensuciar +N") y lo mismo para **Fresh Items**.
-- **FRESCOS (diseño APROBADO el 26/09, sin construir):** los frescos de la Shopping list del inventario (los mismos del HOTO). (1) se apuntan hablando; faltan "tiré" y "pedí" (usar/contar/"no queda" ya funcionan); (2) un solo número de verdad por ítem y el Shopping del HOTO se actualiza SOLO; (3) a 0 → "Por comprar"; (4) Isabel pregunta una vez al día en rotación. **Es lo siguiente por hacer.**
+- **Fresh Items (nombre suyo; antes "frescos"):** construido el 26/09 noche (CHANGELOG). Falta verlo funcionando de verdad con un inventario abierto y confirmar que Isabel ve `agenda_*` tras `openclaw mcp reload`.
 - Valores por confirmar del 9H-VCF: Lime (dijo "habían seis", sigue 1), Orange (2), Coca Cola/Ginger/Tonic/Coke Light/Coke Zero puestos al estándar sin contar.
 - `npm run fallos`: HOTO abiertos (Focus of the Month sin cerrar la tarea, recordatorio de feedback al subir un HOTO, horario diario) y los 2 de PDF del 22/09 (config del Gateway; posiblemente resueltos, falta probar enviando un PDF).
 - **HOTO del 9H-VCF:** listo para exportar; faltan 5 fechas de Cabin Care que ella no sabe y marcar las Daily duties. "HOTO: Offload plates to Sores" ya no aplica.
@@ -53,3 +53,11 @@ Estado: conocimiento vigente
 ## 5. Qué documentos leer
 
 `CURRENT_STATE.md` → `DECISIONS.md` D71 (y D70, D69) → `modules/VISTAJET_INVENTORY.md` (§ Lenguaje) → `modules/VISTAJET_HOTO.md` → `KNOWN_PROBLEMS.md` (§ Inicio y prioridad).
+
+## 6. Añadido el 26/09 noche (Fresh Items + Agenda)
+
+- **Probar de verdad:** ella manda las 2 fotos del horario a Isabel → `agenda_save`; abrir VistaJet → Agenda de vuelos y contrastar horas locales con la lista (LT). Contar un Fresh Item por chat y ver que el Shopping del HOTO cambia. Ver llegar la pregunta diaria (rotación + inventario abierto).
+- **No hay agenda del día en Inicio** (a propósito, `feedback_inicio_lifeos`): pendiente decidir con ella si "hoy" debe mostrar sus vuelos.
+- Pendiente de Fresh Items: "Por comprar" se apoya en la tarea "Comprar X" del análisis del HOTO (no hay lista propia); Soya/Skimmed/Oat/Almond sin sincronía (no existen en su inventario); Evian/Volvic aparte.
+- Conteos de tablecloths/napkins/DR kits: solo texto libre en pre-HOTO (siempre `review`).
+- Guard O5 del frontend (`main.js`) sigue rojo desde antes; `main.js` cambió de hash otra vez con la Agenda.
