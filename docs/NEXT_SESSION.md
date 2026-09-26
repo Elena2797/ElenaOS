@@ -33,7 +33,7 @@ Estado: conocimiento vigente
 - **Feedbacks (`eee62a6`):** confirmar el "último aviso" del vuelo y, al recibir avión nuevo, el del avión; falta integrar el horario (CrewScheduler) y la pregunta "¿recibiste el avión hoy?".
 - **Correos:** vigilar los Telegram de Outlook (`09253d4`) y ajustar `outlookTriage.js`. Los resúmenes de Gmail del coach viven en `isabel-gateway/ensure-coach-crons.mjs` (a Claude le bloquea escribir en el Gateway; lo lanza ella).
 - Sin cambios: confirmar D69 contra un HOTO real; documentar `df1da17` (bug RLS); primera noche del turno nocturno; confirmar que Isabel ve `vistajet_deliver_aircraft` tras `openclaw mcp reload`.
-- **Pre-HOTO — falta:** probar con un HOTO real (notas antes → subir PDF → `hoto_pre_list`); pantalla en la app para verlo; confirmar tras `openclaw mcp reload` que Isabel ve `hoto_pre_*`. El contraste es por texto parecido: un defecto con otras palabras sale `not_in_hoto` (lo revisa ella). Otro pendiente de esa tanda: qué hacer con notas `pending` de un avión que se entrega sin haber llegado nunca el HOTO. En `life-os-app` hay un stash de otra rama (`fix/tareas-isabel-en-dominios`).
+- **Pre-HOTO (26/09 tarde, desplegado):** probado ida y vuelta con datos reales; contraste por mejor coincidencia; entregar avión descarta las notas (`pre_hoto_notes_discarded`); tarjeta "Antes del HOTO" en Entrega del HOTO (`/v1/app/pre-hoto`, sin tocar RLS). **Falta:** verla en su móvil con notas reales (hay 4 de 9H-VCC, todas `other`: fridge bag/fresh items/tablecloths → iran a `review`; su sitio real es Fresh Items), y confirmar que Isabel ve `hoto_pre_*` tras `openclaw mcp reload` y cumple las reglas Outlook/Calendar. El guard O5 del frontend sigue rojo desde antes (no lo toqué).
 
 ## 3. Qué hacer inmediatamente después
 
