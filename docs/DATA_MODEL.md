@@ -144,6 +144,9 @@ Migración: `hoto_migration.sql` + `hoto_migration_v2.sql`. Detalle de uso en [m
 ### `vj_hoto_items`
 id, hoto_id (FK, cascade), section (`defect`\|`comment`\|`offload`), position, content, source (default `manual`), created_at.
 
+### `vj_pre_hoto_notes`
+id, tail_number, category (`defect`|`offload`|`comment`|`magazine`|`other`), content, status (`pending`|`confirmed`|`not_in_hoto`|`review`|`migrated`|`dismissed`), hoto_id (FK, nullable), reconcile_detail, created_at, reconciled_at. Información PROVISIONAL de un avión antes de tener su HOTO; se contrasta al importar el PDF oficial. RLS sin políticas (solo clave de servicio). `hoto_migration_v6.sql`, aplicada y verificada 2026-09-26.
+
 Storage: bucket `hoto-templates` (contiene `HOTO_official_v1.pdf`, la plantilla oficial en blanco).
 
 ---

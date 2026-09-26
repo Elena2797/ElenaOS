@@ -1,10 +1,11 @@
 Estado: conocimiento vigente
-Última actualización: 2026-09-26 — cierre de la sesión de prioridad de Inicio (trabajo del 23/09, D71). Conserva los pendientes vigentes de la sesión larga del 25/09 (chat de inventario D70, entrega del 9H-VCF, feedbacks, Outlook), cuyo detalle está en `CHANGELOG.md`.
+Última actualización: 2026-09-26 (tarde: pre-HOTO, entrega limpia tareas) — cierre de la sesión de prioridad de Inicio (trabajo del 23/09, D71). Conserva los pendientes vigentes de la sesión larga del 25/09 (chat de inventario D70, entrega del 9H-VCF, feedbacks, Outlook), cuyo detalle está en `CHANGELOG.md`.
 
 # Próxima sesión
 
 ## 1. Qué se terminó en esta sesión
 
+- **Pre-HOTO** (`vj_pre_hoto_notes`, tools `hoto_pre_*`, contraste al importar), **entregar avión descarta las tareas del HOTO**, y reglas de Outlook/Calendar en las tools. `isabel-api` `7b0ede7`, 1049/1049; migración v6 aplicada. Detalle en `CHANGELOG.md` 2026-09-26.
 - **Inicio respeta la prioridad real (D71):** listas ordenadas con `sortByPriority()`, desempate de `workQueue()` por prioridad real, "Ahora" con hasta 3 tareas (una por dominio, "+N más de <familia>") y tarjeta "Urgente" con etiquetas concretas. `life-os-app` `80c0189`, `144c8d8`, `6f39085`, desplegado y verificado en el bundle de Vercel.
 - **D69 enmendado:** Cabin Care sin fecha → `high`. `isabel-api` `4a17738`, 876/876.
 - Detalle y causas en `CHANGELOG.md` (2026-09-23, mediodía) y `DECISIONS.md` D71.
@@ -27,12 +28,12 @@ Estado: conocimiento vigente
 - **HOTO del 9H-VCF:** listo para exportar; faltan 5 fechas de Cabin Care que ella no sabe y marcar las Daily duties. "HOTO: Offload plates to Sores" ya no aplica.
 - **Revistas:** el import ya las interpreta (`d698f28`); falta que Isabel diga qué comprar y las revise al recibir el avión.
 - **Rediseño de la pantalla de VistaJet (petición explícita suya):** Exportar Excel/UPLIFT están al final del todo (`main.js`, `invExport`); reunir exportar HOTO/Laundry/Excel en un sitio visible, tarjeta de confianza rediseñada (`modules/AIRCRAFT_READINESS.md § Rediseño acordado 2026-09-25`), estado "dejando el avión", recordatorios de documentos y feedbacks. Hay que diseñarlo, no parchearlo.
-- **Entregar un avión debe cerrar todo y pasar a STAND-BY:** hoy `updateVistajetStatus({status:'libre'})` solo cierra el HOTO; debe cerrar también inventario (`closed`) y Laundry Form (`delivered`) y dejar `standby`. El feedback del avión se envía al RECIBIR el siguiente. Revisar con ella la plantilla de handover (no incluye el Laundry Form y su asunto difiere del del feedback).
+- **Entregar un avión** ya cierra todo y deja STAND-BY con `vistajet_deliver_aircraft` (y descarta sus tareas de HOTO); `updateVistajetStatus({status:'libre'})` sigue solo cerrando el HOTO. El feedback del avión se envía al RECIBIR el siguiente. Revisar con ella la plantilla de handover (no incluye el Laundry Form y su asunto difiere del del feedback).
 - **Nombre del PDF en el visor del móvil** ("export"): exige ampliar `TICKET_PATH` en `core/access.js` con cuidado.
 - **Feedbacks (`eee62a6`):** confirmar el "último aviso" del vuelo y, al recibir avión nuevo, el del avión; falta integrar el horario (CrewScheduler) y la pregunta "¿recibiste el avión hoy?".
 - **Correos:** vigilar los Telegram de Outlook (`09253d4`) y ajustar `outlookTriage.js`. Los resúmenes de Gmail del coach viven en `isabel-gateway/ensure-coach-crons.mjs` (a Claude le bloquea escribir en el Gateway; lo lanza ella).
 - Sin cambios: confirmar D69 contra un HOTO real; documentar `df1da17` (bug RLS); primera noche del turno nocturno; confirmar que Isabel ve `vistajet_deliver_aircraft` tras `openclaw mcp reload`.
-- **Cambios de OTRA sesión sin commitear en `isabel-api`** (2026-09-26: `tasks.js`, `vistajet.js`, `hoto/autoTasks.js`, `hoto/data.js`, `mcp.js` y dos tests): no son de esta sesión; `git diff` antes de tocar esos ficheros. En `life-os-app` hay un stash de otra rama (`fix/tareas-isabel-en-dominios`).
+- **Pre-HOTO — falta:** probar con un HOTO real (notas antes → subir PDF → `hoto_pre_list`); pantalla en la app para verlo; confirmar tras `openclaw mcp reload` que Isabel ve `hoto_pre_*`. El contraste es por texto parecido: un defecto con otras palabras sale `not_in_hoto` (lo revisa ella). Otro pendiente de esa tanda: qué hacer con notas `pending` de un avión que se entrega sin haber llegado nunca el HOTO. En `life-os-app` hay un stash de otra rama (`fix/tareas-isabel-en-dominios`).
 
 ## 3. Qué hacer inmediatamente después
 

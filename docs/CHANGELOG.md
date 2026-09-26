@@ -9,11 +9,11 @@ No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí
 
 ## 2026-09-26 (issues de Isabel: entregar limpia tareas, reglas Outlook/Calendar, flujo pre-HOTO)
 
-Sin commit ni despliegue aún. `isabel-api` 1049/1049.
+`isabel-api` `7b0ede7` en `main`, 1049/1049. Migración v6 aplicada en Supabase y verificada (insert + CHECK de categoría). Las tools nuevas llegan a Isabel tras `openclaw mcp reload`.
 
 1. **Entregar avión descarta las tareas del HOTO** (`discardHotoTasks` en `hoto/autoTasks.js`): por título EXACTO de lo que genera el análisis (+ variantes de Cabin Care); no toca tareas escritas a mano. `deliverAircraft` devuelve `hoto_tasks_discarded`; si falla, la entrega sigue ok.
 2. **Reglas en descripciones de tools (`mcp.js`):** no replicar Outlook (ya lo ve) y nunca poner vuelos en Google Calendar (su horario de vuelos se ve en LIFEOS). Son instrucciones a Isabel, no bloqueos en código.
-3. **Pre-HOTO:** tabla nueva `vj_pre_hoto_notes` (`life-os-app/hoto_migration_v6.sql`, **SIN APLICAR en Supabase**), `hoto/preHoto.js`, tools `hoto_pre_add` / `hoto_pre_list` / `hoto_pre_resolve`. Al importar el HOTO oficial (`applyHotoImport`) se contrasta cada nota (determinista, sin modelo): `confirmed` / `not_in_hoto` / `review` (revistas, con el estado oficial). Nunca sobrescribe; migrar o descartar lo decide ella. **Falta:** verlo en la app de LIFEOS (hoy solo por Isabel) y probar en producción tras aplicar la migración y `openclaw mcp reload`.
+3. **Pre-HOTO:** tabla nueva `vj_pre_hoto_notes` (`life-os-app/hoto_migration_v6.sql`, aplicada 2026-09-26), `hoto/preHoto.js`, tools `hoto_pre_add` / `hoto_pre_list` / `hoto_pre_resolve`. Al importar el HOTO oficial (`applyHotoImport`) se contrasta cada nota (determinista, sin modelo): `confirmed` / `not_in_hoto` / `review` (revistas, con el estado oficial). Nunca sobrescribe; migrar o descartar lo decide ella. **Falta:** verlo en la app de LIFEOS (hoy solo por Isabel) y probarlo con un HOTO real.
 4. Lección de modelo: no asumir qué significa un icono/número de la app (era nº de pasajeros, no sillas de ruedas).
 
 ## 2026-09-25 (el chat de inventario entiende sin depender del LLM — D70 — + cierre real del inventario del 9H-VCF + primer Laundry Form real)
