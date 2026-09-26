@@ -3175,6 +3175,61 @@ function vjHotoView(){
 }
 
 // ── Pestaña Entrega: editor vivo + exportación al PDF oficial ────────────────
+// ── Notas pre-HOTO: lo que ella contó del avión antes de tener su HOTO ─────────
+// Viven en vj_pre_hoto_notes (solo servidor); la app las lee y resuelve por isabel-api.
+const PRE_CAT_LABEL={defect:'Defecto',offload:'Offload',comment:'Comentario',magazine:'Revista',other:'Otro'};
+const PRE_MIGRATABLE=['defect','offload','comment'];
+async function loadPreHoto(force){
+  const tail=S.vjState.aircraft;
+  if(!tail||!appClient().isLinked()||S._preHotoLoading) return;
+  if(!force&&S._preHotoTail===tail) return;
+  S._preHotoLoading=true; S._preHotoTail=tail;
+  try{
+    const r=await appClient().get('/v1/app/pre-hoto?tail='+encodeURIComponent(tail));
+    S.preHotoNotes=r&&r.ok?r.notes:[];
+  }catch(e){ S.preHotoNotes=[]; }
+  S._preHotoLoading=false;
+  if(S.view==='vj_hoto') render();
+}
+async function resolvePreHoto(id,action){
+  const note=(S.preHotoNotes||[]).find(n=>n.id===id);
+  if(!note) return;
+  if(action==='dismiss'&&!confirm('¿Descartar "'+note.content+'"?')) return;
+  const r=await appClient().post('/v1/app/pre-hoto/'+encodeURIComponent(id)+'/resolve',{tail:S.vjState.aircraft,action});
+  if(!r||!r.ok){
+    const why={no_active_hoto:'Todavía no hay HOTO activo para este avión.',not_migratable:'Esta nota no se puede pasar al HOTO.',ambiguous_hoto:'Hay más de un HOTO activo: no se elige solo.'}[r&&r.error];
+    alert(why||'No se pudo ahora mismo. Prueba otra vez.');
+    return;
+  }
+  if(action==='migrate'&&S.hotoRec){ try{ S.hotoItems=await hotoSvc.loadItems(S.hotoRec.id); }catch(e){} }
+  S.preHotoNotes=(S.preHotoNotes||[]).filter(n=>n.id!==id);
+  render();
+}
+function preHotoCard(){
+  loadPreHoto();
+  const notes=S.preHotoNotes||[];
+  if(!notes.length) return '';
+  const hasHoto=!!S.hotoRec&&!S.hotoRec.ambiguous;
+  const state={pending:'Esperando el HOTO',not_in_hoto:'No está en el HOTO',review:'Revísalo'};
+  const rows=notes.map(n=>{
+    const canMigrate=hasHoto&&PRE_MIGRATABLE.includes(n.category);
+    return `<div style="padding:12px 0;border-top:0.5px solid var(--border)">
+      <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin-bottom:3px">${PRE_CAT_LABEL[n.category]||n.category} · ${state[n.status]||n.status}</div>
+      <div style="font-size:13px;color:var(--text);line-height:1.4">${escHtml(n.content)}</div>
+      ${n.reconcile_detail?`<div style="font-size:12px;color:var(--t2);margin-top:4px;line-height:1.4">${escHtml(n.reconcile_detail)}</div>`:''}
+      <div style="display:flex;gap:8px;margin-top:8px">
+        ${canMigrate?`<button onclick="resolvePreHoto('${escHtml(n.id)}','migrate')" style="${HOME_BTN}">Pasar al HOTO</button>`:''}
+        <button onclick="resolvePreHoto('${escHtml(n.id)}','dismiss')" style="${HOME_BTN}">Descartar</button>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div style="background:var(--surface);border-radius:12px;padding:6px 14px 4px;border:0.5px solid var(--border);margin-bottom:12px">
+    <div style="padding:10px 0 8px;font-size:14px;font-weight:600;color:var(--text)">Antes del HOTO · ${notes.length}</div>
+    <div style="font-size:12px;color:var(--t2);line-height:1.5;padding-bottom:8px">Lo que contaste de este avión antes de tener el HOTO oficial. No se pasa nada solo: tú decides.</div>
+    ${rows}
+  </div>`;
+}
+
 function hotoEntregaTab(){
   const rec=S.hotoRec;
   const lbl=(t)=>`<div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:14px 0 6px">${t}</div>`;
@@ -3220,6 +3275,7 @@ function hotoEntregaTab(){
   // Sin HOTO activo → crear uno nuevo, o importar uno recibido
   if(!rec){
     return `${importInput}
+    ${preHotoCard()}
     <div style="background:var(--surface);border-radius:12px;padding:20px;border:0.5px solid var(--border);margin-bottom:12px">
       <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">Nuevo HOTO</div>
       <div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px">${S.vjState.aircraft?`HOTO pendiente para ${S.vjState.aircraft} — todavía no hay ninguno registrado para este avión.`:'No hay ningún HOTO activo.'} Empieza uno para esta rotación. Se irá construyendo solo mientras trabajas; el día de la entrega solo exportas el PDF oficial.</div>
@@ -3265,6 +3321,7 @@ function hotoEntregaTab(){
   return `
   ${importInput}
   ${bannerNoPrior}
+  ${preHotoCard()}
   <div style="background:var(--surface);border-radius:12px;padding:16px;border:0.5px solid var(--border)">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><label style="font-size:10px;font-weight:600;color:var(--t3)">MATRÍCULA</label>
@@ -3865,6 +3922,7 @@ async function hotoImportChoose(mode){
     S._hotoSummaryLoaded=false; S.hotoSummaryRec=null;
     S.hotoImportAnalysis=null; S.hotoImportErr=null;
     _hotoImportBytes=null; _hotoImportFilename='';
+    loadPreHoto(true);
   }catch(e){
     S.hotoImportErr=e.message;
   }finally{
@@ -5249,7 +5307,7 @@ async function invCloseSession() {
 // Expose functions to global scope for inline onclick handlers (required in ES module context)
 Object.assign(window, {
   showPin, pinPress,
-  go, toggleMode, openAdd, openIsabel, forgetLearned, toggleNightItem, copyNightItem,
+  go, toggleMode, openAdd, openIsabel, forgetLearned, resolvePreHoto, toggleNightItem, copyNightItem,
   openLink, linkStart, linkVerify, toggleIsabelMsg, logHabitToday,
   focusDone, focusTomorrow, focusDiscard, focusNext, toggleBrandStrategy, toggleJetmiContext, toggleMarcaPropia,
   retryLoad, gymLogSession,

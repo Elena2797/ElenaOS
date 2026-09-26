@@ -6,7 +6,7 @@ Estado: fotografía operativa vigente
 ## Actualización — 2026-09-26, tarde (manda sobre las de abajo)
 
 - **Pre-HOTO + limpieza al entregar + reglas Outlook/Calendar:** `isabel-api` `7b0ede7` en `main` (1049/1049). Migración `hoto_migration_v6.sql` (`vj_pre_hoto_notes`) aplicada y verificada en Supabase. Entregar avión descarta las tareas del HOTO; Isabel ya no replica Outlook ni pone vuelos en Google Calendar (reglas en descripciones de tools). Detalle: `CHANGELOG.md` 2026-09-26, `modules/VISTAJET_HOTO.md`.
-- **Sin verificar:** que Railway terminó el despliegue y que Isabel ve las tools nuevas tras `openclaw mcp reload`; el pre-HOTO no se ha probado con un HOTO real ni tiene pantalla en la app.
+- **Pre-HOTO verificado (2026-09-26, tarde):** Railway `SUCCESS` en el commit `7b0ede7` y `/mcp/http` lista `hoto_pre_*` en producción; ida y vuelta real (HOTO del 9H-VCF exportado a PDF → importado con notas de prueba → contraste → migrar → limpieza) OK. **Sin commitear/desplegar aún:** contraste por *mejor* coincidencia (`similarity`/`bestMatch`, `jump seat`=`jumpseat`, mínimo 2 palabras) y **entregar avión descarta las notas pre-HOTO** (`pre_hoto_notes_discarded`), 1053/1053. **Sin verificar:** que Isabel ve las tools tras `openclaw mcp reload` (lo lanza ella) y su comportamiento con las reglas Outlook/Calendar; el pre-HOTO no tiene pantalla (falta diseño + política RLS de `vj_pre_hoto_notes`).
 
 ## Actualización — 2026-09-23, mediodía
 
