@@ -75,3 +75,10 @@ Estado: conocimiento vigente
 - **Coste de tools por turno:** las tools de hoy (`agenda_*`, `fresh_items_status`, `vistajet_leaving_aircraft`, `hoto_pre_*`) suman ~1.6 k tokens por turno; con DeepSeek son céntimos. La auditoría de tools (KNOWN_PROBLEMS "47 definiciones, usa 9") sigue abierta.
 - **`vistajet_get_status` ya lleva la agenda compacta** (hoy / volando / siguiente, con status): raíz de "¿tranquila con el ferry?" cuando ya había aterrizado.
 - **Un vuelo UPDATED** (misma ruta y día, otra hora) se actualiza sin duplicarse y `agenda_save` devuelve `changes`.
+
+## 9. Provisionales (26/09 noche, petición suya: "hoy no tengo ni HOTO ni inventario")
+
+- **Inventario provisional** (`core/inventoryProvisional.js`, botón en Inventario, tool `inventory_start_provisional`) y **HOTO provisional** (formulario "Empieza uno provisional", tool `hoto_start_provisional`, fusión no destructiva `hoto/provisional.js`). Detalle en CHANGELOG 2026-09-26 (15-17), `modules/VISTAJET_INVENTORY.md` y `modules/VISTAJET_HOTO.md`.
+- **Probar en su móvil (nada de esto se ha visto con sus datos):** Inventario → "Empezar inventario provisional" (debe salir con 345 ítems y el banner naranja); contar un Fresh Item; crear el HOTO provisional y ver que el Shopping recoge lo contado; luego subir un Excel/PDF oficial y comprobar que integra sin perder lo suyo (avisos al terminar).
+- **Tools nuevas que necesitan `openclaw mcp reload`:** `inventory_start_provisional`, `hoto_start_provisional`, `fresh_items_status`, `vistajet_leaving_aircraft`, `agenda_save/get`.
+- **Trampas:** el provisional se marca en `column_map.provisional` (jsonb) y `source:'provisional'` en sus ítems: no rehacer `column_map` sin conservar esa clave. Un HOTO es "provisional" mientras no tenga `imported_at` ni `source_filename`. La plantilla de Excel que exporta el provisional es la del inventario clonado (`9H-VCF sept23.xlsx`, comprobada en Storage).
