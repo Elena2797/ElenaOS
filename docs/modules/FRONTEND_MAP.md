@@ -39,3 +39,8 @@ Añadir una vista = registrarla en `views`, en `VJ_SUBVIEWS` (si es de VistaJet,
 - `S.pendingQuestions` solo se enseña en el dominio; Inicio sigue sin ellas (D59).
 - El Copiloto de entrega (`readiness.js`, reglas congeladas) no CUENTA las notas pre-HOTO ni la agenda en la confianza; sí las enseña como avisos "para repasar" (`services/deliveryNotices.js`).
 - La pantalla real no se ha visto con datos suyos sin PIN + código de Telegram: se comprobó con el HTML generado y datos de ejemplo.
+
+## Subsistemas inertes encontrados (26/09, segunda pasada)
+- **`alertas`:** la tabla está VACÍA y nada la escribe (solo se lee: señales de dominio, `areaHealth`, `generalHandler`, `globalContext`). Si algún día se llena, la app no tiene botón para cerrarlas (se quitó `dismissAlerta`, sin uso). Decidir con ella si el concepto sigue vivo (las alertas reales hoy son señales/Interventions/tareas) o se retira la lectura.
+- Funciones de servicio sin ningún uso, retiradas: `getMode`, `dismissAlerta`, `loadOpenSessionsForOtherAircraft` (los "restos de otro avión" ya salen como pregunta de Isabel en VistaJet), `updateItem` y `saveChat` del inventario (los conteos y el chat pasan por isabel-api; el servidor es el único que escribe conteos, por eso `freshSync` no tiene atajos).
+- Backend: 333 exports sin uso fuera de su archivo, casi todos "export innecesario"; solo 9 no los usa nadie (diagnóstico o scripts, p. ej. `pendingReceipts`, `listOpenFailures` que usa `npm run fallos`): no se tocan.

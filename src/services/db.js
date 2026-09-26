@@ -49,11 +49,6 @@ export async function loadAll() {
 
 // ─── Modo ─────────────────────────────────────────────────────────────────────
 
-export async function getMode() {
-  const { data } = await _db.from('life_context').select('*').order('created_at', { ascending: false }).limit(1);
-  return data?.[0] ?? null;
-}
-
 export async function setMode(mode) {
   const { data } = await _db.from('life_context').select('id').order('created_at', { ascending: false }).limit(1);
   if (data?.[0]) {
@@ -208,6 +203,3 @@ export async function createEvento({ project_id, area_id, origen, texto, herrami
 
 // ─── Alertas ──────────────────────────────────────────────────────────────────
 
-export async function dismissAlerta(id) {
-  await _db.from('alertas').update({ status: 'dismissed' }).eq('id', id);
-}

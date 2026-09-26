@@ -53,19 +53,6 @@ export async function loadActiveSession(tailNumber) {
   return data?.[0] ?? null;
 }
 
-// Sesiones abiertas que NO son del avión actual. No se cierran solas (cerrar es
-// irreversible): se muestran, para que dejen de ser un resto invisible. Espejo
-// de listOpenSessionsForOtherAircraft() en isabel-api (D34).
-export async function loadOpenSessionsForOtherAircraft(tailNumber) {
-  let q = _db.from('vj_inventory_sessions')
-    .select('id,aircraft_registration,session_date,created_at')
-    .eq('status', 'open');
-  if (tailNumber) q = q.neq('aircraft_registration', tailNumber);
-  const { data, error } = await q.order('created_at', { ascending: false });
-  if (error) throw error;
-  return data ?? [];
-}
-
 // Última sesión en cualquier estado (open o closed). Solo lectura — la usa
 // Aircraft Readiness para evaluar la evidencia de inventario.
 //
@@ -134,27 +121,7 @@ export async function loadSessionItems(session_id) {
   return data ?? [];
 }
 
-export async function updateItem(id, patch) {
-  const { error } = await _db.from('vj_inventory_session_items').update({
-    ...patch,
-    updated_at: new Date().toISOString(),
-  }).eq('id', id);
-  if (error) throw error;
-}
-
 // ─── Chat ────────────────────────────────────────────────────────────────────
-
-export async function saveChat({ session_id, role, content, intent, resolved_item_id }) {
-  const { data, error } = await _db.from('vj_inventory_chat').insert({
-    session_id,
-    role,
-    content,
-    intent: intent || null,
-    resolved_item_id: resolved_item_id || null,
-  }).select().single();
-  if (error) throw error;
-  return data;
-}
 
 export async function getChatHistory(session_id, limit = 20) {
   const { data, error } = await _db
