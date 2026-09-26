@@ -65,6 +65,7 @@ Estado: conocimiento vigente
 ## 7. Repaso del 26/09 noche (qué queda tras cerrar huecos)
 
 - **Cerrado:** pantalla Fresh Items, Inicio (más hoy / Urgente multi-dominio), guard O5, "Documentos de entrega" (ya existía), avisos de feedback con agenda, "¿recibiste el avión?", revistas a comprar. Ver CHANGELOG 2026-09-26 (repaso).
+- **Tareas espejo:** además de los feedbacks, foto del horario y Fresh Item, hay "Subir el HOTO del <matrícula>" y "Subir el inventario del <matrícula>" (rotación sin HOTO activo / sin sesión abierta); se cierran solas al existir.
 - **Sigue abierto:** ver en el móvil de ella las pantallas Agenda y Fresh Items con datos reales (tras el PIN pide el código de Telegram); probar `vistajet_leaving_aircraft` con ella; Isabel debe cumplir las reglas nuevas tras `openclaw mcp reload` (agenda_*, hoto_pre_*, magazines); primera noche del turno nocturno.
 - **Ojo Agenda:** si una foto trae horas UPDATED, Isabel debe pasar `replace_days` solo con el día entero a la vista; con la lista (cortada) nunca.
 
