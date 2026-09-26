@@ -16,7 +16,7 @@ VistaJet es, con diferencia, el dominio más maduro de LIFEOS: es el único con 
 | [VISTAJET_LAUNDRY_CLEANING.md](VISTAJET_LAUNDRY_CLEANING.md) | Laundry & Cleaning Form (lavandería, dishwashing, bed linen, dry cleaning, cristalería), export PDF oficial | implementado, en `main`, desplegado — con tools de chat (`laundry_*`) desde 2026-09-22 |
 | [VISTAJET_FRESH.md](VISTAJET_FRESH.md) | Fresh Items: conteo → Shopping del HOTO, pregunta diaria, pantalla | implementado (26/09) |
 | [VISTAJET_AGENDA.md](VISTAJET_AGENDA.md) | Agenda de vuelos desde fotos del horario, hora local, avisos ligados | implementado (26/09) |
-| [../modules/FRONTEND_MAP.md](FRONTEND_MAP.md) | Cómo se hablan las pantallas de LIFEOS (revisión del 26/09) | vigente |
+| [FRONTEND_MAP.md](FRONTEND_MAP.md) | Cómo se hablan las pantallas de LIFEOS (revisión del 26/09) | vigente |
 | [AIRCRAFT_READINESS.md](AIRCRAFT_READINESS.md) | Evaluación de "¿puedo entregar el avión ya?" | implementado |
 
 ## Los 3 documentos del avión — no confundirlos (2026-09-22)

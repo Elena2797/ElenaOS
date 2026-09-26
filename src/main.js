@@ -13,6 +13,7 @@ import { currentSleepEntry, formatSleepMinutes } from './services/sleepReadModel
 import { financeStateSummary } from './services/financeReadModel.js';
 import { buildLearnedModel, kindLabel, learnedMeta } from './services/knowledgeLearned.js';
 import { buildNightWorkModel } from './services/nightWork.js';
+import { dayLabel as agendaDayLabelFor, cardSummary as agendaCardModel, lastLegOf as agendaLastLegOf, todayRows as agendaTodayRows } from './services/agendaModel.js';
 // Definiciones del dominio HOTO: fuente única en src/hoto/model.js.
 // Se importan con los nombres VJ_* históricos para no tocar sus usos.
 import {
@@ -585,17 +586,9 @@ function todayBlock() {
     const today = /^hoy\b/i.test(r.when || '') || !/\d{4}|mañana|lunes|martes|miércoles|jueves|viernes|sábado|domingo/i.test(r.when || '');
     if (today) rows.push({ at: m ? m[1].padStart(5, '0') : '', label: r.when, text: r.text, icon: 'ti-bell' });
   });
-  // Sus vuelos de hoy (agenda de vuelos, hora LOCAL del aeropuerto). Se ordenan por la hora real de Madrid,
-  // que es la del resto del día; lo que se enseña es la hora local.
+  // Sus vuelos de hoy (agenda de vuelos, hora LOCAL; ordenados por la hora real de Madrid): services/agendaModel.js
   if (linked) loadAgenda();
-  const todayDay = (S.agenda || []).find(d => d.day === madridDate(0));
-  (todayDay ? todayDay.entries : []).forEach(e => {
-    if (e.kind === 'rot') { rows.push({ at: '', sortAt: '', label: 'ROT', text: 'ROT · día de rotación, aún sin vuelos definidos', icon: 'ti-plane-inflight' }); return; }
-    const madrid = new Date(e.dep_utc).toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' });
-    const pax = e.pax == null ? '' : ' · ' + e.pax + ' pax';
-    rows.push({ at: e.dep_local, sortAt: madrid, label: e.dep_local, icon: 'ti-plane-departure',
-      text: e.dep_icao + ' → ' + e.arr_icao + ' · ' + e.dep_local + (e.arr_local ? '–' + e.arr_local : '') + pax + ' (hora local)' });
-  });
+  agendaTodayRows(S.agenda, madridDate(0)).forEach(r => rows.push(r));
   rows.sort((x, y) => (x.sortAt ?? x.at).localeCompare(y.sortAt ?? y.at));
   let dayHtml = '';
   if (rows.length) {
@@ -3737,33 +3730,20 @@ async function loadAgenda(force){
   S._agendaAt=Date.now(); S._agendaLoading=false;
   if(S.view==='vj_agenda'||S.view==='area'||S.view==='home') render();
 }
-// Resumen de la tarjeta "Agenda de vuelos" en VistaJet: el siguiente vuelo (hora local) o qué falta.
+// Resumen de la tarjeta "Agenda de vuelos" en VistaJet: el siguiente vuelo (hora local) o qué falta (lógica en services/agendaModel.js).
 function agendaCardSummary(){
-  if(!appClient().isLinked()) return 'Tus vuelos y días de rotación, en hora local';
-  loadAgenda();
-  const days=S.agenda;
-  if(!days) return 'Tus vuelos y días de rotación, en hora local';
-  const today=madridDate(0);
-  const next=days.filter(d=>d.day>=today).flatMap(d=>d.entries).find(e=>e.kind==='flight'&&e.status!=='landed');
-  if(next) return 'Siguiente: '+escHtml(next.dep_icao)+' → '+escHtml(next.arr_icao)+' · '+escHtml(next.dep_local)+' (hora local)';
-  return days.some(d=>d.day>=today)?'Días de rotación, sin vuelos definidos':'Sin vuelos guardados: mándale la foto a Isabel';
-}
-function agendaLastLeg(tail){
-  const legs=(S.agenda||[]).flatMap(d=>d.entries).filter(e=>e.kind==='flight'&&e.tail_number===tail&&e.arr_icao).sort((a,b)=>String(a.dep_utc).localeCompare(String(b.dep_utc)));
-  return legs.length?legs[legs.length-1]:null;
+  if(appClient().isLinked()) loadAgenda();
+  const r=agendaCardModel({days:S.agenda,today:madridDate(0),linked:appClient().isLinked()});
+  if(typeof r==='string') return r;
+  return 'Siguiente: '+escHtml(r.next.dep_icao)+' → '+escHtml(r.next.arr_icao)+' · '+escHtml(r.next.dep_local)+' (hora local)';
 }
 function agendaIcaoHint(rec){
   if(!rec||String(rec.icao||'').trim()) return '';
   loadAgenda();
-  const last=agendaLastLeg(rec.tail_number||S.vjState.aircraft);
+  const last=agendaLastLegOf(S.agenda,rec.tail_number||S.vjState.aircraft);
   return last?'<div style="font-size:10px;color:var(--t3);margin-top:3px">Tu último vuelo acaba en '+escHtml(last.arr_icao)+'</div>':'';
 }
-function agendaDayLabel(iso){
-  const d=new Date(iso+'T12:00:00Z');
-  const t=d.toLocaleDateString('es-ES',{timeZone:'UTC',weekday:'short',day:'numeric',month:'short'}).replace(/\./g,'');
-  const tag=iso===madridDate(0)?' · hoy':iso===madridDate(1)?' · mañana':'';
-  return t.charAt(0).toUpperCase()+t.slice(1)+tag;
-}
+function agendaDayLabel(iso){ return agendaDayLabelFor(iso,madridDate(0),madridDate(1)); }
 function agendaEntryHtml(e){
   if(e.kind==='rot') return `<div style="background:var(--bg);border:0.5px dashed var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--t2)"><b style="color:var(--text)">ROT</b> · día de rotación, aún sin vuelos definidos</div>`;
   const chip=(t)=>`<span style="font-size:10px;font-weight:600;color:${t==='FERRY'?'#854F0B':'#4B5563'};background:${t==='FERRY'?'#FAEEDA':'#F1F1F1'};border-radius:999px;padding:2px 8px;margin-left:4px">${escHtml(t)}</span>`;
