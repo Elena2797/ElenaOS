@@ -5,6 +5,18 @@
 let _db = null;
 export function setClient(client) { _db = client; }
 
+// La app escribe el HOTO directo en la base, así que los disparadores del servidor (análisis D69, Fresh Items → Shopping) no
+// corrían con esas ediciones. Cada escritura avisa aquí; main.js lo agrupa y llama a POST /v1/app/hoto/refresh.
+let _onWrite = () => {};
+export function setOnWrite(fn) { _onWrite = typeof fn === 'function' ? fn : () => {}; }
+/** ¿Esta edición puede cambiar lo que el análisis ve? Las tareas diarias (checkboxes) no. */
+export function writeMatters(patch) {
+  if (!patch) return true;
+  const keys = Object.keys(patch).filter((k) => k !== 'updated_at');
+  return keys.length === 0 || keys.some((k) => k !== 'daily_duties');
+}
+const notify = (kind, patch) => { try { _onWrite({ kind, patch }); } catch { /* el aviso nunca rompe una escritura */ } };
+
 // ── Record activo ──────────────────────────────────────────────────────────
 //
 // El HOTO "actual" es el que corresponde al avión operativo actual
@@ -55,6 +67,7 @@ export async function createHoto(fields = {}) {
     .select()
     .single();
   if (error) throw error;
+  notify('create');
   return data;
 }
 
@@ -64,6 +77,7 @@ export async function updateHoto(id, patch) {
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq('id', id);
   if (error) throw error;
+  if (writeMatters(patch)) notify('update', patch);
 }
 
 // ── Items: defects / comments / offload ──────────────────────────────────────
@@ -85,12 +99,14 @@ export async function addItem(hoto_id, section, content) {
     .select()
     .single();
   if (error) throw error;
+  notify('add_item');
   return data;
 }
 
 export async function deleteItem(id) {
   const { error } = await _db.from('vj_hoto_items').delete().eq('id', id);
   if (error) throw error;
+  notify('delete_item');
 }
 
 // Borra TODAS las líneas de una sección de UN hoto (reset por sección).

@@ -180,6 +180,7 @@ async function initApp() {
   dbSvc.setClient(db);
   invSvc.setClient(db);
   hotoSvc.setClient(db);
+  hotoSvc.setOnWrite(scheduleHotoRefresh);
   llcSvc.setClient(db);
   // Login real (D62): la base solo se abre con una sesión de su usuario, y esa
   // sesión sale del token de app (código de Telegram). Sin ella no se carga nada.
@@ -311,6 +312,18 @@ function habitsStreakRow({ actions = false } = {}) {
 let appLinkClient = null;
 function appClient() {
   return appLinkClient || (appLinkClient = createAppLinkClient({ base: ISABEL_API }));
+}
+
+// Tras EDITAR el HOTO desde la app (que escribe directo en la base) el servidor debe re-analizarlo (tareas D69) y pasar al
+// Shopping los Fresh Items ya contados: esos disparadores solo corrían con Isabel y con el import. Se agrupan las ediciones
+// (2,5 s) y al terminar se recargan las tareas para que las nuevas salgan en Inicio.
+let _hotoRefreshTimer = null;
+function scheduleHotoRefresh() {
+  if (!appClient().isLinked() || !S.vjState.aircraft) return;
+  clearTimeout(_hotoRefreshTimer);
+  _hotoRefreshTimer = setTimeout(async () => {
+    try { await appClient().post('/v1/app/hoto/refresh', { tail: S.vjState.aircraft }); await reload(); render(); } catch (e) { /* silencioso: la edición ya está guardada */ }
+  }, 2500);
 }
 
 const HOME_CARD = 'background:var(--surface);border-radius:14px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)';
