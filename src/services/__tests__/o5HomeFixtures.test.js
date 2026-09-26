@@ -37,8 +37,9 @@ const MAIN_URL = new URL('../../main.js', import.meta.url);
 // página vieja de isabel-api). Home no cambia. Sin O5.
 // Re-aprobado el 2026-09-26 (noche), a conciencia: el checkpoint llevaba rojo desde antes de D71. Desde entonces main.js
 // ganó la pantalla Agenda de vuelos, la pantalla Fresh Items (ya no el "próximamente"), la tarjeta Urgente con
-// varios dominios y "más hoy" sin contar lo que no tiene fecha. Comprobado: main.js no importa ningún fixture O5.
-const MAIN_CHECKPOINT_SHA256 = '9A3074E4319E571F773B395476A1FC52CA83B85C5F031EDB2224861A3F3A6FA3';
+// varios dominios y "más hoy" sin contar lo que no tiene fecha; luego vuelos en "Tu día", preguntas de Isabel en su dominio y enlaces
+// entre agenda, HOTO y Fresh Items. Comprobado: main.js no importa ningún fixture O5.
+const MAIN_CHECKPOINT_SHA256 = 'AAFA8EAFA109D769BDA99FB7A04C997370A2C29D9734CB4C7E9C02E3871110EB';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

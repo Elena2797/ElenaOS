@@ -585,15 +585,27 @@ function todayBlock() {
     const today = /^hoy\b/i.test(r.when || '') || !/\d{4}|mañana|lunes|martes|miércoles|jueves|viernes|sábado|domingo/i.test(r.when || '');
     if (today) rows.push({ at: m ? m[1].padStart(5, '0') : '', label: r.when, text: r.text, icon: 'ti-bell' });
   });
-  rows.sort((x, y) => x.at.localeCompare(y.at));
+  // Sus vuelos de hoy (agenda de vuelos, hora LOCAL del aeropuerto). Se ordenan por la hora real de Madrid,
+  // que es la del resto del día; lo que se enseña es la hora local.
+  if (linked) loadAgenda();
+  const todayDay = (S.agenda || []).find(d => d.day === madridDate(0));
+  (todayDay ? todayDay.entries : []).forEach(e => {
+    if (e.kind === 'rot') { rows.push({ at: '', sortAt: '', label: 'ROT', text: 'ROT · día de rotación, aún sin vuelos definidos', icon: 'ti-plane-inflight' }); return; }
+    const madrid = new Date(e.dep_utc).toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' });
+    const pax = e.pax == null ? '' : ' · ' + e.pax + ' pax';
+    rows.push({ at: e.dep_local, sortAt: madrid, label: e.dep_local, icon: 'ti-plane-departure',
+      text: e.dep_icao + ' → ' + e.arr_icao + ' · ' + e.dep_local + (e.arr_local ? '–' + e.arr_local : '') + pax + ' (hora local)' });
+  });
+  rows.sort((x, y) => (x.sortAt ?? x.at).localeCompare(y.sortAt ?? y.at));
   let dayHtml = '';
   if (rows.length) {
     let marked = false;
     const line = `<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="font-size:11px;font-weight:600;color:#185FA5;width:44px">ahora</span><span style="flex:1;border-top:1.5px solid #185FA5"></span></div>`;
     dayHtml = rows.map(r => {
       let pre = '';
-      if (!marked && r.at && r.at > hm) { pre = line; marked = true; }
-      const past = r.at && r.at <= hm;
+      const t = r.sortAt ?? r.at;
+      if (!marked && t && t > hm) { pre = line; marked = true; }
+      const past = t && t <= hm;
       return `${pre}<div style="display:flex;gap:8px;padding:5px 0;font-size:13px;line-height:1.4;${past ? 'opacity:.55' : ''}">
         <span style="width:44px;flex-shrink:0;color:var(--t3);font-size:12px">${escHtml(r.at || '·')}</span>
         <i class="ti ${r.icon}" style="font-size:14px;color:var(--t3);margin-top:1px"></i>
@@ -601,7 +613,7 @@ function todayBlock() {
       </div>`;
     }).join('') + (marked ? '' : line);
   } else if (linked && ag && ag.ok) {
-    dayHtml = `<div style="font-size:13px;color:var(--t2)">Agenda libre hoy.</div>`;
+    dayHtml = `<div style="font-size:13px;color:var(--t2)">${(S.vjState && S.vjState.status === 'rotacion') ? 'Nada apuntado hoy. Si vuelas, mándale a Isabel la foto de tu horario.' : 'Agenda libre hoy.'}</div>`;
   } else if (linked && ag && !ag.ok) {
     dayHtml = `<div style="font-size:13px;color:var(--t2)">${ag.error === 'google_reauth_required' ? 'Google está desconectado: no puedo leer tu agenda.' : 'No pude leer tu agenda ahora mismo.'}</div>`;
   } else if (!linked) {
@@ -897,14 +909,15 @@ function escHtml(v) {
   return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function pendingQuestionsCard() {
-  const qs = S.pendingQuestions || [];
+// Las preguntas que Isabel deja "esperando en la app" (push:false: restos de otro avión, feedback del avión pendiente)
+// llevaban sin verse desde que D59 las quitó de Inicio. Salen en SU dominio: ni en Inicio ni invisibles.
+function domainQuestionsCard(domainName) {
+  const qs = (S.pendingQuestions || []).filter(q => q.domain === domainName);
   if (!qs.length) return '';
   const rows = qs.map((q, i) => {
     const sep = i < qs.length - 1 ? 'padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--border)' : '';
     return '<div style="' + sep + '">' +
       '<div style="font-size:14px;color:var(--text);line-height:1.55">' + escHtml(q.text) + '</div>' +
-      '<div style="font-size:11px;color:var(--t3);margin-top:4px">' + escHtml(q.domain) + '</div>' +
       '</div>';
   }).join('');
   return '<div style="background:var(--surface);border-radius:14px;padding:16px;margin-bottom:10px;border:0.5px solid var(--border)">' +
@@ -2107,7 +2120,7 @@ function areaView() {
       <span style="font-size:20px">🗓️</span>
       <div>
         <div style="font-size:13px;font-weight:600;color:var(--text)">Agenda de vuelos</div>
-        <div style="font-size:11px;color:var(--t2);margin-top:2px">Tus vuelos y días de rotación, en hora local</div>
+        <div style="font-size:11px;color:var(--t2);margin-top:2px">${agendaCardSummary()}</div>
       </div>
     </button>
     <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:8px 0 8px">Herramientas de la rotación</div>
@@ -2948,6 +2961,7 @@ function areaView() {
     <h2>${a.name}</h2>
   </div>
   ${domainIntroHtml}
+  ${domainQuestionsCard(a.name)}
   ${nightWorkCard(a)}
   ${isVJ?vjView():''}
   ${isJETMI?jetmiView():''}
@@ -3347,7 +3361,7 @@ function hotoEntregaTab(){
       <div><label style="font-size:10px;font-weight:600;color:var(--t3)">MATRÍCULA</label>
         <input value="${v(rec.tail_number)}" onchange="hotoField('tail_number',this.value)" style="${fieldStyle};margin-top:4px;text-transform:uppercase"></div>
       <div><label style="font-size:10px;font-weight:600;color:var(--t3)">ICAO</label>
-        <input value="${v(rec.icao)}" onchange="hotoField('icao',this.value)" style="${fieldStyle};margin-top:4px;text-transform:uppercase"></div>
+        <input value="${v(rec.icao)}" onchange="hotoField('icao',this.value)" style="${fieldStyle};margin-top:4px;text-transform:uppercase">${agendaIcaoHint(rec)}</div>
       <div><label style="font-size:10px;font-weight:600;color:var(--t3)">ESTADO</label>
         <select onchange="hotoField('aircraft_status',this.value)" style="${fieldStyle};margin-top:4px">${['Good','Bad','Requires Attention'].map(o=>opt(o,rec.aircraft_status)).join('')}</select></div>
       <div><label style="font-size:10px;font-weight:600;color:var(--t3)">PATTERN</label>
@@ -3685,7 +3699,7 @@ function vjLandingCleaningView(){
       <div><label style="font-size:10px;font-weight:600;color:var(--t3)">AIRCRAFT REGISTRATION</label>
         <input value="${v(rec.tail_number)}" onchange="llcField('tail_number',this.value)" style="${fieldStyle};margin-top:4px;text-transform:uppercase"></div>
       <div><label style="font-size:10px;font-weight:600;color:var(--t3)">ICAO</label>
-        <input value="${v(rec.icao)}" onchange="llcField('icao',this.value)" style="${fieldStyle};margin-top:4px;text-transform:uppercase"></div>
+        <input value="${v(rec.icao)}" onchange="llcField('icao',this.value)" style="${fieldStyle};margin-top:4px;text-transform:uppercase">${agendaIcaoHint(rec)}</div>
       <div><label style="font-size:10px;font-weight:600;color:var(--t3)">DATE</label>
         <input value="${v(rec.service_date)}" onchange="llcField('service_date',this.value)" placeholder="25-May-26" style="${fieldStyle};margin-top:4px"></div>
       <div><label style="font-size:10px;font-weight:600;color:var(--t3)">EXPECTED DATE OF DEPARTURE</label>
@@ -3721,7 +3735,28 @@ async function loadAgenda(force){
     S.agenda=r&&r.ok?r.days:[]; S._agendaError=!(r&&r.ok);
   }catch(e){ S.agenda=[]; S._agendaError=true; }
   S._agendaAt=Date.now(); S._agendaLoading=false;
-  if(S.view==='vj_agenda'||S.view==='area') render();
+  if(S.view==='vj_agenda'||S.view==='area'||S.view==='home') render();
+}
+// Resumen de la tarjeta "Agenda de vuelos" en VistaJet: el siguiente vuelo (hora local) o qué falta.
+function agendaCardSummary(){
+  if(!appClient().isLinked()) return 'Tus vuelos y días de rotación, en hora local';
+  loadAgenda();
+  const days=S.agenda;
+  if(!days) return 'Tus vuelos y días de rotación, en hora local';
+  const today=madridDate(0);
+  const next=days.filter(d=>d.day>=today).flatMap(d=>d.entries).find(e=>e.kind==='flight'&&e.status!=='landed');
+  if(next) return 'Siguiente: '+escHtml(next.dep_icao)+' → '+escHtml(next.arr_icao)+' · '+escHtml(next.dep_local)+' (hora local)';
+  return days.some(d=>d.day>=today)?'Días de rotación, sin vuelos definidos':'Sin vuelos guardados: mándale la foto a Isabel';
+}
+function agendaLastLeg(tail){
+  const legs=(S.agenda||[]).flatMap(d=>d.entries).filter(e=>e.kind==='flight'&&e.tail_number===tail&&e.arr_icao).sort((a,b)=>String(a.dep_utc).localeCompare(String(b.dep_utc)));
+  return legs.length?legs[legs.length-1]:null;
+}
+function agendaIcaoHint(rec){
+  if(!rec||String(rec.icao||'').trim()) return '';
+  loadAgenda();
+  const last=agendaLastLeg(rec.tail_number||S.vjState.aircraft);
+  return last?'<div style="font-size:10px;color:var(--t3);margin-top:3px">Tu último vuelo acaba en '+escHtml(last.arr_icao)+'</div>':'';
 }
 function agendaDayLabel(iso){
   const d=new Date(iso+'T12:00:00Z');
@@ -3767,8 +3802,8 @@ async function loadFresh(force){
   S._freshLoading=true; S._freshTail=tail;
   try{
     const r=await appClient().get('/v1/app/fresh?tail='+encodeURIComponent(tail));
-    S.fresh=r&&r.ok?r:null; S._freshError=!(r&&r.ok);
-  }catch(e){ S.fresh=null; S._freshError=true; }
+    S.fresh=r&&r.ok?r:null;
+  }catch(e){ S.fresh=null; }
   S._freshAt=Date.now(); S._freshLoading=false;
   if(S.view==='vj_fresh'||S.view==='area') render();
 }
@@ -3813,6 +3848,9 @@ function vjFreshView(){
     +(!f.has_hoto?`<div style="font-size:12px;color:var(--t2);margin-bottom:10px">${f.ambiguous_hoto?'Hay más de un HOTO activo: no se elige solo.':'Todavía no hay HOTO de este avión.'}</div>`:'')
     +`<div style="display:grid;gap:8px;margin-bottom:12px">${f.items.map(i=>freshRowHtml(i,i.key===f.today)).join('')}</div>`
     +`<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-bottom:12px">Cuenta hablando con Isabel: "tengo 2 limas", "tiré 1 apio", "pedí 3 limones". El Shopping del HOTO se actualiza solo.</div>`
+    +`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <button onclick="go('vj_inventario')" style="padding:12px;border:0.5px solid var(--border);background:var(--surface);color:var(--text);border-radius:12px;font-size:13px;font-weight:600;cursor:pointer">Abrir inventario</button>
+      <button onclick="go('vj_hoto')" style="padding:12px;border:0.5px solid var(--border);background:var(--surface);color:var(--text);border-radius:12px;font-size:13px;font-weight:600;cursor:pointer">Abrir HOTO</button></div>`
     +`<button onclick="openIsabel()" style="width:100%;padding:14px;border:none;background:var(--text);color:#fff;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer">Contar con Isabel →</button>`;
 }
 
@@ -4772,18 +4810,6 @@ function resetVjBag() {
   saveVjState({bag_checks:{}});
 }
 
-function toggleVjRecv(key) {
-  const checks=JSON.parse(localStorage.getItem('vj_recv_checks')||'{}');
-  checks[key]=!checks[key];
-  localStorage.setItem('vj_recv_checks',JSON.stringify(checks));
-  render();
-}
-
-function resetVjRecv() {
-  localStorage.removeItem('vj_recv_checks');
-  render();
-}
-
 async function setSueno(h) {
   const a=S.areas.find(x=>x.name==='Vida Personal');
   if(!a) return;
@@ -5437,7 +5463,7 @@ Object.assign(window, {
   openIngresoModal, openAddIngreso, saveAddIngreso,
   openAddTx, txTypeChanged, saveNewTx,
   openEditTx, saveEditTx, deleteTx,
-  finPrev, finNext,
+  finPrev, finNext, setFinanceMonth,
   goProject, goAvanzar,
   openProjectAdd, saveNewProject,
   openEditNextAction, saveNextAction,
