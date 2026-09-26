@@ -37,5 +37,5 @@ Añadir una vista = registrarla en `views`, en `VJ_SUBVIEWS` (si es de VistaJet,
 ## Abierto (no roto, decisión de producto)
 - Claves de localStorage leídas y nunca escritas: `life_budgets`, `vj_bag_templates` (ver KNOWN_PROBLEMS).
 - `S.pendingQuestions` solo se enseña en el dominio; Inicio sigue sin ellas (D59).
-- El Copiloto de entrega (`readiness.js`, reglas congeladas) no cuenta las notas pre-HOTO ni la agenda.
+- El Copiloto de entrega (`readiness.js`, reglas congeladas) no CUENTA las notas pre-HOTO ni la agenda en la confianza; sí las enseña como avisos "para repasar" (`services/deliveryNotices.js`).
 - La pantalla real no se ha visto con datos suyos sin PIN + código de Telegram: se comprobó con el HTML generado y datos de ejemplo.

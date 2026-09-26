@@ -13,6 +13,7 @@ import { currentSleepEntry, formatSleepMinutes } from './services/sleepReadModel
 import { financeStateSummary } from './services/financeReadModel.js';
 import { buildLearnedModel, kindLabel, learnedMeta } from './services/knowledgeLearned.js';
 import { buildNightWorkModel } from './services/nightWork.js';
+import { reviewNotices } from './services/deliveryNotices.js';
 import { dayLabel as agendaDayLabelFor, cardSummary as agendaCardModel, lastLegOf as agendaLastLegOf, todayRows as agendaTodayRows } from './services/agendaModel.js';
 // Definiciones del dominio HOTO: fuente única en src/hoto/model.js.
 // Se importan con los nombres VJ_* históricos para no tocar sus usos.
@@ -2016,6 +2017,7 @@ function areaView() {
     // ── Tarjeta Isabel = Aircraft Readiness: evaluación desde datos reales ──
     // La UI solo renderiza el objeto de services/readiness.js; sin lógica aquí.
     const R=S.vjReadiness;
+    if(vj.aircraft&&status==='rotacion'){ loadPreHoto(); loadFresh(); }   // avisos "para repasar" del Copiloto
     const readiCard=(()=>{
       const head=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3)">Copiloto de entrega</div>
@@ -2033,7 +2035,7 @@ function areaView() {
       const lvlIcon={ok:'✓',warn:'⚠',block:'✗',missing:'?'};
       const lvlColor={ok:'#0F6E56',warn:'#B87A00',block:'#A33636',missing:'#9CA3AF'};
       const detail=!S.readiDetail?'':`<div style="margin-top:10px;border-top:0.5px solid var(--border);padding-top:8px">
-        ${R.modules.map(m=>`<div style="margin-bottom:8px">
+        ${R.modules.concat(reviewNotices({preHotoNotes:S.preHotoNotes,fresh:S.fresh})||[]).map(m=>`<div style="margin-bottom:8px">
           <div style="font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--t3);margin-bottom:3px">${m.name}</div>
           ${m.lines.map(l=>`<div style="display:flex;gap:7px;font-size:12px;line-height:1.5;color:var(--t2)"><span style="color:${lvlColor[l.level]};font-weight:700;flex-shrink:0">${lvlIcon[l.level]}</span><span>${l.text}</span></div>`).join('')}
         </div>`).join('')}
@@ -3216,7 +3218,7 @@ async function loadPreHoto(force){
     S.preHotoNotes=r&&r.ok?r.notes:[];
   }catch(e){ S.preHotoNotes=[]; }
   S._preHotoLoading=false;
-  if(S.view==='vj_hoto') render();
+  if(S.view==='vj_hoto'||S.view==='area') render();
 }
 async function resolvePreHoto(id,action){
   const note=(S.preHotoNotes||[]).find(n=>n.id===id);
