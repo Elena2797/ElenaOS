@@ -39,7 +39,7 @@ const MAIN_URL = new URL('../../main.js', import.meta.url);
 // ganó la pantalla Agenda de vuelos, la pantalla Fresh Items (ya no el "próximamente"), la tarjeta Urgente con
 // varios dominios y "más hoy" sin contar lo que no tiene fecha; luego vuelos en "Tu día", preguntas de Isabel en su dominio y enlaces
 // entre agenda, HOTO y Fresh Items; luego la lógica de la agenda pasó a services/agendaModel.js (con tests) y el Copiloto ganó avisos "para repasar" (services/deliveryNotices.js); al volver a la app se relee la agenda/Fresh Items/pre-HOTO y Tu día no duplica vuelos del Calendar; inventario y HOTO provisionales (services/inventoryProvisional.js). Comprobado: main.js no importa ningún fixture O5.
-const MAIN_CHECKPOINT_SHA256 = '59BE829DBEA8F7BA969293D8BB357F20C8F72C8A50A298CD1A022F64B7BE6B25';
+const MAIN_CHECKPOINT_SHA256 = 'BFDD000E4745251B42C400462E9A9DE5355DB8AC2452684CFFE34739BDAF73FD';
 
 describe('O5 adaptive Home fixtures remain presentational and disconnected', () => {
   test('only-input fixture contains no empty visual categories', () => {

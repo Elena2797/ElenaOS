@@ -5535,7 +5535,7 @@ const surfaceRevalidator = createSurfaceRevalidator({
       || VJ_SUBVIEWS.includes(S.view);
     // Si Isabel abrió un inventario/HOTO (provisional o no) mientras la app estaba en segundo plano, la pantalla que decía
     // "no hay" lo relee al volver. Lo que ya tiene datos no se toca (no se pierde lo que estés escribiendo).
-    if (inVJ) { if (!S.invSession) S._invLoaded = false; if (!S.hotoRec) S._hotoLoaded = false; }
+    if (inVJ) { if (!S.invSession) S._invLoaded = false; if (!S.hotoRec) S._hotoLoaded = false; S._readiLoaded = false; }   // y el Copiloto se recalcula (sigue enseñando el último veredicto mientras)
     if (inVJ) await refreshVjContext();
     if (S.view === 'aprendido') await loadLearned();
   },
