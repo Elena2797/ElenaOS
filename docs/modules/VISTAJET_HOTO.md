@@ -72,3 +72,11 @@ Conversación con Isabel durante la rotación sobre el propio HOTO (Isabel ya le
 
 # Próximo hito
 La reconstrucción por fases hacia "datos propios vs. prestados" (D6) sigue pendiente de que la usuaria decida retomarla — sin cambios. El HOTO real de D-AFBS ya se importó y está en uso (Generación 2 al cierre de esa sesión, D16/D17) — sin cambios adicionales de modelo previstos salvo que aparezca algo que `fieldMap.js` no cubra. **Pendiente inmediato (D69):** confirmar con Estefanía que el análisis automático crea tareas de verdad la próxima vez que edite o importe el HOTO activo — solo probado con Supabase falso en memoria, nunca contra producción.
+
+# HOTO PROVISIONAL (2026-09-26)
+
+Sin PDF oficial ella puede empezar un HOTO a mano ("Empieza uno provisional"): se reconoce por no tener `imported_at` ni
+`source_filename`. Cuando llega el PDF y lo importa con **Continuar**, `mergeProvisional` (`hoto/provisional.js`) conserva lo suyo
+y solo rellena lo vacío (sin pisar Shopping/Fresh Items, ICAO, cabecera, fechas de Cabin Care más recientes, tareas diarias;
+líneas repetidas no se duplican); `applyHotoImport` devuelve `provisional: {integrated, kept}`. Un HOTO ya importado sigue con
+`mergeImportIntoExisting` (el PDF autoritativo). Las notas pre-HOTO (`hoto_pre_*`) siguen siendo para lo que cuenta sin HOTO alguno.

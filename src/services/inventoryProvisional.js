@@ -31,3 +31,12 @@ export function integrationMessage(r) {
   if (un.length) t += ` No los encontré en el oficial: ${un.slice(0, 8).join(', ')}${un.length > 8 ? '…' : ''}.`;
   return t;
 }
+
+/** Tras importar el PDF oficial sobre un HOTO provisional: qué pasó (lo suyo manda; el PDF rellenó lo vacío). Null si no aplica. */
+export function hotoIntegrationMessage(provisional) {
+  if (!provisional || !provisional.integrated) return null;
+  const kept = provisional.kept || [];
+  let t = 'HOTO oficial listo. Mantuve lo que ya tenías puesto y el PDF rellenó solo lo que estaba vacío.';
+  if (kept.length) t += ` En ${kept.length} ${kept.length === 1 ? 'cosa era distinto' : 'cosas eran distintas'} y me quedé con lo tuyo: ${kept.slice(0, 6).join('; ')}${kept.length > 6 ? '…' : ''}.`;
+  return t;
+}

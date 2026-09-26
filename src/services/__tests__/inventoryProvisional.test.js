@@ -27,3 +27,13 @@ test('integración: cuenta lo integrado, lista lo que no cuadró y avisa si fall
   const many = Array.from({ length: 10 }, (_, i) => ({ description: 'X' + i }));
   assert.match(integrationMessage({ ok: true, integrated: 0, unmatched: many }), /X7…\./);
 });
+
+import { hotoIntegrationMessage } from '../inventoryProvisional.js';
+test('HOTO provisional + PDF oficial: mensaje claro; sin integración no hay mensaje', () => {
+  assert.equal(hotoIntegrationMessage(null), null);
+  assert.equal(hotoIntegrationMessage({ integrated: false }), null);
+  assert.equal(hotoIntegrationMessage({ integrated: true, kept: [] }), 'HOTO oficial listo. Mantuve lo que ya tenías puesto y el PDF rellenó solo lo que estaba vacío.');
+  const m = hotoIntegrationMessage({ integrated: true, kept: ['ICAO: tuyo "LIPX", el PDF "EDSB"'] });
+  assert.match(m, /En 1 cosa era distinto y me quedé con lo tuyo: ICAO/);
+  assert.match(hotoIntegrationMessage({ integrated: true, kept: ['a', 'b'] }), /En 2 cosas eran distintas/);
+});

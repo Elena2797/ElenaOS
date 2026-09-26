@@ -14,7 +14,7 @@ import { financeStateSummary } from './services/financeReadModel.js';
 import { buildLearnedModel, kindLabel, learnedMeta } from './services/knowledgeLearned.js';
 import { buildNightWorkModel } from './services/nightWork.js';
 import { reviewNotices } from './services/deliveryNotices.js';
-import { isProvisional as invIsProvisional, provisionalFrom as invProvisionalFrom, startResult as invStartResult, integrationMessage as invIntegrationMessage } from './services/inventoryProvisional.js';
+import { isProvisional as invIsProvisional, provisionalFrom as invProvisionalFrom, startResult as invStartResult, integrationMessage as invIntegrationMessage, hotoIntegrationMessage as invHotoIntegrationMessage } from './services/inventoryProvisional.js';
 import { dayLabel as agendaDayLabelFor, cardSummary as agendaCardModel, lastLegOf as agendaLastLegOf, todayRows as agendaTodayRows, looksLikeAgendaFlight } from './services/agendaModel.js';
 // Definiciones del dominio HOTO: fuente única en src/hoto/model.js.
 // Se importan con los nombres VJ_* históricos para no tocar sus usos.
@@ -3309,8 +3309,8 @@ function hotoEntregaTab(){
     return `${importInput}
     ${preHotoCard()}
     <div style="background:var(--surface);border-radius:12px;padding:20px;border:0.5px solid var(--border);margin-bottom:12px">
-      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">Nuevo HOTO</div>
-      <div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px">${S.vjState.aircraft?`HOTO pendiente para ${S.vjState.aircraft} — todavía no hay ninguno registrado para este avión.`:'No hay ningún HOTO activo.'} Empieza uno para esta rotación. Se irá construyendo solo mientras trabajas; el día de la entrega solo exportas el PDF oficial.</div>
+      <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">¿Aún no tienes el HOTO? Empieza uno provisional</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.5;margin-bottom:14px">${S.vjState.aircraft?`HOTO pendiente para ${S.vjState.aircraft} — todavía no hay ninguno registrado para este avión.`:'No hay ningún HOTO activo.'} Empieza uno para esta rotación y ve rellenándolo (defectos, Fresh Items, fechas de Cabin Care…). Si llega el PDF oficial, súbelo aquí y elige «Continuar»: <b>lo que ya pusiste se queda</b> y el PDF solo rellena lo vacío. Si no llega, este es tu HOTO y el día de la entrega exportas el PDF.</div>
       <label style="font-size:11px;font-weight:600;color:var(--t2)">Matrícula</label>
       <input id="hoto-new-tail" value="${S.vjState.aircraft||''}" placeholder="9H-JHK" style="${fieldStyle};margin:4px 0 10px;text-transform:uppercase">
       <label style="font-size:11px;font-weight:600;color:var(--t2)">ICAO destino</label>
@@ -4082,6 +4082,8 @@ async function hotoImportChoose(mode){
     S.hotoImportAnalysis=null; S.hotoImportErr=null;
     _hotoImportBytes=null; _hotoImportFilename='';
     loadPreHoto(true);
+    const provMsg=invHotoIntegrationMessage(body.provisional);
+    if(provMsg) alert(provMsg);
   }catch(e){
     S.hotoImportErr=e.message;
   }finally{
