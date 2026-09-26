@@ -61,6 +61,12 @@ describe('Telegram ↔ LIFEOS: revalidación de una app abierta', () => {
     assert.match(wiring, /refreshHabits: loadHabits/);
   });
 
+  test('al volver a la app se releen la agenda de vuelos, Fresh Items y las notas pre-HOTO', () => {
+    const main = fs.readFileSync(new URL('../../main.js', import.meta.url), 'utf8');
+    const wiring = main.slice(main.indexOf('createSurfaceRevalidator({'));
+    assert.match(wiring, /refreshPrivate: .*loadAgenda\(true\).*loadFresh\(true\).*loadPreHoto\(true\)/);
+  });
+
   test('coalesce eventos simultáneos y limita rebotes de visibilidad', async () => {
     let reads = 0;
     let release;

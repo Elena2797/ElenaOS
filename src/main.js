@@ -5491,7 +5491,8 @@ const surfaceRevalidator = createSurfaceRevalidator({
   refreshReminders: loadReminders,
   refreshHabits: loadHabits,
   refreshPriority: () => loadIsabelNow({ silent: true }),
-  refreshPrivate: loadAppToday,
+  // Al volver a la app: lo de hoy, la agenda de vuelos, Fresh Items y las notas pre-HOTO (lo que ella le acaba de contar a Isabel).
+  refreshPrivate: () => Promise.allSettled([loadAppToday(), loadAgenda(true), loadFresh(true), loadPreHoto(true)]),
   render,
 });
 
