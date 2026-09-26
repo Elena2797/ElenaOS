@@ -147,6 +147,9 @@ id, hoto_id (FK, cascade), section (`defect`\|`comment`\|`offload`), position, c
 ### `vj_pre_hoto_notes`
 id, tail_number, category (`defect`|`offload`|`comment`|`magazine`|`other`), content, status (`pending`|`confirmed`|`not_in_hoto`|`review`|`migrated`|`dismissed`), hoto_id (FK, nullable), reconcile_detail, created_at, reconciled_at. Información PROVISIONAL de un avión antes de tener su HOTO; se contrasta al importar el PDF oficial. RLS sin políticas (solo clave de servicio). `hoto_migration_v6.sql`, aplicada y verificada 2026-09-26.
 
+### `vj_flights`
+id, tail_number, kind (`flight`|`rot`), day (fecha local de salida, o el día ROT), dep_icao, arr_icao, dep_utc, arr_utc (timestamptz), dep_tz, arr_tz (IANA), pax, tags (text[]), flight_ref, created_at, updated_at. La agenda de vuelos que Isabel lee de las fotos del horario. Únicos parciales: (tail_number, dep_icao, arr_icao, dep_utc) para vuelos y (tail_number, day) para ROT. RLS sin políticas (solo clave de servicio; la app lee por `/v1/app/agenda`). `agenda_migration_v1.sql`, aplicada 2026-09-26. Ver modules/VISTAJET_AGENDA.md.
+
 Storage: bucket `hoto-templates` (contiene `HOTO_official_v1.pdf`, la plantilla oficial en blanco).
 
 ---

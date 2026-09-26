@@ -3,6 +3,12 @@ Estado: fotografía operativa vigente
 
 # Estado actual de LIFEOS
 
+## Actualización — 2026-09-26, noche (manda sobre las de abajo)
+
+- **Fresh Items, Agenda de vuelos y avisos ligados al horario** en producción: `modules/VISTAJET_FRESH.md`, `modules/VISTAJET_AGENDA.md`, mapa del frontend en `modules/FRONTEND_MAP.md`. Tabla nueva `vj_flights` (aplicada). `isabel-api` en `main` (1159/1159), `life-os-app` (88/88, guard O5 re-aprobado). Detalle: CHANGELOG 2026-09-26.
+- **Isabel:** `npm run fallos` sin abiertos salvo 2 del PDF (clave de Anthropic por renovar: la pone ella en Railway). Tools nuevas que necesitan `openclaw mcp reload`: `agenda_save/get`, `fresh_items_status`, `vistajet_leaving_aircraft`, `hoto_pre_*`.
+- **Sin ver aún con datos reales:** pantallas Agenda y Fresh Items, y Tu día con vuelos (piden PIN + código de Telegram).
+
 ## Actualización — 2026-09-26, tarde (manda sobre las de abajo)
 
 - **Pre-HOTO + limpieza al entregar + reglas Outlook/Calendar:** `isabel-api` `7b0ede7` en `main` (1049/1049). Migración `hoto_migration_v6.sql` (`vj_pre_hoto_notes`) aplicada y verificada en Supabase. Entregar avión descarta las tareas del HOTO; Isabel ya no replica Outlook ni pone vuelos en Google Calendar (reglas en descripciones de tools). Detalle: `CHANGELOG.md` 2026-09-26, `modules/VISTAJET_HOTO.md`.
