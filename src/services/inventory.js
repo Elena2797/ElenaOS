@@ -179,6 +179,18 @@ export function getSessionStats(items) {
 
 // ─── Parser de Excel .xlsx ────────────────────────────────────────────────────
 
+// Texto de una celda. Nunca "[object Object]": si la celda no es texto plano (texto enriquecido,
+// fórmula con resultado, hipervínculo) se saca el texto de dentro; si no hay, cadena vacía.
+export function cellText(v) {
+  if (v == null) return '';
+  if (typeof v !== 'object') return String(v).trim();
+  if (Array.isArray(v.richText)) return v.richText.map((r) => String(r?.text ?? '')).join('').trim();
+  for (const k of ['text', 'result', 'w', 'v']) {
+    if (v[k] != null && v[k] !== v) return cellText(v[k]);
+  }
+  return '';
+}
+
 export function parseXlsx(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -199,8 +211,9 @@ export function parseXlsx(file) {
 
         // Datos empiezan en fila 5 (índice 4), fila 4 es el header
         for (let i = 4; i < rows.length; i++) {
-          const code = String(rows[i][0] ?? '').trim();
-          const desc = String(rows[i][1] ?? '').trim();
+          const code = cellText(rows[i][0]);
+          // Celda con contenido pero sin texto legible: el código como nombre, antes que perder el ítem.
+          const desc = cellText(rows[i][1]) || (code && rows[i][1] ? code : '');
           const stdQ = rows[i][2];
           const actQ = rows[i][3];
           const reqQ = rows[i][4];

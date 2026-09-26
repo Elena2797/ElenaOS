@@ -10,6 +10,8 @@ No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí
 ## 2026-09-26 (issues de Isabel: entregar limpia tareas, reglas Outlook/Calendar, flujo pre-HOTO)
 
 `isabel-api` `7b0ede7` en `main`, 1049/1049. Migración v6 aplicada en Supabase y verificada (insert + CHECK de categoría). Las tools nuevas llegan a Isabel tras `openclaw mcp reload`.
+**Conteos provisionales de frescos (26/09 noche, `isabel-api` `f020f24`, 1058/1058):** el catálogo estándar de frescos es el mismo en todos los aviones (los 13 de `SHOPPING_ITEMS`). Un conteo pre-HOTO se guarda como nota `other` con formato "Lemons: 2" (etiqueta exacta; sin migración). Al importar el HOTO se contrasta con `shopping`: igual → `confirmed`; distinto o sin cantidad → `review` con ambos valores. Tablecloths/napkins/DR kits: texto libre, siempre `review`. Checkpoint de `src/mcp.js` movido con nota. **Falta:** `openclaw mcp reload`; FRESCOS completo (tiré/pedí, número único, "Por comprar", pregunta diaria); vista de agenda de vuelos en la app.
+
 
 1. **Entregar avión descarta las tareas del HOTO** (`discardHotoTasks` en `hoto/autoTasks.js`): por título EXACTO de lo que genera el análisis (+ variantes de Cabin Care); no toca tareas escritas a mano. `deliverAircraft` devuelve `hoto_tasks_discarded`; si falla, la entrega sigue ok.
 2. **Reglas en descripciones de tools (`mcp.js`):** no replicar Outlook (ya lo ve) y nunca poner vuelos en Google Calendar (su horario de vuelos se ve en LIFEOS). Son instrucciones a Isabel, no bloqueos en código.
