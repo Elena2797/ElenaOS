@@ -991,7 +991,7 @@ function render() {
   });
   const mp=document.getElementById('mp');
   mp.textContent=S.mode; mp.className='mode-pill '+(S.mode==='ON'?'m-on':'m-off');
-  const views={home:homeView,areas:areasView,aprendido:learnedView,area:areaView,global:globalView,project:projectView,avanzar:avanzarView,resultado_ia:resultadoIAView,vj_hoto:vjHotoView,vj_inventario:vjInventarioView,vj_laundry_cleaning:vjLandingCleaningView,vj_fresh:vjFreshView,vj_status:vjStatusView};
+  const views={home:homeView,areas:areasView,aprendido:learnedView,area:areaView,global:globalView,project:projectView,avanzar:avanzarView,resultado_ia:resultadoIAView,vj_hoto:vjHotoView,vj_inventario:vjInventarioView,vj_laundry_cleaning:vjLandingCleaningView,vj_fresh:vjFreshView,vj_status:vjStatusView,vj_agenda:vjAgendaView};
   document.getElementById('main').innerHTML=connectionBanner()+(views[S.view]||homeView)();
   renderFab();
 }
@@ -1008,7 +1008,7 @@ function render() {
 // laundry…), donde "añadir" significa otra cosa y cada una tiene ya su propia
 // acción: un "+" genérico ahí sería ambiguo, que es justo lo que D32 corrigió
 // en las tarjetas de eLearnings/Facturas.
-const FAB_HIDDEN_VIEWS = ['vj_hoto','vj_inventario','vj_laundry_cleaning','vj_fresh','vj_status'];
+const FAB_HIDDEN_VIEWS = ['vj_hoto','vj_inventario','vj_laundry_cleaning','vj_fresh','vj_status','vj_agenda'];
 function renderFab() {
   const existing=document.getElementById('fab');
   if(FAB_HIDDEN_VIEWS.includes(S.view)) { if(existing) existing.remove(); return; }
@@ -2090,6 +2090,13 @@ function areaView() {
         <span style="font-size:10px;font-weight:600;color:${acSC};background:${acSB};border-radius:999px;padding:3px 9px;white-space:nowrap">${acSL}</span>
       </button>`;
     })()}
+    <button onclick="go('vj_agenda')" style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;margin-bottom:8px">
+      <span style="font-size:20px">🗓️</span>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:var(--text)">Agenda de vuelos</div>
+        <div style="font-size:11px;color:var(--t2);margin-top:2px">Tus vuelos y días de rotación, en hora local</div>
+      </div>
+    </button>
     <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);margin:8px 0 8px">Herramientas de la rotación</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
       ${toolCard('📋','HOTO',hotoSL,hotoSC,hotoSB,hotoSummary,'vj_hoto')}
@@ -3690,6 +3697,54 @@ function vjLandingCleaningView(){
   <div style="text-align:center;font-size:11px;color:var(--t3);margin-top:8px;line-height:1.5">Genera el PDF oficial de VistaJet con estos datos.<br>El PDF nunca se edita a mano: siempre se exporta desde aquí.</div>`;
 }
 
+// ── Agenda de vuelos: lo que Isabel lee de las fotos de su horario ─────────────
+// Vive en vj_flights (solo servidor); la app la lee por /v1/app/agenda con la hora LOCAL ya calculada.
+async function loadAgenda(force){
+  if(!appClient().isLinked()||S._agendaLoading) return;
+  if(!force&&S.agenda&&Date.now()-(S._agendaAt||0)<60000) return;
+  S._agendaLoading=true;
+  try{
+    const r=await appClient().get('/v1/app/agenda?from='+madridDate(0)+'&to='+madridDate(45));
+    S.agenda=r&&r.ok?r.days:[]; S._agendaError=!(r&&r.ok);
+  }catch(e){ S.agenda=[]; S._agendaError=true; }
+  S._agendaAt=Date.now(); S._agendaLoading=false;
+  if(S.view==='vj_agenda'||S.view==='area') render();
+}
+function agendaDayLabel(iso){
+  const d=new Date(iso+'T12:00:00Z');
+  const t=d.toLocaleDateString('es-ES',{timeZone:'UTC',weekday:'short',day:'numeric',month:'short'}).replace(/\./g,'');
+  const tag=iso===madridDate(0)?' · hoy':iso===madridDate(1)?' · mañana':'';
+  return t.charAt(0).toUpperCase()+t.slice(1)+tag;
+}
+function agendaEntryHtml(e){
+  if(e.kind==='rot') return `<div style="background:var(--bg);border:0.5px dashed var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--t2)"><b style="color:var(--text)">ROT</b> · día de rotación, aún sin vuelos definidos</div>`;
+  const chip=(t)=>`<span style="font-size:10px;font-weight:600;color:${t==='FERRY'?'#854F0B':'#4B5563'};background:${t==='FERRY'?'#FAEEDA':'#F1F1F1'};border-radius:999px;padding:2px 8px;margin-left:4px">${escHtml(t)}</span>`;
+  return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:12px 14px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+      <div style="font-size:15px;font-weight:600;color:var(--text)">${escHtml(e.dep_icao)} → ${escHtml(e.arr_icao)}</div>
+      <div style="font-size:13px;color:var(--text);white-space:nowrap">${escHtml(e.dep_local)}${e.arr_local?' – '+escHtml(e.arr_local)+(e.arr_next_day?' <span style="font-size:10px;color:var(--t3)">+1</span>':''):''}</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:11px;color:var(--t2)">
+      <div>${escHtml(e.tail_number)}${e.pax==null?'':' · '+e.pax+' pax'}<span style="color:var(--t3)"> · hora local</span></div>
+      <div>${(e.tags||[]).map(chip).join('')}</div>
+    </div>
+  </div>`;
+}
+function vjAgendaView(){
+  loadAgenda();
+  const days=S.agenda||[];
+  const head=`<div class="ph"><button class="back" onclick="go('area','${S.areaId}')"><i class="ti ti-arrow-left"></i></button><h2>Agenda de vuelos</h2></div>`;
+  if(!appClient().isLinked()) return head+`<div style="padding:24px 16px;text-align:center;font-size:13px;color:var(--t2)">Conecta la app con Isabel para ver tu agenda.</div>`;
+  if(S._agendaLoading&&!S.agenda) return head+`<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--t3);font-size:13px">Cargando…</div>`;
+  if(S._agendaError) return head+`<div style="padding:24px 16px;text-align:center;font-size:13px;color:var(--t2)">No pude leer la agenda ahora mismo. Prueba otra vez en un momento.</div>`;
+  if(!days.length) return head+`<div style="background:var(--surface);border-radius:12px;padding:24px 16px;text-align:center;border:0.5px solid var(--border)">
+    <div style="font-size:32px;margin-bottom:10px">🗓️</div>
+    <div style="font-size:13px;color:var(--t2);line-height:1.6">Todavía no hay vuelos guardados.<br>Mándale a Isabel una foto de tu horario y aparecerán aquí.</div></div>`;
+  return head+days.map(d=>`<div style="margin-bottom:14px">
+    <div style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:${d.day===madridDate(0)?'var(--text)':'var(--t3)'};margin-bottom:6px">${escHtml(agendaDayLabel(d.day))}</div>
+    <div style="display:grid;gap:8px">${d.entries.map(agendaEntryHtml).join('')}</div></div>`).join('');
+}
+
 function vjFreshView(){
   const status=S.vjState.status||'libre';
   return `<div class="ph"><button class="back" onclick="go('area','${S.areaId}')"><i class="ti ti-arrow-left"></i></button><h2>Fresh Items Plan</h2></div>
@@ -4360,7 +4415,7 @@ function hotoFocusSection(){
   </div>`;
 }
 
-const VJ_SUBVIEWS=['vj_hoto','vj_inventario','vj_laundry_cleaning','vj_fresh','vj_status'];
+const VJ_SUBVIEWS=['vj_hoto','vj_inventario','vj_laundry_cleaning','vj_fresh','vj_status','vj_agenda'];
 
 function go(view, id=null) {
   S.view=view; if(id) S.areaId=id;
