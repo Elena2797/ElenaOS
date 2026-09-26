@@ -7,6 +7,15 @@ Fuente de verdad de datos: ninguna
 
 No es un espejo del `git log` completo (para eso, `git log` en cada repo). Aquí solo lo que un chat nuevo necesita saber para entender por qué el sistema está como está.
 
+## 2026-09-26 (issues de Isabel: entregar limpia tareas, reglas Outlook/Calendar, flujo pre-HOTO)
+
+Sin commit ni despliegue aún. `isabel-api` 1049/1049.
+
+1. **Entregar avión descarta las tareas del HOTO** (`discardHotoTasks` en `hoto/autoTasks.js`): por título EXACTO de lo que genera el análisis (+ variantes de Cabin Care); no toca tareas escritas a mano. `deliverAircraft` devuelve `hoto_tasks_discarded`; si falla, la entrega sigue ok.
+2. **Reglas en descripciones de tools (`mcp.js`):** no replicar Outlook (ya lo ve) y nunca poner vuelos en Google Calendar (su horario de vuelos se ve en LIFEOS). Son instrucciones a Isabel, no bloqueos en código.
+3. **Pre-HOTO:** tabla nueva `vj_pre_hoto_notes` (`life-os-app/hoto_migration_v6.sql`, **SIN APLICAR en Supabase**), `hoto/preHoto.js`, tools `hoto_pre_add` / `hoto_pre_list` / `hoto_pre_resolve`. Al importar el HOTO oficial (`applyHotoImport`) se contrasta cada nota (determinista, sin modelo): `confirmed` / `not_in_hoto` / `review` (revistas, con el estado oficial). Nunca sobrescribe; migrar o descartar lo decide ella. **Falta:** verlo en la app de LIFEOS (hoy solo por Isabel) y probar en producción tras aplicar la migración y `openclaw mcp reload`.
+4. Lección de modelo: no asumir qué significa un icono/número de la app (era nº de pasajeros, no sillas de ruedas).
+
 ## 2026-09-25 (el chat de inventario entiende sin depender del LLM — D70 — + cierre real del inventario del 9H-VCF + primer Laundry Form real)
 
 Sesión a contrarreloj: entrega del 9H-VCF el mismo día. Estefanía había llevado un WhatsApp aparte durante tres días porque el modo inventario "no entendía casi nada".
@@ -39,6 +48,18 @@ Sesión a contrarreloj: entrega del 9H-VCF el mismo día. Estefanía había llev
 19. **El import de HOTO ya no tira las revistas (`d698f28`, 1003/1003):** `hoto/magazines.js` interpreta la celda ("GQ, Cosmopolitan, Economist, Vogue") a `shopping.magazines_list`: presentes sin verificar + las de la lista estándar que no vienen como `missing`; respeta estados de nuestro propio export; celda vacía = lista vacía. `mergeImportIntoExisting` conserva la lista puesta a mano. Comprobado de extremo a extremo: el PDF del HOTO exportado el 25/09 se reimporta con sus 6 revistas y estados. Cierra el punto 8 de este día. **Pendiente (Isabel):** que además te diga qué revistas comprar y te recuerde revisarlas una vez al recibir el avión (la lista ya llega con `missing`/`needs_renewal`, falta el aviso).
 
 20. **Triaje del correo de Outlook (`09253d4`, 1039/1039):** el webhook `POST /v1/outlook/inbound` mandaba UN Telegram por cada correo (12-31 al día, entero, la abrumaba). `core/outlookTriage.js`: el correo SIEMPRE se guarda en `eventos`; se avisa solo de lo DISTINTO y con un resumen de 1-2 líneas (nunca el cuerpo). Orden: importancia alta → avisa; remitente automático (noreply/newsletter/marketing) o publicidad (descuentos, ofertas) → silencio; "lo de siempre" (misma plantilla de asunto ≥3 veces en 30 días, o mismo arranque de asunto ≥4) → silencio salvo que el texto hable de un cambio; el resto lo lee el modelo (`outlook_triage`, registrado en `consumerRegistry`, ~$0,0002/correo) y decide + resume. **Falla abierto:** si el modelo o la lectura de la historia fallan, se avisa igual. Repetida sobre sus 100 correos reales: 19 silencio directo, 81 al modelo (casi todo operativo: catering, viajes, crew planning). Solo hay historia desde el 22/09, así que "lo de siempre" mejora con los días. **A vigilar:** cuántos Telegram llegan mañana y si se cuela ruido o se silencia algo importante.
+
+## 2026-09-23, mediodía (Inicio respeta la prioridad real; una tarea por dominio; Cabin Care sin fecha baja a `high` — D71)
+
+Sesión abierta con "revisa cómo me priorizas las tareas": la lista de la mañana era una lista enorme y la app no enseñaba la prioridad. Verificado contra Supabase real (22 tareas abiertas en VistaJet: 5 `critical`, 12 `high`, 5 `medium`). Las tareas `🔴 HOTO:` eran de Isabel a mano, no de D69 (formato de título distinto).
+
+1. **Listas sin orden (`life-os-app` `80c0189`):** `db.js` carga `tasks` sin `ORDER BY` y las listas de cada área, "Todas las tareas" y la frase "Una cosa antes de salir" de VistaJet usaban ese orden crudo. Nuevo `sortByPriority()` (mismo criterio que `tasks_list`) y desempate por fecha/antigüedad en `workQueue()`.
+2. **"Ahora" mostraba una `medium` por delante de las `critical` (`144c8d8`)** — bug visto en su captura: `workQueue()` da peso 5 a todo lo que vence en ≤1 día sin mirar `priority`. Ahora desempata primero por prioridad real.
+3. **"Ahora" hasta 3 tareas, una por dominio (`80c0189` → `6f39085`)**, con "+N más de <familia>" (`taskFamily()`). Primer intento deduplicando por familia: dejaba a VistaJet con las 3 plazas; ella pidió una por dominio.
+4. **Tarjeta "Urgente" (`6f39085`):** etiquetas para `stock_low`, `inventory_discrepancies`, `offload_pending`, `hoto_ambiguous`, `magazine_renewal_needed` y filtro de señales `weak`/`informational`. Antes: "VistaJet: necesita atención".
+5. **D69 enmendado (`isabel-api` `4a17738`):** Cabin Care sin fecha → `high` (no `critical`). 876/876. De paso, alias `still water` → evian en `inventoryAliases.js` (el resolver lo reescribió después D70; el fallo `58cdac43` se explicaba sobre todo por el bug de RLS que `df1da17` corrigió 62 min después).
+6. **Desplegado y verificado:** Railway (`/health` 200) y Vercel (bundle servido con las cadenas nuevas). El primer `git push` de `life-os-app` lo bloqueó el clasificador ("Out-of-Place Publication"); tras confirmarlo ella en el chat, el reintento pasó.
+7. **Sin tocar:** los 2 fallos de PDF (config del Gateway, la lanza ella) y los cambios sin commitear que otra sesión tenía en `isabel-api`.
 
 ## 2026-09-23 (memory_search resuelto de verdad + incidente de bucle de reinicio + causa exacta del 401 de PDF)
 

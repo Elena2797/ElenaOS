@@ -1,52 +1,54 @@
 Estado: conocimiento vigente
-Última actualización: 2026-09-26 (cierre de la sesión larga del 25/09) — ver `CHANGELOG.md` 2026-09-25 puntos 1-20. Hecho ese día: chat de inventario sin LLM (D70) + fase 2 del lenguaje, linen→lavandería, contado vs estimado, entrega de avión (stand-by), Laundry Form, tarjeta de confianza, feedbacks proactivos, revistas del PDF, triaje de Outlook.
+Última actualización: 2026-09-26 — cierre de la sesión de prioridad de Inicio (trabajo del 23/09, D71). Conserva los pendientes vigentes de la sesión larga del 25/09 (chat de inventario D70, entrega del 9H-VCF, feedbacks, Outlook), cuyo detalle está en `CHANGELOG.md`.
 
 # Próxima sesión
 
 ## 1. Qué se terminó en esta sesión
 
-- **Chat de inventario que entiende de verdad (D70):** `quickIntent.js` + resolver que no adivina + alias + lote con antes→después. `isabel-api` `4e1e4e2`, 898/898, desplegado. Ver `CHANGELOG.md` 2026-09-25.
-- **Inventario del 9H-VCF cerrado con ella, ítem por ítem** (lista completa en el CHANGELOG). Bebidas puestas al estándar sin contar por decisión suya.
-- **Primer Laundry & Cleaning Form real** (9H-VCF, 10 filas Given, cabecera completa).
-- Reglas de su lenguaje documentadas en `modules/VISTAJET_INVENTORY.md § Lenguaje`.
+- **Inicio respeta la prioridad real (D71):** listas ordenadas con `sortByPriority()`, desempate de `workQueue()` por prioridad real, "Ahora" con hasta 3 tareas (una por dominio, "+N más de <familia>") y tarjeta "Urgente" con etiquetas concretas. `life-os-app` `80c0189`, `144c8d8`, `6f39085`, desplegado y verificado en el bundle de Vercel.
+- **D69 enmendado:** Cabin Care sin fecha → `high`. `isabel-api` `4a17738`, 876/876.
+- Detalle y causas en `CHANGELOG.md` (2026-09-23, mediodía) y `DECISIONS.md` D71.
 
 ## 2. Qué quedó pendiente
 
-- **Probar en producción que el arreglo funciona de verdad** con "He usado 2 Evian 0,33 l" y "Usé 1 wine sleeve y 1 rubber band" (`/health` solo devuelve `{"ok":true}`, no confirma la versión desplegada).
-- **Fase 2 del lenguaje (D70): HECHO** (atrás+adelante, no queda=0, estándar, entrada, caja=10; `aa0c720`). **También hecho:** linen → Laundry Form acumulando (`3065f0a`), lo no entendido → fallo (`58ba464`), contado vs estimado (`d2147fa`). **Falta:** probar todo en producción con Telegram (tras `openclaw mcp reload`) y que la app / `readiness.js` muestren contado vs estimado.
-- **Sistema de lavado que acumule** ("ensuciar +N") en vez de fijar valor; hoy solo lo llevó de cabeza en la conversación. Lo mismo para **Fresh Items** (no se lleva bien la cuenta de hierbas/fruta/leche).
-- **Valores por confirmar del 9H-VCF:** Lime (dijo "habían seis", sigue 1), Orange (2, "no me acuerdo"), Coca Cola/Ginger/Tonic/Coke Light/Coke Zero puestos al estándar sin contar.
-- `npm run fallos`: revisar los HOTO abiertos (Focus of the Month sin cerrar la tarea, recordatorio de feedback al subir un HOTO, horario diario) y los de PDF del 22 (posiblemente ya resueltos).
-- **HOTO del 9H-VCF:** listo para exportar; faltan 5 fechas de Cabin Care que ella no sabe (quedan vacías) y marcar las Daily duties en la app. Tarea vieja "HOTO: Offload plates to Sores" ya no aplica. Hay tareas duplicadas de Cabin Care/defects de Isabel por limpiar.
-- **Revistas:** el import ya las interpreta (`d698f28`). **Falta:** que Isabel diga qué comprar (`missing`/`needs_renewal`) y las revise una vez al recibir el avión.
-- **Contado vs estimado en la APP y en la tarjeta de confianza** (el backend ya lo distingue desde `d2147fa`; los datos del 9H-VCF del 25/09 quedaron sin marcar).
-- Reglas nuevas: siempre Pattern 2; inventario y Shopping del HOTO deben coincidir (pero "creerle al HOTO" fue solo para el apio, NO una regla).
-- **Rediseño de la tarjeta de Aircraft Readiness (confianza para entregar):** especificación en `modules/AIRCRAFT_READINESS.md § Rediseño acordado 2026-09-25`. Sin construir. Depende de: contado-vs-estimado en el inventario, Daily duties del HOTO, estado "dejando el avión", feedbacks y envío de documentos.
-- **Rediseñar la pantalla de VistaJet (petición explícita suya, 2026-09-25):** los botones **Exportar Excel / Exportar UPLIFT** están al final del todo, después del bloque "Estado del avión" (`main.js` ~3720, `invExport`), y no los encuentra el día de la entrega. Sumar: exportar HOTO, Laundry y Excel en un solo sitio visible; tarjeta de confianza rediseñada (ver `modules/AIRCRAFT_READINESS.md`); estado "dejando el avión" que activa el modo entrega; recordatorios de envío de documentos y feedbacks. Ella dijo que hay que diseñar estas pantallas, no parchearlas.
-- **Entregar un avión debe cerrar todo y pasar a STAND-BY (regla suya, 2026-09-25):** hoy `updateVistajetStatus({status:'libre'})` solo cierra el HOTO y deja `libre`. Debe cerrar también la sesión de inventario (`closed`) y el Laundry Form (`delivered`) y dejar `standby` (sigue en sus días de rotación). El 9H-VCF se entregó a mano el 2026-09-25 (HOTO `delivered`, inventario `closed`, laundry `delivered`, `vj_state` standby). Además, el feedback del avión se envía al RECIBIR el siguiente, no al entregar. Y la plantilla de handover que guardó Isabel (`Handover//TAIL/CHCODE`, adjuntos "Excel + PDF HOTO") no incluye el Laundry Form y su asunto difiere del del feedback (`HANDOVER//TAIL//CH-OLE`): revisar con ella.
-- **Nombre del PDF en el visor del móvil:** la app abre `/v1/laundry-cleaning/:id/export?inline=1` y el visor enseña "export"; el ticket está firmado para esa ruta exacta, así que redirigir a `.../export/<nombre>.pdf` exige ampliar `TICKET_PATH` en `core/access.js` con cuidado.
-- **Feedbacks (hecho, `eee62a6`):** probar en producción mañana 26/09 08:30 (debe llegar el "último aviso" del vuelo del 25) y, cuando reciba avión nuevo, el del avión. **Falta:** integrar el horario (foto de CrewScheduler) para conocer la hora real del vuelo y afinar el límite de 24 h; la pregunta "¿recibiste el avión hoy?" al subir un HOTO nuevo; el modo "dejando el avión".
-- **FRESCOS (diseño APROBADO por ella el 26/09, sin construir):** fresh items = los frescos de la Shopping list del inventario (limas, limones, apio, leche, hierbas, frambuesas…), los mismos del HOTO. (1) se apuntan hablando: "usé 2 limones", "tiré las frambuesas", "pedí 6 limas", "me subieron 4", "no queda leche" — usar/contar/"no queda" ya funcionan; **faltan "tiré" y "pedí"**; (2) un solo número de verdad por ítem y el Shopping del HOTO se actualiza SOLO (0/1/2/3/+4) para que siempre coincidan; (3) a 0 → entra en "Por comprar"; (4) Isabel pregunta una vez al día en rotación "¿cómo van los frescos?". Es lo siguiente por hacer.
-- **CORREOS (a vigilar mañana):** el triaje de Outlook (`09253d4`) ya está desplegado. Mirar cuántos Telegram de correo llegan y si se cuela ruido o se silencia algo importante; ajustar `outlookTriage.js` (PROMO, CHANGE_WORDS, umbrales) con lo que ella diga. Resúmenes de correo del coach 08:30/21:30 (Gmail) NO se tocaron: viven en `isabel-gateway/ensure-coach-crons.mjs` (a Claude le bloquea escribir en el Gateway; lo lanza ella).
-- **Otra sesión tiene cambios SIN commitear en `isabel-api`** (`src/core/specialists/tasks.js`, `vistajet.js`, `hoto/autoTasks.js`, `__tests__/deliverAircraft.test.js`): NO son de esta sesión; comprobarlos con `git diff` antes de tocar esos ficheros. En `life-os-app` hay además un stash de otra rama (`fix/tareas-isabel-en-dominios`).
-- **Ella tiene que lanzar** `openclaw mcp reload` (hecho el 26/09) para que Isabel vea `vistajet_deliver_aircraft`; pedirle que confirme que la ve.
-- Sin cambios respecto a antes: confirmar D69 contra un HOTO real; documentar `df1da17` (bug RLS); primera noche del turno nocturno.
+**De esta sesión (D71 / `KNOWN_PROBLEMS.md`):**
+- **Guard O5 del frontend en rojo** (hash de `main.js` vs checkpoint): decidir con ella re-aprobar o retirar; no actualizar a ciegas.
+- **"Y N pendientes más hoy"** cuenta también las tareas sin fecha (18 en su captura): decidir si lo sin fecha entra en "hoy".
+- **La tarjeta "Urgente" muestra un solo dominio** (el de `/v1/now`) aunque VistaJet y Vida Personal estén ambos `urgent`. Ella lo planteó; se resolvió solo para "Ahora".
+- **Tareas `🔴 HOTO:` hechas a mano por Isabel** (`critical`, título distinto del de D69): D69 no las deduplica y puede duplicarlas cuando corra contra un HOTO real. Limpiarlas antes (ya había duplicados de Cabin Care/defects).
+- Comprobar en su móvil que "Ahora" y "Urgente" se ven como se probó con datos reales (no se abrió la app real: pide su token).
+
+**Heredado del 25/09 (sigue vigente):**
+- Probar en producción el chat de inventario con "He usado 2 Evian 0,33 l" y "Usé 1 wine sleeve y 1 rubber band" (`/health` no confirma la versión); probar por Telegram tras `openclaw mcp reload` y que la app / `readiness.js` muestren contado vs estimado.
+- **Sistema de lavado que acumule** ("ensuciar +N") y lo mismo para **Fresh Items**.
+- **FRESCOS (diseño APROBADO el 26/09, sin construir):** los frescos de la Shopping list del inventario (los mismos del HOTO). (1) se apuntan hablando; faltan "tiré" y "pedí" (usar/contar/"no queda" ya funcionan); (2) un solo número de verdad por ítem y el Shopping del HOTO se actualiza SOLO; (3) a 0 → "Por comprar"; (4) Isabel pregunta una vez al día en rotación. **Es lo siguiente por hacer.**
+- Valores por confirmar del 9H-VCF: Lime (dijo "habían seis", sigue 1), Orange (2), Coca Cola/Ginger/Tonic/Coke Light/Coke Zero puestos al estándar sin contar.
+- `npm run fallos`: HOTO abiertos (Focus of the Month sin cerrar la tarea, recordatorio de feedback al subir un HOTO, horario diario) y los 2 de PDF del 22/09 (config del Gateway; posiblemente resueltos, falta probar enviando un PDF).
+- **HOTO del 9H-VCF:** listo para exportar; faltan 5 fechas de Cabin Care que ella no sabe y marcar las Daily duties. "HOTO: Offload plates to Sores" ya no aplica.
+- **Revistas:** el import ya las interpreta (`d698f28`); falta que Isabel diga qué comprar y las revise al recibir el avión.
+- **Rediseño de la pantalla de VistaJet (petición explícita suya):** Exportar Excel/UPLIFT están al final del todo (`main.js`, `invExport`); reunir exportar HOTO/Laundry/Excel en un sitio visible, tarjeta de confianza rediseñada (`modules/AIRCRAFT_READINESS.md § Rediseño acordado 2026-09-25`), estado "dejando el avión", recordatorios de documentos y feedbacks. Hay que diseñarlo, no parchearlo.
+- **Entregar un avión debe cerrar todo y pasar a STAND-BY:** hoy `updateVistajetStatus({status:'libre'})` solo cierra el HOTO; debe cerrar también inventario (`closed`) y Laundry Form (`delivered`) y dejar `standby`. El feedback del avión se envía al RECIBIR el siguiente. Revisar con ella la plantilla de handover (no incluye el Laundry Form y su asunto difiere del del feedback).
+- **Nombre del PDF en el visor del móvil** ("export"): exige ampliar `TICKET_PATH` en `core/access.js` con cuidado.
+- **Feedbacks (`eee62a6`):** confirmar el "último aviso" del vuelo y, al recibir avión nuevo, el del avión; falta integrar el horario (CrewScheduler) y la pregunta "¿recibiste el avión hoy?".
+- **Correos:** vigilar los Telegram de Outlook (`09253d4`) y ajustar `outlookTriage.js`. Los resúmenes de Gmail del coach viven en `isabel-gateway/ensure-coach-crons.mjs` (a Claude le bloquea escribir en el Gateway; lo lanza ella).
+- Sin cambios: confirmar D69 contra un HOTO real; documentar `df1da17` (bug RLS); primera noche del turno nocturno; confirmar que Isabel ve `vistajet_deliver_aircraft` tras `openclaw mcp reload`.
+- **Cambios de OTRA sesión sin commitear en `isabel-api`** (2026-09-26: `tasks.js`, `vistajet.js`, `hoto/autoTasks.js`, `hoto/data.js`, `mcp.js` y dos tests): no son de esta sesión; `git diff` antes de tocar esos ficheros. En `life-os-app` hay un stash de otra rama (`fix/tareas-isabel-en-dominios`).
 
 ## 3. Qué hacer inmediatamente después
 
 1. `npm run fallos` en `isabel-api`.
-2. Probar el chat de inventario con las dos frases de arriba en producción.
-3. Diseñar la fase 2 del lenguaje con ella, empezando por atrás+adelante y linen → lavado.
+2. Construir los FRESCOS (diseño aprobado) o, si ella prefiere, decidir lo de "hoy" y el guard O5 primero (son cortos).
+3. Probar en producción el chat de inventario con las dos frases.
 
 ## 4. Qué no debe romperse
 
-- El análisis del HOTO (D69) es **determinista, sin modelo** — mismo principio que Aircraft Readiness. No meter a Isabel/un LLM a decidir qué tarea crear.
-- Un defect/offload de D69 se resuelve **borrando la línea de origen** (`DELETE /hoto/items/:id`), no solo completando la tarea — si no, se recrea en el próximo análisis (documentado, no es bug).
+- El análisis del HOTO (D69) es **determinista, sin modelo**. Un defect/offload de D69 se resuelve **borrando la línea de origen** (`DELETE /hoto/items/:id`), no solo completando la tarea.
+- **La prioridad real de la tarea manda** en Inicio (D71): ni una tarea `medium` por delante de una `critical`, ni una sola área ocupando las 3 plazas de "Ahora", ni señales débiles en "Urgente".
 - `/v1` nunca vuelve a aceptar una llave que esté en el bundle (D68); `/v1/app` va montado antes de `requireAccess`.
-- Nunca `railway up` en `isabel-api`: push a `main` desde un worktree limpio de `origin/main`. En `isabel-gateway` es al revés (sin remoto, se despliega con `railway up`) — no confundir los dos repos.
-- A Claude el clasificador le bloquea escribir en el Gateway y los secretos de Railway: eso lo lanza ella.
-- Sin chat dentro de LIFEOS (D55). El turno de noche nunca toca VistaJet.
+- Nunca `railway up` en `isabel-api`: push a `main` desde un worktree limpio de `origin/main`. `isabel-gateway` es al revés (sin remoto, `railway up`).
+- A Claude el clasificador le bloquea escribir en el Gateway y los secretos de Railway: eso lo lanza ella (y a veces frena un `git push`: si ella lo confirma en el chat, se reintenta).
+- Sin chat dentro de LIFEOS (D55). El turno de noche nunca toca VistaJet. El chat de inventario no adivina (D70).
 
 ## 5. Qué documentos leer
 
-`CURRENT_STATE.md` → `DECISIONS.md` D70 (y D62–D69) → `modules/VISTAJET_INVENTORY.md` (§ Lenguaje) → `modules/VISTAJET_HOTO.md` → `operations/TURNO_NOCHE.md` si toca el turno de noche.
+`CURRENT_STATE.md` → `DECISIONS.md` D71 (y D70, D69) → `modules/VISTAJET_INVENTORY.md` (§ Lenguaje) → `modules/VISTAJET_HOTO.md` → `KNOWN_PROBLEMS.md` (§ Inicio y prioridad).

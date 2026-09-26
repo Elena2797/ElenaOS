@@ -1,5 +1,5 @@
 Estado: conocimiento vigente — lista viva, se actualiza con "Actualiza la documentación"
-Última verificación: 2026-09-22
+Última verificación: 2026-09-23
 Verificado en: auditorías de sesiones anteriores (HOTO, Inventario, arquitectura de Isabel, incidente de Supabase pausado) + incidentes de infraestructura reales del 2026-08-03 (Isabel Core Fase 1/2, Railway, Vercel) + spike de OpenClaw del 2026-08-05 + repro Windows-vs-Linux y despliegue real de `isabel-gateway` en Railway del 2026-08-06
 
 # KNOWN_PROBLEMS.md — Deuda técnica y grietas conocidas
@@ -243,3 +243,11 @@ Reportado por la usuaria: al intentar leer 2 PDFs (Laundry Form, HOTO Checklist)
 
 ## Seguridad
 Ver [SECURITY.md](SECURITY.md). Las URLs Git locales ya están limpias y `faithful-light` está detenido sin autodespliegue. Siguen abiertos el PIN visible en el bundle, (la API key del bundle se retiró y rotó en D68; RLS está cerrado, D62) la exposición histórica de tokens y la rotación pendiente de `ANTHROPIC_API_KEY`. MCP sin autenticación ya se resolvió.
+
+## Inicio y prioridad (2026-09-23)
+
+### El guard O5 del frontend está en rojo: `main.js` ya no coincide con el checkpoint aprobado
+`src/services/__tests__/o5HomeFixtures.test.js` compara el SHA-256 de `src/main.js` con `MAIN_CHECKPOINT_SHA256` (frontend 84/85 al 2026-09-26; el único rojo). Falla ya antes de la sesión del 2026-09-23 y cualquier cambio de Inicio lo mantiene rojo: no es una regresión de esa sesión, es que el "checkpoint aprobado" quedó atrás. Decidir con ella: re-aprobar el hash actual o retirar el guard; no actualizarlo a ciegas.
+
+### Inicio: lo que queda abierto de D71
+"Y N pendientes más hoy" cuenta también lo sin fecha; la tarjeta "Urgente" enseña un solo dominio; las tareas `🔴 HOTO:` hechas a mano no las deduplica D69. Detalle en `DECISIONS.md` D71 (Pendiente).

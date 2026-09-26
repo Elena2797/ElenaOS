@@ -3,7 +3,14 @@ Estado: fotografía operativa vigente
 
 # Estado actual de LIFEOS
 
-## Actualización — 2026-09-23, mañana (manda sobre las de abajo)
+## Actualización — 2026-09-23, mediodía (manda sobre las de abajo)
+
+- **Inicio respeta la prioridad real (D71):** las listas de tareas van ordenadas (prioridad → fecha → antigüedad); "Ahora" enseña hasta 3 tareas, una por dominio, con "+N más de <familia>"; la tarjeta roja "Urgente" dice cosas concretas ("7 ítems con stock bajo") en vez de "necesita atención". `life-os-app` `6f39085` (desplegado, bundle de Vercel verificado). Comprobado con sus datos reales: VistaJet + Vida Personal + Marca Personal.
+- **D69 enmendado:** Cabin Care sin fecha crea `high`, no `critical`. `isabel-api` `4a17738`, 876/876, `/health` 200.
+- **Frontend 84/85 (2026-09-26):** el único rojo es el guard O5 por el hash de `main.js` (`KNOWN_PROBLEMS.md`), anterior a esta sesión.
+- **Alcance de esta fotografía:** recoge la sesión del 23/09. El trabajo del 25–26/09 (chat de inventario D70, entrega del 9H-VCF, feedbacks, Outlook) está en `CHANGELOG.md` y `NEXT_SESSION.md`, no aquí.
+
+## Actualización — 2026-09-23, mañana
 
 - **Análisis automático del HOTO crea tareas reales (D69):** cada vez que se crea, edita, se añade un defect/offload o se importa el HOTO activo, un specialist determinista (sin modelo) revisa Cabin Care/Shopping/Defects/Offload/Monthly Focus/cabecera y apunta lo que haga falta en VistaJet, sin que Estefanía lo pida. `isabel-api` `cca4433` (876/876), desplegado, `/health` 200 verificado tras el push. **Sin probar todavía contra un HOTO real de producción** — falta que ella edite o importe el activo y confirme que aparecen tareas nuevas. Detalle: `modules/VISTAJET_HOTO.md`, `DECISIONS.md` D69.
 - **Nota honesta, gap detectado al cerrar esta sesión:** entre la actualización de las 17:30 de ayer y esta, se subió a `main` de `isabel-api` el commit `df1da17` ("tool temporal para abrir sesion de inventario (bug RLS)", 04:47Z) desde fuera de esta conversación — toca `inventorySessions.js`, `mcp.js` y el checkpoint de `o5DisconnectedGuard.test.js`. No se documentó en su momento (ni aquí ni en `CHANGELOG.md`) y esta sesión no tiene el contexto de qué bug de RLS resolvía ni si es temporal de verdad. Pendiente de que quien lo hizo (o Estefanía) lo explique para documentarlo — ver `NEXT_SESSION.md`.
