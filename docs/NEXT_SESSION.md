@@ -67,3 +67,10 @@ Estado: conocimiento vigente
 - **Cerrado:** pantalla Fresh Items, Inicio (más hoy / Urgente multi-dominio), guard O5, "Documentos de entrega" (ya existía), avisos de feedback con agenda, "¿recibiste el avión?", revistas a comprar. Ver CHANGELOG 2026-09-26 (repaso).
 - **Sigue abierto:** ver en el móvil de ella las pantallas Agenda y Fresh Items con datos reales (tras el PIN pide el código de Telegram); probar `vistajet_leaving_aircraft` con ella; Isabel debe cumplir las reglas nuevas tras `openclaw mcp reload` (agenda_*, hoto_pre_*, magazines); primera noche del turno nocturno.
 - **Ojo Agenda:** si una foto trae horas UPDATED, Isabel debe pasar `replace_days` solo con el día entero a la vista; con la lista (cortada) nunca.
+
+## 8. Decisiones de la noche del 26/09 (para no repetir el análisis)
+
+- **Nombre del PDF "export" en el visor del móvil: NO se toca.** Habría que meter el nombre en la ruta firmada del ticket (`TICKET_PATH` en `core/access.js`) y en `openPdf` (rompe el ticket precalentado por ruta exacta); no se puede probar en un iPhone desde una sesión de código y el HOTO/Laundry PDF es lo crítico de la entrega. Si se hace: ruta `/export/<nombre>.pdf` con charset `[A-Za-z0-9_.-]`, ticket por ruta completa, y probar en el móvil de ella antes de subir.
+- **Coste de tools por turno:** las tools de hoy (`agenda_*`, `fresh_items_status`, `vistajet_leaving_aircraft`, `hoto_pre_*`) suman ~1.6 k tokens por turno; con DeepSeek son céntimos. La auditoría de tools (KNOWN_PROBLEMS "47 definiciones, usa 9") sigue abierta.
+- **`vistajet_get_status` ya lleva la agenda compacta** (hoy / volando / siguiente, con status): raíz de "¿tranquila con el ferry?" cuando ya había aterrizado.
+- **Un vuelo UPDATED** (misma ruta y día, otra hora) se actualiza sin duplicarse y `agenda_save` devuelve `changes`.
