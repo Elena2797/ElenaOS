@@ -46,3 +46,8 @@ Reglas (`core/agenda.js`, con tests):
 - La app pide PIN + código de Telegram: no se pueden ver sus pantallas con datos reales desde una sesión de código.
 - Tras subir un deploy, el móvil puede seguir con la versión vieja hasta cerrar del todo la app (KNOWN_PROBLEMS: service worker).
 - Un vuelo UPDATED (misma ruta y día, otra hora) se actualiza solo y `agenda_save` devuelve `changes`. Si la hora lo pasa a OTRO día, el viejo queda hasta que un `replace_days` lo retire.
+
+# Tareas espejo en Inicio (`core/mirrorTasks.js`)
+
+Lo que Isabel te recuerda por Telegram sale además como tarea en Inicio (feedback del vuelo, feedback del avión, foto del
+horario, Fresh Item de hoy) para marcarlo ahí. Sincronía en los dos sentidos por el tick; detalle en CHANGELOG 2026-09-26 (14).
