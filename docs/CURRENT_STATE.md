@@ -3,7 +3,12 @@ Estado: fotografía operativa vigente
 
 # Estado actual de LIFEOS
 
-## Actualización — 2026-09-23, mediodía (manda sobre las de abajo)
+## Actualización — 2026-09-26, tarde (manda sobre las de abajo)
+
+- **Pre-HOTO + limpieza al entregar + reglas Outlook/Calendar:** `isabel-api` `7b0ede7` en `main` (1049/1049). Migración `hoto_migration_v6.sql` (`vj_pre_hoto_notes`) aplicada y verificada en Supabase. Entregar avión descarta las tareas del HOTO; Isabel ya no replica Outlook ni pone vuelos en Google Calendar (reglas en descripciones de tools). Detalle: `CHANGELOG.md` 2026-09-26, `modules/VISTAJET_HOTO.md`.
+- **Sin verificar:** que Railway terminó el despliegue y que Isabel ve las tools nuevas tras `openclaw mcp reload`; el pre-HOTO no se ha probado con un HOTO real ni tiene pantalla en la app.
+
+## Actualización — 2026-09-23, mediodía
 
 - **Inicio respeta la prioridad real (D71):** las listas de tareas van ordenadas (prioridad → fecha → antigüedad); "Ahora" enseña hasta 3 tareas, una por dominio, con "+N más de <familia>"; la tarjeta roja "Urgente" dice cosas concretas ("7 ítems con stock bajo") en vez de "necesita atención". `life-os-app` `6f39085` (desplegado, bundle de Vercel verificado). Comprobado con sus datos reales: VistaJet + Vida Personal + Marca Personal.
 - **D69 enmendado:** Cabin Care sin fecha crea `high`, no `critical`. `isabel-api` `4a17738`, 876/876, `/health` 200.
