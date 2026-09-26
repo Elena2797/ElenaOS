@@ -21,7 +21,7 @@ capturas) y llama a `agenda_save`:
 Reglas (`core/agenda.js`, con tests):
 - Se guarda en UTC; la hora **LOCAL** se calcula con la zona de cada aeropuerto y es la que se enseña siempre (decisión suya).
   Sin zona válida el vuelo se **rechaza**: no se adivina una hora local.
-- Las dos fotos se unen por (avión, origen, destino, salida UTC); la segunda no pierde lo que ya se sabía (pax, nº de vuelo).
+- Las dos fotos se unen por (avión, origen, destino, salida UTC) o, si cambió la hora, por avión+ruta+día cuando hay uno solo; la segunda no pierde lo que ya se sabía (pax, nº de vuelo).
 - Foto nueva sustituye a la vieja; un día solo pierde vuelos si viene en `replace_days`. Un día con vuelos deja de ser ROT.
 - `flightStatus`: cada vuelo trae `scheduled | in_flight | landed` contra AHORA (y `arrival_estimated` si no hay llegada: bloque de 3 h).
 
@@ -45,4 +45,4 @@ Reglas (`core/agenda.js`, con tests):
 
 - La app pide PIN + código de Telegram: no se pueden ver sus pantallas con datos reales desde una sesión de código.
 - Tras subir un deploy, el móvil puede seguir con la versión vieja hasta cerrar del todo la app (KNOWN_PROBLEMS: service worker).
-- Si una foto trae horas UPDATED que cambian de día, el vuelo viejo queda hasta que un `replace_days` lo retire.
+- Un vuelo UPDATED (misma ruta y día, otra hora) se actualiza solo y `agenda_save` devuelve `changes`. Si la hora lo pasa a OTRO día, el viejo queda hasta que un `replace_days` lo retire.
